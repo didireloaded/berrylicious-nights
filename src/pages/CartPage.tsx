@@ -1,25 +1,41 @@
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/vibe";
 import { Minus, Plus, X } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { toast } from "sonner";
 
 const CartPage = () => {
   const { items, updateQuantity, removeItem, totalPrice, clearCart } = useCart();
+  const { user } = useAuth();
   const [ordered, setOrdered] = useState(false);
   const deliveryFee = items.length > 0 ? 20 : 0;
 
-  const handleCheckout = () => {
-    const order = {
-      items: items.map((i) => ({ name: i.name, qty: i.quantity, price: i.price })),
-      total: totalPrice + deliveryFee,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-    };
+  const handleCheckout = async () => {
+    const orderItems = items.map((i) => ({ name: i.name, qty: i.quantity, price: i.price }));
+    const total = totalPrice + deliveryFee;
+
+    // Save to database
+    const { error } = await supabase.from("orders").insert({
+      user_id: user?.id || null,
+      items: orderItems,
+      total,
+    });
+
+    if (error) {
+      toast.error("Something went wrong. Try again.");
+      return;
+    }
+
+    // Also save to localStorage for backward compatibility
+    const order = { items: orderItems, total, status: "pending", createdAt: new Date().toISOString() };
     const existing = JSON.parse(localStorage.getItem("berrylicious-orders") || "[]");
     existing.push(order);
     localStorage.setItem("berrylicious-orders", JSON.stringify(existing));
+
     clearCart();
     setOrdered(true);
   };

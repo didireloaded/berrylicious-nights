@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalendarDays, Minus, Plus, Clock } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const timeSlots = [
   { time: "18:00", label: "Quiet" },
@@ -11,20 +14,50 @@ const timeSlots = [
 
 const BookingPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [date, setDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [guests, setGuests] = useState(2);
   const [specialRequests, setSpecialRequests] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!date || !selectedTime) return;
-    const bookingData = { date, time: selectedTime, guests, specialRequests, createdAt: new Date().toISOString() };
+    if (!user && !guestName.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+
+    setLoading(true);
+    const bookingData = {
+      user_id: user?.id || null,
+      guest_name: user ? null : guestName,
+      guest_phone: user ? null : guestPhone,
+      date,
+      time: selectedTime,
+      guests,
+      special_requests: specialRequests || null,
+    };
+
+    const { error } = await supabase.from("bookings").insert(bookingData);
+
+    if (error) {
+      toast.error("Something went wrong. Try again.");
+      setLoading(false);
+      return;
+    }
+
+    // Also save to localStorage for backward compatibility
+    const localData = { date, time: selectedTime, guests, specialRequests, createdAt: new Date().toISOString() };
     const existing = JSON.parse(localStorage.getItem("berrylicious-bookings") || "[]");
-    existing.push(bookingData);
+    existing.push(localData);
     localStorage.setItem("berrylicious-bookings", JSON.stringify(existing));
-    navigate("/booking/success", { state: bookingData });
+
+    navigate("/booking/success", { state: localData });
   };
 
   return (
@@ -89,6 +122,32 @@ const BookingPage = () => {
         </div>
       </div>
 
+      {/* Guest info (only if not logged in) */}
+      {!user && (
+        <div className="mb-6 space-y-4 animate-fade-in">
+          <div>
+            <label className="text-sm text-muted-foreground font-medium mb-2 block">Your Name</label>
+            <input
+              type="text"
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+              placeholder="Enter your name"
+              className="w-full bg-card border border-border rounded-lg py-3 px-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground font-medium mb-2 block">Phone (optional)</label>
+            <input
+              type="tel"
+              value={guestPhone}
+              onChange={(e) => setGuestPhone(e.target.value)}
+              placeholder="+264 81 234 5678"
+              className="w-full bg-card border border-border rounded-lg py-3 px-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Special Requests */}
       <div className="mb-8 animate-fade-in">
         <label className="text-sm text-muted-foreground font-medium mb-2 block">Any special requests? (optional)</label>
@@ -103,10 +162,10 @@ const BookingPage = () => {
       {/* Confirm */}
       <button
         onClick={handleConfirm}
-        disabled={!date || !selectedTime}
+        disabled={!date || !selectedTime || loading}
         className="w-full bg-primary text-primary-foreground font-semibold py-4 rounded-lg hover:opacity-90 transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        Confirm Booking
+        {loading ? "Booking..." : "Confirm Booking"}
       </button>
     </div>
   );
