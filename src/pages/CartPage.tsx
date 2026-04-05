@@ -3,27 +3,60 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/vibe";
 import { Minus, Plus, X } from "lucide-react";
-import EmptyState from "@/components/EmptyState";
-import { Link } from "react-router-dom";
+import { menuItems } from "@/data/menu";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { toast } from "sonner";
 
+const SuggestionItem = ({ item }: { item: any }) => {
+  const { addItem } = useCart();
+  const [added, setAdded] = useState(false);
+
+  const handleAdd = () => {
+    addItem(item);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1200);
+  };
+
+  return (
+    <div className="flex items-center gap-3 bg-card border border-border rounded-lg p-3 animate-fade-in">
+      <img src={item.image} alt={item.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-foreground font-semibold text-sm truncate">{item.name}</p>
+        <p className="text-muted-foreground text-xs truncate">{item.description}</p>
+        <p className="text-primary font-semibold text-sm mt-0.5">{formatPrice(item.price)}</p>
+      </div>
+      <button
+        onClick={handleAdd}
+        className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 ${
+          added
+            ? "bg-green-600/20 text-green-400 border border-green-600/30"
+            : "bg-primary text-primary-foreground hover:opacity-90"
+        }`}
+      >
+        {added ? "Added ✓" : "Add"}
+      </button>
+    </div>
+  );
+};
+
 const CartPage = () => {
   const { items, updateQuantity, removeItem, totalPrice, clearCart } = useCart();
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
+  const navigate = useNavigate();
   const [ordered, setOrdered] = useState(false);
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const deliveryFee = items.length > 0 ? 20 : 0;
 
   const handleCheckout = async () => {
     const orderItems = items.map((i) => ({ name: i.name, qty: i.quantity, price: i.price }));
     const total = totalPrice + deliveryFee;
 
-    // Save to database
-    const { error } = await supabase.from("orders").insert({
+    const { data, error } = await supabase.from("orders").insert({
       user_id: user?.id || null,
       items: orderItems,
       total,
-    });
+    }).select("id").single();
 
     if (error) {
       toast.error("Something went wrong. Try again.");
@@ -37,6 +70,8 @@ const CartPage = () => {
     localStorage.setItem("berrylicious-orders", JSON.stringify(existing));
 
     clearCart();
+    if (refreshProfile) await refreshProfile();
+    setLastOrderId(data?.id || null);
     setOrdered(true);
   };
 
@@ -45,19 +80,54 @@ const CartPage = () => {
       <div className="min-h-screen flex flex-col items-center justify-center px-6 max-w-lg mx-auto text-center animate-fade-in">
         <span className="text-5xl mb-4">📋</span>
         <h1 className="font-display text-3xl font-bold text-foreground mb-2">Got your order — we're on it.</h1>
-        <p className="text-muted-foreground mb-8">You'll see updates on your profile page.</p>
-        <Link to="/" className="bg-primary text-primary-foreground font-semibold py-3 px-8 rounded-lg hover:opacity-90 transition-opacity">
-          Back to Home
-        </Link>
+        <p className="text-muted-foreground mb-8">You'll get live updates as we prepare it.</p>
+        <div className="flex gap-3 w-full">
+          {lastOrderId && (
+            <Link
+              to={`/order/${lastOrderId}`}
+              className="flex-1 bg-primary text-primary-foreground font-semibold py-3 rounded-lg text-center hover:opacity-90 transition-opacity"
+            >
+              Track Order →
+            </Link>
+          )}
+          <Link to="/" className="flex-1 border border-border text-foreground font-semibold py-3 rounded-lg text-center hover:bg-card transition-colors">
+            Back to Home
+          </Link>
+        </div>
       </div>
     );
   }
 
   if (items.length === 0) {
+    const popular = menuItems.filter((i) => i.popular).slice(0, 3);
+
     return (
-      <div className="min-h-screen pb-24 px-6 pt-6 max-w-lg mx-auto">
+      <div className="min-h-screen pb-24 px-6 pt-6 max-w-lg mx-auto animate-fade-in">
         <h1 className="font-display text-3xl font-bold mb-8">Your Order</h1>
-        <EmptyState message="Your cart is empty 🍽️" actionLabel="Browse Menu →" actionTo="/menu" />
+
+        {/* Empty state */}
+        <div className="text-center py-8 mb-8">
+          <div className="text-5xl mb-4">🍽️</div>
+          <p className="text-foreground font-semibold mb-1">Your cart is empty</p>
+          <p className="text-muted-foreground text-sm">Start with something popular</p>
+        </div>
+
+        {/* Suggestions */}
+        <div>
+          <h2 className="font-display text-lg font-semibold mb-3">Popular right now</h2>
+          <div className="space-y-3">
+            {popular.map((item) => (
+              <SuggestionItem key={item.id} item={item} />
+            ))}
+          </div>
+        </div>
+
+        <Link
+          to="/menu"
+          className="block w-full border border-primary text-primary font-semibold py-3.5 rounded-lg text-center hover:bg-primary/10 transition-colors mt-6"
+        >
+          Browse Full Menu →
+        </Link>
       </div>
     );
   }

@@ -51,7 +51,6 @@ const BookingPage = () => {
       return;
     }
 
-    // Also save to localStorage for backward compatibility
     const localData = { date, time: selectedTime, guests, specialRequests, createdAt: new Date().toISOString() };
     const existing = JSON.parse(localStorage.getItem("berrylicious-bookings") || "[]");
     existing.push(localData);
@@ -62,7 +61,10 @@ const BookingPage = () => {
 
   return (
     <div className="min-h-screen pb-24 px-6 pt-6 max-w-lg mx-auto">
-      <h1 className="font-display text-3xl font-bold mb-8">Book a Table</h1>
+      <h1 className="font-display text-3xl font-bold mb-2">Book a Table</h1>
+      <p className="text-muted-foreground text-sm mb-8">
+        Tables fill up quickly after 19:00 — secure yours now.
+      </p>
 
       {/* Suggested Times */}
       <div className="mb-8 animate-fade-in">
@@ -72,9 +74,9 @@ const BookingPage = () => {
             <button
               key={slot.time}
               onClick={() => setSelectedTime(slot.time)}
-              className={`shrink-0 px-4 py-3 rounded-lg text-sm font-medium border transition-colors flex items-center gap-2 ${
+              className={`shrink-0 px-4 py-3 rounded-lg text-sm font-medium border transition-all flex items-center gap-2 ${
                 selectedTime === slot.time
-                  ? "bg-primary text-primary-foreground border-primary"
+                  ? "bg-primary text-primary-foreground border-primary scale-105 shadow-lg shadow-primary/20"
                   : "bg-card text-foreground border-border hover:border-primary/40"
               }`}
             >

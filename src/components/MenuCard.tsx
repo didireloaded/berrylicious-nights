@@ -3,19 +3,25 @@ import { useCart } from "@/context/CartContext";
 import type { MenuItem } from "@/data/menu";
 import { formatPrice } from "@/lib/vibe";
 import { Plus } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const MenuCard = ({ item }: { item: MenuItem }) => {
   const { addItem } = useCart();
   const [pulse, setPulse] = useState(false);
 
-  const handleAdd = () => {
+  const handleAdd = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     addItem(item);
     setPulse(true);
     setTimeout(() => setPulse(false), 400);
   };
 
   return (
-    <div className="group bg-card rounded-lg overflow-hidden border border-border hover:border-primary/30 transition-colors animate-fade-in">
+    <Link
+      to={`/menu/${item.id}`}
+      className="group bg-card rounded-lg overflow-hidden border border-border hover:border-primary/30 transition-all animate-fade-in hover:-translate-y-0.5"
+    >
       <div className="relative overflow-hidden aspect-[16/10]">
         <img
           src={item.image}
@@ -44,7 +50,7 @@ const MenuCard = ({ item }: { item: MenuItem }) => {
         </div>
         <p className="text-primary font-semibold mt-1">{formatPrice(item.price)}</p>
       </div>
-    </div>
+    </Link>
   );
 };
 
