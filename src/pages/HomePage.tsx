@@ -25,6 +25,7 @@ const HomePage = () => {
   const { addItem } = useCart();
   const { user, profile } = useAuth();
   const [updates, setUpdates] = useState<Update[]>([]);
+  const [videoError, setVideoError] = useState(true); // default to image until video URL provided
 
   useEffect(() => {
     const fetchUpdates = async () => {
@@ -46,7 +47,21 @@ const HomePage = () => {
     <div className="min-h-screen pb-20">
       {/* Hero */}
       <section className="relative h-screen max-h-[800px] min-h-[600px]">
-        <img src={heroImage} alt="Berrylicious restaurant interior" className="absolute inset-0 w-full h-full object-cover" width={1920} height={1080} />
+        {!videoError ? (
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            onError={() => setVideoError(true)}
+            className="absolute inset-0 w-full h-full object-cover"
+            poster={heroImage}
+          >
+            {/* Add video source URL when available */}
+          </video>
+        ) : (
+          <img src={heroImage} alt="Berrylicious restaurant interior" className="absolute inset-0 w-full h-full object-cover" width={1920} height={1080} />
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/50 to-background" />
         <div className="relative h-full flex flex-col justify-end px-6 pb-12 max-w-lg mx-auto">
           <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-2">
@@ -59,10 +74,21 @@ const HomePage = () => {
             <Star className="w-4 h-4 text-primary fill-primary" /> 4.5 • Freedom Plaza, Windhoek
           </p>
 
-          {/* Vibe line */}
-          <div className="bg-surface/80 backdrop-blur-sm border border-border rounded-lg px-4 py-3 mb-6 mt-4">
-            <p className="text-foreground text-sm font-medium">{vibeLine}</p>
+          {/* Vibe block — richer */}
+          <div className="bg-surface/80 backdrop-blur-sm border border-primary/20 rounded-lg px-4 py-4 mb-6 mt-4">
+            <p className="text-primary text-xs font-bold uppercase tracking-widest mb-1">Tonight</p>
+            <p className="text-foreground text-lg font-semibold leading-tight">
+              {updates.length > 0 ? updates[0].title : "Live DJ • Limited tables"}
+            </p>
+            <p className="text-muted-foreground text-sm mt-1">
+              {updates.length > 0 && updates[0].subtitle ? updates[0].subtitle : "Best time: 19:30"}
+            </p>
           </div>
+
+          {/* Urgency */}
+          <p className="text-muted-foreground text-xs mb-3 text-center">
+            Almost fully booked tonight — secure your table
+          </p>
 
           {/* CTAs */}
           <div className="flex gap-3">
@@ -102,21 +128,21 @@ const HomePage = () => {
           <h2 className="font-display text-2xl font-semibold mb-4">Featured Dishes</h2>
           <div className="flex gap-4 overflow-x-auto pb-2 -mx-6 px-6 snap-x snap-mandatory scrollbar-hide">
             {featured.map((item) => (
-              <div key={item.id} className="min-w-[200px] snap-start bg-card rounded-lg overflow-hidden border border-border flex-shrink-0">
+              <Link key={item.id} to={`/menu/${item.id}`} className="min-w-[200px] snap-start bg-card rounded-lg overflow-hidden border border-border flex-shrink-0 hover:border-primary/30 transition-colors">
                 <img src={item.image} alt={item.name} loading="lazy" className="w-full h-32 object-cover" />
                 <div className="p-3">
                   <h3 className="font-display text-sm font-semibold truncate">{item.name}</h3>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-primary font-semibold text-sm">{formatPrice(item.price)}</span>
                     <button
-                      onClick={() => addItem(item)}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem(item); }}
                       className="w-7 h-7 rounded bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </section>
@@ -154,6 +180,12 @@ const HomePage = () => {
           <p className="font-display text-lg text-foreground">Berrylicious</p>
           <p className="text-muted-foreground text-sm mt-1">Restaurant & Lounge</p>
           <p className="text-muted-foreground text-xs mt-1">Freedom Plaza, City Centre, Windhoek</p>
+          <Link
+            to="/about"
+            className="inline-block text-primary text-sm mt-4 hover:opacity-80 transition-opacity"
+          >
+            About us & hours →
+          </Link>
           <p className="text-muted-foreground text-xs mt-4">© {new Date().getFullYear()} Berrylicious. All rights reserved.</p>
         </footer>
       </div>

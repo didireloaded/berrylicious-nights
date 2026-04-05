@@ -1,16 +1,18 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, UtensilsCrossed, CalendarDays, ShoppingBag, User, Sparkles } from "lucide-react";
+import { Home, UtensilsCrossed, CalendarDays, User, Sparkles, Info } from "lucide-react";
+import { useCart } from "@/context/CartContext";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/menu", icon: UtensilsCrossed, label: "Menu" },
   { to: "/plan", icon: Sparkles, label: "Plan" },
-  { to: "/booking", icon: CalendarDays, label: "Book" },
+  { to: "/about", icon: Info, label: "About" },
   { to: "/profile", icon: User, label: "Profile" },
 ];
 
 const BottomNav = () => {
   const { pathname } = useLocation();
+  const { totalItems } = useCart();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-lg border-t border-border">

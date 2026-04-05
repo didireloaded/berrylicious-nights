@@ -1,4 +1,4 @@
-import { User, Gift, Clock, CalendarDays, LogOut, ChevronRight, Shield } from "lucide-react";
+import { User, Gift, Clock, CalendarDays, LogOut, ChevronRight, Shield, Info } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { formatPrice } from "@/lib/vibe";
 import { useAuth } from "@/context/AuthContext";
@@ -24,7 +24,6 @@ const ProfilePage = () => {
       supabase.from("bookings").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10)
         .then(({ data }) => setBookings(data ?? []));
     } else {
-      // Fallback to localStorage for guests
       setOrders(JSON.parse(localStorage.getItem("berrylicious-orders") || "[]").reverse());
       setBookings(JSON.parse(localStorage.getItem("berrylicious-bookings") || "[]").reverse());
     }
@@ -79,6 +78,16 @@ const ProfilePage = () => {
           <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
         </Link>
       )}
+
+      {/* About link */}
+      <Link
+        to="/about"
+        className="flex items-center gap-2 bg-card border border-border rounded-lg p-4 mb-6 hover:border-primary/30 transition-colors"
+      >
+        <Info className="w-5 h-5 text-primary" />
+        <span className="text-foreground font-semibold">About & Opening Hours</span>
+        <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+      </Link>
 
       {/* Loyalty */}
       {user && (
@@ -138,7 +147,7 @@ const ProfilePage = () => {
             {bookings.slice(0, 3).map((b: any, i: number) => (
               <div key={b.id || i} className="flex items-center justify-between text-sm">
                 <span className="text-foreground">
-                  Table for {b.guests} • {new Date(b.date).toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" })} • {b.time}
+                  Table for {b.guests} • {new Date(b.date + "T00:00").toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" })} • {b.time}
                 </span>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
                   b.status === "confirmed" ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
@@ -164,7 +173,12 @@ const ProfilePage = () => {
                   </p>
                   <p className="text-muted-foreground text-xs mt-0.5">{new Date(o.created_at || o.createdAt).toLocaleDateString()}</p>
                 </div>
-                <span className="text-primary font-semibold text-sm">{formatPrice(Number(o.total))}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-primary font-semibold text-sm">{formatPrice(Number(o.total))}</span>
+                  {o.id && o.status !== "completed" && (
+                    <Link to={`/order/${o.id}`} className="text-xs text-primary hover:underline">Track</Link>
+                  )}
+                </div>
               </div>
             ))}
           </div>

@@ -11,10 +11,10 @@ const vibeOptions = [
   { value: "romantic" as Vibe, emoji: "🕯️", label: "Romantic" },
 ];
 
-const suggestions: Record<Vibe, { time: string; dish: string; drink: string }> = {
-  chill: { time: "18:00", dish: "Classic Smash Burger + Loaded Fries", drink: "House lager" },
-  lively: { time: "20:00", dish: "Lamb Chops + Chicken Wings", drink: "Berry Bliss Cocktail" },
-  romantic: { time: "19:30", dish: "Ribeye Steak + Chocolate Lava Cake", drink: "Old Fashioned" },
+const suggestions: Record<Vibe, { time: string; dish: string; drink: string; note: string }> = {
+  chill:    { time: "18:00", dish: "Salmon Tartare + Tofu Bowl",            drink: "House White Wine",    note: "Quiet evening, relaxed pace" },
+  lively:   { time: "21:30", dish: "Tomahawk Steak + Avocado Bruschetta",   drink: "Espresso Martini",    note: "DJ starts at 8 — best energy" },
+  romantic: { time: "19:00", dish: "Beef Carpaccio + Vanilla Panna Cotta",  drink: "Mango Sunrise",      note: "Golden hour on the terrace" },
 };
 
 const PlanMyNightPage = () => {
@@ -121,6 +121,14 @@ const PlanMyNightPage = () => {
               <div>
                 <p className="text-muted-foreground text-xs uppercase tracking-wider">Drinks</p>
                 <p className="text-foreground font-semibold">{result.drink}</p>
+              </div>
+            </div>
+            <div className="border-t border-border" />
+            <div className="flex items-start gap-3">
+              <span className="text-lg">✨</span>
+              <div>
+                <p className="text-muted-foreground text-xs uppercase tracking-wider">Vibe</p>
+                <p className="text-foreground font-semibold">{result.note}</p>
               </div>
             </div>
           </div>
