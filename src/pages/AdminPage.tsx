@@ -2,11 +2,17 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/vibe";
+import { calculateRevenue, type KitchenOrder } from "@/lib/kitchen-ai";
 import { Navigate } from "react-router-dom";
-import { CalendarDays, ShoppingBag, Megaphone, Shield, Plus, Trash2, Check, X, Clock } from "lucide-react";
+import { CalendarDays, ShoppingBag, Megaphone, BarChart3, Plus, Trash2, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import AdminTopBar from "@/components/admin/AdminTopBar";
+import AdminSuggestions from "@/components/admin/AdminSuggestions";
+import KitchenColumn from "@/components/admin/KitchenColumn";
+import OrderDetailPanel from "@/components/admin/OrderDetailPanel";
+import AnalyticsTab from "@/components/admin/AnalyticsTab";
 
-type Tab = "bookings" | "orders" | "kitchen" | "events";
+type Tab = "kitchen" | "bookings" | "orders" | "events" | "analytics";
 
 const statusColors: Record<string, string> = {
   confirmed: "bg-primary/20 text-primary",
@@ -21,8 +27,9 @@ const AdminPage = () => {
   const { user, isAdmin, loading } = useAuth();
   const [tab, setTab] = useState<Tab>("kitchen");
   const [bookings, setBookings] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [updates, setUpdates] = useState<any[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<KitchenOrder | null>(null);
   const [newEvent, setNewEvent] = useState({ title: "", subtitle: "", type: "event" });
   const prevOrderCount = useRef(0);
 
@@ -32,24 +39,13 @@ const AdminPage = () => {
       fetchOrders();
       fetchUpdates();
 
-      // Subscribe to new orders in realtime
       const channel = supabase
         .channel("admin-orders")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "orders" },
-          () => fetchOrders()
-        )
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "bookings" },
-          () => fetchBookings()
-        )
+        .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchOrders())
+        .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, () => fetchBookings())
         .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+      return () => { supabase.removeChannel(channel); };
     }
   }, [isAdmin]);
 
@@ -57,7 +53,6 @@ const AdminPage = () => {
   useEffect(() => {
     if (orders.length > prevOrderCount.current && prevOrderCount.current > 0) {
       toast.success("🔔 New order received!", { duration: 5000 });
-      // Play sound if available
       try {
         const audio = new Audio("data:audio/wav;base64,UklGRl9vT19teleHhYWFhBAAAAQBACAAIAACAAIAJAAA");
         audio.volume = 0.3;
@@ -74,7 +69,7 @@ const AdminPage = () => {
 
   const fetchOrders = async () => {
     const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(50);
-    setOrders(data ?? []);
+    setOrders((data ?? []) as KitchenOrder[]);
   };
 
   const fetchUpdates = async () => {
@@ -90,7 +85,10 @@ const AdminPage = () => {
 
   const updateOrderStatus = async (id: string, status: string) => {
     await supabase.from("orders").update({ status }).eq("id", id);
-    toast.success(`Order marked as ${status}`);
+    toast.success(`Order → ${status}`);
+    if (selectedOrder?.id === id) {
+      setSelectedOrder(prev => prev ? { ...prev, status } : null);
+    }
     fetchOrders();
   };
 
@@ -125,80 +123,84 @@ const AdminPage = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
   if (!user || !isAdmin) return <Navigate to="/" replace />;
 
-  // Kitchen view: split orders by status
-  const pendingOrders = orders.filter((o) => o.status === "pending");
-  const preparingOrders = orders.filter((o) => o.status === "preparing");
-  const readyOrders = orders.filter((o) => o.status === "ready");
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayBookings = bookings.filter(b => b.date === todayStr);
+  const revenue = calculateRevenue(orders);
+
+  const pendingOrders = orders.filter(o => o.status === "pending");
+  const preparingOrders = orders.filter(o => o.status === "preparing");
+  const readyOrders = orders.filter(o => o.status === "ready");
+  const activeCount = pendingOrders.length + preparingOrders.length;
 
   const tabs = [
-    { id: "kitchen" as Tab, label: "Kitchen", icon: ShoppingBag, count: pendingOrders.length + preparingOrders.length },
-    { id: "bookings" as Tab, label: "Bookings", icon: CalendarDays, count: bookings.length },
+    { id: "kitchen" as Tab, label: "Kitchen", icon: ShoppingBag, count: activeCount },
+    { id: "bookings" as Tab, label: "Bookings", icon: CalendarDays, count: todayBookings.length },
     { id: "orders" as Tab, label: "All Orders", icon: ShoppingBag, count: orders.length },
     { id: "events" as Tab, label: "Events", icon: Megaphone, count: updates.length },
+    { id: "analytics" as Tab, label: "Analytics", icon: BarChart3, count: null },
   ];
 
   return (
-    <div className="min-h-screen pb-24 px-6 pt-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-2 mb-6">
-        <Shield className="w-6 h-6 text-primary" />
-        <h1 className="font-display text-2xl font-bold">Admin Dashboard</h1>
-      </div>
+    <div className="min-h-screen pb-24 px-4 md:px-6 pt-4 max-w-7xl mx-auto">
+      {/* Top Bar */}
+      <AdminTopBar orders={orders} bookingsToday={todayBookings.length} revenue={revenue} />
+
+      {/* AI Suggestions */}
+      <AdminSuggestions orders={orders} />
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto">
+      <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
         {tabs.map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => { setTab(t.id); setSelectedOrder(null); }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${
               tab === t.id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground border border-border"
             }`}
           >
             <t.icon className="w-4 h-4" />
             {t.label}
-            <span className="text-xs opacity-70">({t.count})</span>
+            {t.count !== null && <span className="text-xs opacity-70">({t.count})</span>}
           </button>
         ))}
       </div>
 
-      {/* Kitchen View — 3 columns */}
+      {/* Kitchen View — 3 columns + detail panel */}
       {tab === "kitchen" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Pending */}
-          <div>
-            <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
-              📋 New <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">{pendingOrders.length}</span>
-            </h3>
-            <div className="space-y-3">
-              {pendingOrders.map((o) => (
-                <KitchenCard key={o.id} order={o} onStatusChange={updateOrderStatus} onSetETA={setOrderETA} />
-              ))}
-            </div>
+        <div className="flex gap-4">
+          <div className="flex-1 flex gap-3 min-w-0">
+            <KitchenColumn
+              title="New" emoji="📋" orders={pendingOrders}
+              colorClass="bg-primary/20 text-primary"
+              selectedId={selectedOrder?.id ?? null}
+              onSelect={setSelectedOrder} onStatusChange={updateOrderStatus}
+            />
+            <KitchenColumn
+              title="Preparing" emoji="👨‍🍳" orders={preparingOrders}
+              colorClass="bg-yellow-500/20 text-yellow-400"
+              selectedId={selectedOrder?.id ?? null}
+              onSelect={setSelectedOrder} onStatusChange={updateOrderStatus}
+            />
+            <KitchenColumn
+              title="Ready" emoji="🔥" orders={readyOrders}
+              colorClass="bg-green-500/20 text-green-400"
+              selectedId={selectedOrder?.id ?? null}
+              onSelect={setSelectedOrder} onStatusChange={updateOrderStatus}
+            />
           </div>
 
-          {/* Preparing */}
-          <div>
-            <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
-              👨‍🍳 Preparing <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">{preparingOrders.length}</span>
-            </h3>
-            <div className="space-y-3">
-              {preparingOrders.map((o) => (
-                <KitchenCard key={o.id} order={o} onStatusChange={updateOrderStatus} onSetETA={setOrderETA} />
-              ))}
+          {/* Detail Panel */}
+          {selectedOrder && (
+            <div className="w-80 shrink-0 hidden md:block">
+              <OrderDetailPanel
+                order={selectedOrder}
+                activeOrderCount={activeCount}
+                onClose={() => setSelectedOrder(null)}
+                onStatusChange={updateOrderStatus}
+                onSetETA={setOrderETA}
+              />
             </div>
-          </div>
-
-          {/* Ready */}
-          <div>
-            <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
-              🔥 Ready <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">{readyOrders.length}</span>
-            </h3>
-            <div className="space-y-3">
-              {readyOrders.map((o) => (
-                <KitchenCard key={o.id} order={o} onStatusChange={updateOrderStatus} onSetETA={setOrderETA} />
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -270,21 +272,18 @@ const AdminPage = () => {
       {/* Events */}
       {tab === "events" && (
         <div className="space-y-4">
-          {/* Add new */}
           <div className="bg-card border border-border rounded-lg p-4 space-y-3">
             <h3 className="text-foreground font-semibold text-sm flex items-center gap-2">
               <Plus className="w-4 h-4 text-primary" /> Add Event / Special
             </h3>
             <input
-              type="text"
-              value={newEvent.title}
+              type="text" value={newEvent.title}
               onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
               placeholder="Event title"
               className="w-full bg-surface border border-border rounded-lg py-2 px-3 text-foreground text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary"
             />
             <input
-              type="text"
-              value={newEvent.subtitle}
+              type="text" value={newEvent.subtitle}
               onChange={(e) => setNewEvent({ ...newEvent, subtitle: e.target.value })}
               placeholder="Subtitle / details"
               className="w-full bg-surface border border-border rounded-lg py-2 px-3 text-foreground text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary"
@@ -307,7 +306,6 @@ const AdminPage = () => {
             </button>
           </div>
 
-          {/* List */}
           {updates.map((u) => (
             <div key={u.id} className="bg-card border border-border rounded-lg p-4 flex items-start justify-between">
               <div>
@@ -321,7 +319,6 @@ const AdminPage = () => {
                   className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${
                     u.active ? "bg-green-500/20 text-green-400" : "bg-muted text-muted-foreground"
                   }`}
-                  title={u.active ? "Deactivate" : "Activate"}
                 >
                   {u.active ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
                 </button>
@@ -333,73 +330,21 @@ const AdminPage = () => {
           ))}
         </div>
       )}
-    </div>
-  );
-};
 
-// Kitchen Card component
-const KitchenCard = ({
-  order,
-  onStatusChange,
-  onSetETA,
-}: {
-  order: any;
-  onStatusChange: (id: string, status: string) => void;
-  onSetETA: (id: string, minutes: number) => void;
-}) => {
-  const nextStatus: Record<string, string> = {
-    pending: "preparing",
-    preparing: "ready",
-    ready: "completed",
-  };
+      {/* Analytics */}
+      {tab === "analytics" && <AnalyticsTab orders={orders} bookings={bookings} />}
 
-  const nextLabel: Record<string, string> = {
-    pending: "Start →",
-    preparing: "Ready →",
-    ready: "Complete →",
-  };
-
-  return (
-    <div className="bg-card border border-border rounded-lg p-4">
-      <div className="flex items-start justify-between mb-2">
-        <div>
-          <p className="text-foreground font-semibold text-sm">{formatPrice(order.total)}</p>
-          <p className="text-muted-foreground text-xs mt-0.5">
-            {Array.isArray(order.items) ? order.items.map((i: any) => `${i.name} ×${i.qty}`).join(", ") : "Items"}
-          </p>
-          <p className="text-muted-foreground text-xs mt-0.5">
-            {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </p>
+      {/* Mobile detail drawer */}
+      {selectedOrder && tab === "kitchen" && (
+        <div className="fixed inset-0 z-50 md:hidden bg-background/95 p-4 overflow-y-auto">
+          <OrderDetailPanel
+            order={selectedOrder}
+            activeOrderCount={activeCount}
+            onClose={() => setSelectedOrder(null)}
+            onStatusChange={updateOrderStatus}
+            onSetETA={setOrderETA}
+          />
         </div>
-      </div>
-
-      {/* ETA controls for preparing */}
-      {order.status === "preparing" && (
-        <div className="flex gap-1 mb-3">
-          {[10, 15, 20, 30].map((mins) => (
-            <button
-              key={mins}
-              onClick={() => onSetETA(order.id, mins)}
-              className={`text-xs px-2 py-1 rounded border transition-colors flex items-center gap-1 ${
-                (order as any).eta_minutes === mins
-                  ? "border-primary text-primary bg-primary/10"
-                  : "border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Clock className="w-3 h-3" />
-              {mins}m
-            </button>
-          ))}
-        </div>
-      )}
-
-      {nextStatus[order.status] && (
-        <button
-          onClick={() => onStatusChange(order.id, nextStatus[order.status])}
-          className="w-full bg-primary text-primary-foreground text-sm font-semibold py-2 rounded-lg hover:opacity-90 transition-opacity active:scale-[0.97]"
-        >
-          {nextLabel[order.status]}
-        </button>
       )}
     </div>
   );
