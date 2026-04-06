@@ -16,6 +16,13 @@ const OrderTrackingPage = () => {
   const { id } = useParams();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const prevStatus = useRef<string | null>(null);
+
+  const statusMessages: Record<string, string> = {
+    preparing: "👨‍🍳 Your order is being prepared!",
+    ready: "🔥 Your order is ready for pickup!",
+    completed: "✅ Order complete — enjoy your meal!",
+  };
 
   useEffect(() => {
     if (!id) return;
