@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/vibe";
 import { ArrowLeft, Clock } from "lucide-react";
 import { toast } from "sonner";
-import { ArrowLeft, Clock } from "lucide-react";
 
 const statusSteps = [
   { key: "pending", emoji: "📋", label: "Got your order", desc: "We're reviewing it now" },
