@@ -1,8 +1,9 @@
 import { useParams, Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/vibe";
 import { ArrowLeft, Clock } from "lucide-react";
+import { toast } from "sonner";
 
 const statusSteps = [
   { key: "pending", emoji: "📋", label: "Got your order", desc: "We're reviewing it now" },
@@ -15,6 +16,13 @@ const OrderTrackingPage = () => {
   const { id } = useParams();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const prevStatus = useRef<string | null>(null);
+
+  const statusMessages: Record<string, string> = {
+    preparing: "👨‍🍳 Your order is being prepared!",
+    ready: "🔥 Your order is ready for pickup!",
+    completed: "✅ Order complete — enjoy your meal!",
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -27,6 +35,7 @@ const OrderTrackingPage = () => {
         .eq("id", id)
         .single();
       setOrder(data);
+      prevStatus.current = data?.status ?? null;
       setLoading(false);
     };
     fetchOrder();
@@ -43,7 +52,13 @@ const OrderTrackingPage = () => {
           filter: `id=eq.${id}`,
         },
         (payload) => {
-          setOrder(payload.new);
+          const newOrder = payload.new as any;
+          const newStatus = newOrder.status;
+          if (prevStatus.current && newStatus !== prevStatus.current && statusMessages[newStatus]) {
+            toast.success(statusMessages[newStatus], { duration: 6000 });
+          }
+          prevStatus.current = newStatus;
+          setOrder(newOrder);
         }
       )
       .subscribe();
