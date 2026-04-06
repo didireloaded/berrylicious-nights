@@ -35,6 +35,7 @@ const OrderTrackingPage = () => {
         .eq("id", id)
         .single();
       setOrder(data);
+      prevStatus.current = data?.status ?? null;
       setLoading(false);
     };
     fetchOrder();
