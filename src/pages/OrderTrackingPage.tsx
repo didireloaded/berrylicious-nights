@@ -51,7 +51,13 @@ const OrderTrackingPage = () => {
           filter: `id=eq.${id}`,
         },
         (payload) => {
-          setOrder(payload.new);
+          const newOrder = payload.new as any;
+          const newStatus = newOrder.status;
+          if (prevStatus.current && newStatus !== prevStatus.current && statusMessages[newStatus]) {
+            toast.success(statusMessages[newStatus], { duration: 6000 });
+          }
+          prevStatus.current = newStatus;
+          setOrder(newOrder);
         }
       )
       .subscribe();
