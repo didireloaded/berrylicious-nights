@@ -37,7 +37,7 @@ export async function ensureRestaurantChat(
   supabase: SupabaseClient<Database>,
   userId: string,
 ): Promise<{ chatId: string | null; error: string | null }> {
-  const { data: rpcId, error: rpcErr } = await supabase.rpc("ensure_restaurant_chat_for_me");
+  const { data: rpcId, error: rpcErr } = await (supabase as any).rpc("ensure_restaurant_chat_for_me");
 
   if (!rpcErr && typeof rpcId === "string" && rpcId.length > 0) {
     return { chatId: rpcId, error: null };
