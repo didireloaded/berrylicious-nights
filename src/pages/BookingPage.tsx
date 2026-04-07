@@ -134,14 +134,14 @@ const BookingPage = () => {
     }
     setWaitlistBusy(true);
     try {
-      const { data, error } = await supabase.rpc("join_waitlist", {
+      const { data, error } = await (supabase as any).rpc("join_waitlist", {
         p_party_size: guests,
         p_preferred_date: date,
         p_guest_name: name,
         p_guest_phone: phone,
       });
       if (error) throw error;
-      const j = data as { position?: number; estimated_wait_minutes?: number } | null;
+      const j = data as unknown as { position?: number; estimated_wait_minutes?: number } | null;
       setWaitlistSnap({
         position: Number(j?.position) || 1,
         est: Number(j?.estimated_wait_minutes) || 15,

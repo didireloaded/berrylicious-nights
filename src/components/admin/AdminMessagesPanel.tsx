@@ -28,7 +28,7 @@ export function AdminMessagesPanel() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const fetchChats = useCallback(async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("restaurant_chats")
       .select("id, user_id, updated_at, profiles(display_name)")
       .order("updated_at", { ascending: false });
@@ -36,7 +36,7 @@ export function AdminMessagesPanel() {
       toast.error(error.message);
       return;
     }
-    setChats((data ?? []) as ChatListRow[]);
+    setChats((data ?? []) as unknown as ChatListRow[]);
   }, []);
 
   const loadMessages = useCallback(async (chatId: string) => {
