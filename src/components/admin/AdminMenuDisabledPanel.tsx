@@ -29,7 +29,7 @@ export function AdminMenuDisabledPanel() {
 
   const toggle = async (menuItemId: string, isOff: boolean) => {
     if (isOff) {
-      const { error } = await supabase.from("menu_item_disabled").delete().eq("menu_item_id", menuItemId);
+      const { error } = await (supabase as any).from("menu_item_disabled").delete().eq("menu_item_id", menuItemId);
       if (error) toast.error(error.message);
       else toast.success("Item available again");
     } else {
