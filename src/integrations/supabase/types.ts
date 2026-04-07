@@ -16,6 +16,9 @@ export type Database = {
     Tables: {
       bookings: {
         Row: {
+          arrival_code: string | null
+          arrival_verified_at: string | null
+          assigned_table_code: string | null
           created_at: string
           date: string
           guest_name: string | null
@@ -29,6 +32,9 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          arrival_code?: string | null
+          arrival_verified_at?: string | null
+          assigned_table_code?: string | null
           created_at?: string
           date: string
           guest_name?: string | null
@@ -42,6 +48,9 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          arrival_code?: string | null
+          arrival_verified_at?: string | null
+          assigned_table_code?: string | null
           created_at?: string
           date?: string
           guest_name?: string | null
@@ -58,25 +67,40 @@ export type Database = {
       }
       orders: {
         Row: {
+          arrival_code: string | null
+          arrival_verified_at: string | null
           created_at: string
+          eta_minutes: number | null
+          eta_set_at: string | null
           id: string
           items: Json
+          order_type: string | null
           status: string
           total: number
           user_id: string | null
         }
         Insert: {
+          arrival_code?: string | null
+          arrival_verified_at?: string | null
           created_at?: string
+          eta_minutes?: number | null
+          eta_set_at?: string | null
           id?: string
           items: Json
+          order_type?: string | null
           status?: string
           total: number
           user_id?: string | null
         }
         Update: {
+          arrival_code?: string | null
+          arrival_verified_at?: string | null
           created_at?: string
+          eta_minutes?: number | null
+          eta_set_at?: string | null
           id?: string
           items?: Json
+          order_type?: string | null
           status?: string
           total?: number
           user_id?: string | null
@@ -122,10 +146,69 @@ export type Database = {
         }
         Relationships: []
       }
+      restaurant_chat_messages: {
+        Row: {
+          author_id: string
+          body: string
+          chat_id: string
+          created_at: string
+          from_staff: boolean
+          id: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          chat_id: string
+          created_at?: string
+          from_staff?: boolean
+          id?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          chat_id?: string
+          created_at?: string
+          from_staff?: boolean
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_chat_messages_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "restaurant_chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      restaurant_chats: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       updates: {
         Row: {
           active: boolean
+          available_slots: string[] | null
           created_at: string
+          event_date: string | null
+          event_time: string | null
           expires_at: string | null
           id: string
           subtitle: string | null
@@ -134,7 +217,10 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          available_slots?: string[] | null
           created_at?: string
+          event_date?: string | null
+          event_time?: string | null
           expires_at?: string | null
           id?: string
           subtitle?: string | null
@@ -143,7 +229,10 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          available_slots?: string[] | null
           created_at?: string
+          event_date?: string | null
+          event_time?: string | null
           expires_at?: string | null
           id?: string
           subtitle?: string | null
@@ -167,6 +256,39 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      waitlist_entries: {
+        Row: {
+          created_at: string
+          guest_name: string | null
+          guest_phone: string | null
+          id: string
+          party_size: number
+          preferred_date: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          guest_name?: string | null
+          guest_phone?: string | null
+          id?: string
+          party_size?: number
+          preferred_date: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          guest_name?: string | null
+          guest_phone?: string | null
+          id?: string
+          party_size?: number
+          preferred_date?: string
+          status?: string
+          user_id?: string | null
         }
         Relationships: []
       }
