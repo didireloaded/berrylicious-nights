@@ -5,7 +5,7 @@ export function useMenuAvailability() {
   const [disabledIds, setDisabledIds] = useState<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
-    const { data, error } = await supabase.from("menu_item_disabled").select("menu_item_id");
+    const { data, error } = await (supabase as any).from("menu_item_disabled").select("menu_item_id");
     if (error) {
       console.warn("[useMenuAvailability]", error.message);
       return;

@@ -38,8 +38,8 @@ export async function fetchCrowdSnapshot(isoDate: string): Promise<CrowdSnapshot
   let bookedSlots = 0;
 
   const [countRes, slotsRes] = await Promise.all([
-    supabase.rpc("active_bookings_count", { p_date: isoDate }),
-    supabase.rpc("booked_table_times", { p_date: isoDate }),
+    (supabase as any).rpc("active_bookings_count", { p_date: isoDate }),
+    (supabase as any).rpc("booked_table_times", { p_date: isoDate }),
   ]);
 
   if (countRes.error) {

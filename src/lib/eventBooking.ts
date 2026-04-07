@@ -63,7 +63,7 @@ export function resolveBaseSlots(ev: HomeUpdateRow): string[] {
 }
 
 export async function fetchBookedTimesForDate(date: string): Promise<string[]> {
-  const { data, error } = await supabase.rpc("booked_table_times", { p_date: date });
+  const { data, error } = await (supabase as any).rpc("booked_table_times", { p_date: date });
   if (error) {
     console.warn("[eventBooking] booked_table_times:", error.message);
     return [];

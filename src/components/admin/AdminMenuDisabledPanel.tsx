@@ -33,7 +33,7 @@ export function AdminMenuDisabledPanel() {
       if (error) toast.error(error.message);
       else toast.success("Item available again");
     } else {
-      const { error } = await supabase.from("menu_item_disabled").insert({ menu_item_id: menuItemId });
+      const { error } = await (supabase as any).from("menu_item_disabled").insert({ menu_item_id: menuItemId });
       if (error) toast.error(error.message);
       else toast.success("Item 86'd — hidden in app");
     }
