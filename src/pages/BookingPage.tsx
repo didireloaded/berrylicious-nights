@@ -38,7 +38,7 @@ const BookingPage = () => {
 
   useEffect(() => {
     let cancelled = false;
-    void supabase.rpc("booked_table_times", { p_date: date }).then(({ data }) => {
+    void (supabase as any).rpc("booked_table_times", { p_date: date }).then(({ data }: any) => {
       if (!cancelled) setBookedTimes((data as string[] | null) ?? []);
     });
     return () => {
