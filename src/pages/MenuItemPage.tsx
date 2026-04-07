@@ -1,18 +1,33 @@
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useHref } from "react-router-dom";
 import { menuItems } from "@/data/menu";
 import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/vibe";
-import { ArrowLeft, Minus, Plus, ShoppingBag } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Minus, Plus, Share2, ShoppingBag } from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useMenuAvailability } from "@/hooks/useMenuAvailability";
+import { getUpsellItems } from "@/services/upsell";
 
 const MenuItemPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addItem } = useCart();
+  const { isUnavailable } = useMenuAvailability();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
 
   const item = menuItems.find((i) => i.id === id);
+  const sharePath = useHref(id ? `/menu/${id}` : "/menu");
+  const shareUrl = useMemo(
+    () => (typeof window !== "undefined" ? new URL(sharePath, window.location.href).href : ""),
+    [sharePath],
+  );
+
+  const upsellItems = useMemo(() => {
+    const it = menuItems.find((i) => i.id === id);
+    if (!it) return [];
+    return getUpsellItems(it.id, 5).filter((u) => !isUnavailable(u.id));
+  }, [id, isUnavailable]);
 
   if (!item) {
     return (
@@ -22,18 +37,49 @@ const MenuItemPage = () => {
     );
   }
 
-  const related = menuItems
-    .filter((i) => i.category === item.category && i.id !== item.id)
-    .slice(0, 3);
+  if (isUnavailable(item.id)) {
+    return (
+      <div className="min-h-screen pb-safe-nav px-6 flex flex-col items-center justify-center max-w-lg mx-auto text-center">
+        <p className="font-display text-xl font-bold text-foreground">Off the menu tonight</p>
+        <p className="text-muted-foreground text-sm mt-2">{item.name} isn’t available right now. Pick something else?</p>
+        <Link to="/menu" className="mt-6 text-primary font-semibold">
+          Back to menu
+        </Link>
+      </div>
+    );
+  }
 
   const handleAdd = () => {
     for (let i = 0; i < qty; i++) addItem(item);
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate(10);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `${item.name} · Berrylicious`,
+          text: item.description,
+          url: shareUrl,
+        });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Link copied");
+      } else {
+        toast.error("Sharing isn’t available in this browser.");
+      }
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return;
+      toast.error("Couldn’t share — copy the address from the bar instead.");
+    }
   };
 
   return (
-    <div className="min-h-screen pb-32 animate-fade-in">
+    <div className="pb-safe-nav animate-fade-in">
       {/* Image */}
       <div className="relative">
         <img
@@ -44,17 +90,27 @@ const MenuItemPage = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />
 
         <button
+          type="button"
           onClick={() => navigate(-1)}
-          className="absolute top-4 left-4 w-10 h-10 rounded-full bg-background/80 backdrop-blur flex items-center justify-center"
+          className="absolute top-4 left-4 flex h-10 w-10 items-center justify-center rounded-full bg-background/80 backdrop-blur"
+          aria-label="Back"
         >
-          <ArrowLeft className="w-5 h-5 text-foreground" />
+          <ArrowLeft className="h-5 w-5 text-foreground" />
         </button>
 
-        {item.popular && (
-          <span className="absolute top-4 right-4 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
-            Popular
-          </span>
-        )}
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleShare()}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-background/80 backdrop-blur text-foreground"
+            aria-label="Share this dish"
+          >
+            <Share2 className="h-4 w-4" />
+          </button>
+          {item.popular && (
+            <span className="bg-primary px-3 py-1 text-xs font-bold text-primary-foreground rounded-full">Popular</span>
+          )}
+        </div>
       </div>
 
       <div className="px-6 max-w-lg mx-auto -mt-6 relative">
@@ -99,26 +155,32 @@ const MenuItemPage = () => {
           </button>
         </div>
 
-        {/* Related Items */}
-        {related.length > 0 && (
+        {upsellItems.length > 0 && (
           <div>
-            <h2 className="font-display text-lg font-semibold mb-3">
-              More from {item.category}
-            </h2>
+            <h2 className="font-display text-lg font-semibold mb-1">Goes well with</h2>
+            <p className="text-xs text-muted-foreground mb-3">Drinks and sides guests often add with this dish.</p>
             <div className="space-y-3">
-              {related.map((r) => (
-                <Link
-                  key={r.id}
-                  to={`/menu/${r.id}`}
-                  className="flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/30 transition-colors"
-                >
-                  <img src={r.image} alt={r.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-foreground font-semibold text-sm truncate">{r.name}</p>
-                    <p className="text-muted-foreground text-xs truncate">{r.description}</p>
-                  </div>
-                  <span className="text-primary font-semibold text-sm shrink-0">{formatPrice(r.price)}</span>
-                </Link>
+              {upsellItems.map((r) => (
+                <div key={r.id} className="flex items-center gap-3 bg-card border border-border rounded-lg p-3">
+                  <Link to={`/menu/${r.id}`} className="flex flex-1 min-w-0 items-center gap-3 hover:opacity-90">
+                    <img src={r.image} alt={r.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-foreground font-semibold text-sm truncate">{r.name}</p>
+                      <p className="text-muted-foreground text-xs truncate">{r.description}</p>
+                    </div>
+                    <span className="text-primary font-semibold text-sm shrink-0">{formatPrice(r.price)}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addItem(r);
+                      toast.success(`Added ${r.name}`);
+                    }}
+                    className="shrink-0 rounded-lg bg-primary/15 px-3 py-2 text-xs font-bold text-primary btn-press"
+                  >
+                    Add
+                  </button>
+                </div>
               ))}
             </div>
           </div>

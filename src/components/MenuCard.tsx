@@ -1,57 +1,83 @@
-import { useState } from "react";
+import { memo, useState, useRef } from "react";
 import { useCart } from "@/context/CartContext";
 import type { MenuItem } from "@/data/menu";
 import { formatPrice } from "@/lib/vibe";
 import { Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 
-const MenuCard = ({ item }: { item: MenuItem }) => {
+const MenuCard = memo(function MenuCard({ item, disabled }: { item: MenuItem; disabled?: boolean }) {
   const { addItem } = useCart();
-  const [pulse, setPulse] = useState(false);
+  const [bounce, setBounce] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     addItem(item);
-    setPulse(true);
-    setTimeout(() => setPulse(false), 400);
+
+    setBounce(true);
+    setTimeout(() => setBounce(false), 300);
+
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate(10);
+    }
   };
 
-  return (
-    <Link
-      to={`/menu/${item.id}`}
-      className="group bg-card rounded-lg overflow-hidden border border-border hover:border-primary/30 transition-all animate-fade-in hover:-translate-y-0.5"
-    >
-      <div className="relative overflow-hidden aspect-[16/10]">
+  const inner = (
+    <>
+      <div className="relative overflow-hidden aspect-square">
         <img
           src={item.image}
           alt={item.name}
           loading="lazy"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          decoding="async"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90"
         />
-        {item.popular && (
-          <span className="absolute top-3 left-3 bg-primary text-primary-foreground text-xs font-semibold px-2 py-1 rounded">
+        {disabled ? (
+          <span className="absolute inset-0 flex items-center justify-center bg-background/70 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            Off tonight
+          </span>
+        ) : null}
+        {item.popular && !disabled && (
+          <span className="absolute top-1.5 left-1.5 bg-primary text-primary-foreground text-[9px] font-semibold px-1.5 py-0.5 rounded">
             Popular
           </span>
         )}
       </div>
-      <div className="p-4 flex flex-col gap-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="font-display text-foreground font-semibold truncate">{item.name}</h3>
-            <p className="text-muted-foreground text-sm line-clamp-1">{item.description}</p>
-          </div>
-          <button
-            onClick={handleAdd}
-            className={`shrink-0 w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-all active:scale-95 ${pulse ? "animate-scale-pulse" : ""}`}
-          >
-            <Plus className="w-5 h-5" />
-          </button>
+      <div className="p-1.5">
+        <h3 className="font-display text-foreground text-[11px] sm:text-xs font-semibold truncate leading-tight">{item.name}</h3>
+        <div className="flex items-center justify-between mt-0.5">
+          <span className="text-primary font-semibold text-xs">{formatPrice(item.price)}</span>
+          {!disabled ? (
+            <button
+              ref={btnRef}
+              onClick={handleAdd}
+              className={`shrink-0 w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center btn-press ${bounce ? "animate-scale-bounce" : ""}`}
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <span className="text-[9px] text-muted-foreground">—</span>
+          )}
         </div>
-        <p className="text-primary font-semibold mt-1">{formatPrice(item.price)}</p>
       </div>
+    </>
+  );
+
+  if (disabled) {
+    return (
+      <div className="group bg-card rounded-lg overflow-hidden border border-border opacity-60 pointer-events-none">{inner}</div>
+    );
+  }
+
+  return (
+    <Link
+      to={`/menu/${item.id}`}
+      className="group bg-card rounded-lg overflow-hidden border border-border card-interactive transition-transform duration-150 ease-out active:scale-[0.96] active:ring-2 active:ring-primary/35 active:ring-offset-2 active:ring-offset-background"
+    >
+      {inner}
     </Link>
   );
-};
+});
 
 export default MenuCard;
