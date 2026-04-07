@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
@@ -11,6 +11,8 @@ const AuthPage = () => {
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = (location.state as { from?: string } | null)?.from ?? "/";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +24,7 @@ const AuthPage = () => {
         toast.error(error);
       } else {
         toast.success("Welcome back 👋");
-        navigate("/");
+        navigate(redirectTo, { replace: true });
       }
     } else {
       if (!name.trim()) {
@@ -42,7 +44,7 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 max-w-lg mx-auto">
+    <div className="min-h-screen pb-safe-nav flex flex-col items-center justify-center px-6 max-w-lg mx-auto">
       <h1 className="font-display text-3xl font-bold text-foreground mb-2">
         {isLogin ? "Welcome back" : "Join Berrylicious"}
       </h1>

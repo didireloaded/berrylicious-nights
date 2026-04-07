@@ -1,13 +1,29 @@
 import { Link, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { CalendarDays, Clock, Users } from "lucide-react";
+import { ArrivalCodeCard } from "@/components/ArrivalCodeCard";
+import { useApp } from "@/context/AppContext";
 
 const BookingSuccessPage = () => {
   const location = useLocation();
+  const { setCurrentBooking } = useApp();
   const booking = location.state as {
     date: string;
     time: string;
     guests: number;
+    arrival_code?: string;
+    assigned_table_code?: string;
   } | null;
+
+  useEffect(() => {
+    if (!booking?.date || !booking?.time) return;
+    setCurrentBooking({
+      date: booking.date,
+      time: booking.time,
+      guests: booking.guests,
+      arrival_code: booking.arrival_code,
+    });
+  }, [booking?.date, booking?.time, booking?.guests, booking?.arrival_code, setCurrentBooking]);
 
   const formattedDate = booking?.date
     ? new Date(booking.date + "T00:00").toLocaleDateString("en-ZA", {
@@ -18,7 +34,7 @@ const BookingSuccessPage = () => {
     : null;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 max-w-lg mx-auto text-center animate-fade-in">
+    <div className="min-h-screen pb-safe-nav flex flex-col items-center justify-center px-6 max-w-lg mx-auto text-center animate-fade-in">
 
       {/* Animated checkmark */}
       <div className="w-24 h-24 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center mb-6">
@@ -40,6 +56,14 @@ const BookingSuccessPage = () => {
 
       {booking ? (
         <>
+          {booking.arrival_code ? (
+            <ArrivalCodeCard
+              code={booking.arrival_code}
+              bookingDate={booking.date}
+              bookingTime={booking.time}
+              className="mb-5"
+            />
+          ) : null}
           {/* Booking summary card */}
           <div className="bg-card border border-border rounded-xl p-5 w-full mb-4 text-left space-y-3">
             <div className="flex items-center gap-3">
@@ -67,9 +91,21 @@ const BookingSuccessPage = () => {
                 </p>
               </div>
             </div>
+            {booking.assigned_table_code ? (
+              <>
+                <div className="border-t border-border" />
+                <div>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Table</p>
+                  <p className="text-foreground font-semibold font-mono tracking-wide">{booking.assigned_table_code}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">Auto-assigned for your party size — staff may adjust on arrival.</p>
+                </div>
+              </>
+            ) : null}
           </div>
           <p className="text-muted-foreground text-sm mb-8">
-            We'll remind you 1 hour before. See you then. 🍸
+            {booking.arrival_code
+              ? "Keep the code handy — we’ll match you in seconds at the door."
+              : "We'll remind you 1 hour before. See you then. 🍸"}
           </p>
         </>
       ) : (
@@ -81,13 +117,13 @@ const BookingSuccessPage = () => {
       <div className="flex gap-3 w-full">
         <Link
           to="/menu"
-          className="flex-1 bg-primary text-primary-foreground font-semibold py-4 rounded-lg text-center hover:opacity-90 transition-opacity active:scale-[0.97]"
+          className="flex-1 bg-primary text-primary-foreground font-semibold py-4 rounded-lg text-center btn-press"
         >
           Skip the wait — Pre-order now →
         </Link>
         <Link
           to="/"
-          className="flex-1 border border-border text-foreground font-semibold py-4 rounded-lg text-center hover:bg-card transition-colors active:scale-[0.97]"
+          className="flex-1 border border-border text-foreground font-semibold py-4 rounded-lg text-center hover:bg-card transition-colors btn-press"
         >
           Back to Home
         </Link>

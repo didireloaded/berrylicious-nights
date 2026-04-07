@@ -1,53 +1,32 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
-import BottomNav from "@/components/BottomNav";
-import CartBar from "@/components/CartBar";
-import HomePage from "@/pages/HomePage";
-import MenuPage from "@/pages/MenuPage";
-import MenuItemPage from "@/pages/MenuItemPage";
-import AboutPage from "@/pages/AboutPage";
-import BookingPage from "@/pages/BookingPage";
-import BookingSuccessPage from "@/pages/BookingSuccessPage";
-import CartPage from "@/pages/CartPage";
-import PlanMyNightPage from "@/pages/PlanMyNightPage";
-import ProfilePage from "@/pages/ProfilePage";
-import AuthPage from "@/pages/AuthPage";
-import AdminPage from "@/pages/AdminPage";
-import OrderTrackingPage from "@/pages/OrderTrackingPage";
-import NotFound from "@/pages/NotFound";
+import AppProviders from "@/components/AppProviders";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <CartProvider>
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/menu" element={<MenuPage />} />
-              <Route path="/menu/:id" element={<MenuItemPage />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route path="/booking" element={<BookingPage />} />
-              <Route path="/booking/success" element={<BookingSuccessPage />} />
-              <Route path="/cart" element={<CartPage />} />
-              <Route path="/plan" element={<PlanMyNightPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/auth" element={<AuthPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/order/:id" element={<OrderTrackingPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <CartBar />
-            <BottomNav />
-          </BrowserRouter>
-        </CartProvider>
+        <a
+          href="#main-content"
+          className="fixed left-4 top-4 z-[100] translate-y-[-200%] rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-lg outline-none ring-2 ring-transparent ring-offset-2 ring-offset-background transition-transform focus-visible:translate-y-0 focus-visible:ring-primary"
+        >
+          Skip to main content
+        </a>
+        <Sonner />
+        <AppProviders />
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

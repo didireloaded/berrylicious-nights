@@ -1,3 +1,7 @@
+/**
+ * Menu photos live in `src/assets/` (dish-*.jpg). Replace those files with your own
+ * shots (e.g. from a shoot or export from social) — keep filenames or update imports.
+ */
 import dishBurger from "@/assets/dish-burger.jpg";
 import dishLamb from "@/assets/dish-lamb.jpg";
 import dishCocktail from "@/assets/dish-cocktail.jpg";
@@ -178,6 +182,24 @@ export const menuItems: MenuItem[] = [
     price: 75,
     image: dishCocktail,
     category: "Drinks",
+  },
+  {
+    id: "18",
+    name: "Lamb Chops",
+    description: "Herb-crusted lamb cutlets, roasted vegetables, red wine jus",
+    price: 295,
+    image: dishLamb,
+    category: "Mains",
+    featured: true,
+  },
+  {
+    id: "19",
+    name: "Classic Mojito",
+    description: "White rum, fresh mint, lime, soda — Berrylicious style",
+    price: 85,
+    image: dishCocktail,
+    category: "Drinks",
+    popular: true,
   },
 ];
 

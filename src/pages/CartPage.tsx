@@ -7,6 +7,17 @@ import { menuItems } from "@/data/menu";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { toast } from "sonner";
+import { loadOrderSnapshotFromStorage, saveOrderSnapshotForTracking } from "@/lib/orderTrackingStorage";
+import { useApp } from "@/context/AppContext";
+import { insertOrderWithArrivalCode } from "@/lib/supabaseArrivalInsert";
+
+type OrderType = "preorder" | "pickup" | "dinein";
+
+const orderTypeOptions: { value: OrderType; label: string; desc: string }[] = [
+  { value: "preorder", label: "Pre-order", desc: "Order ahead, food ready when you arrive" },
+  { value: "pickup",   label: "Pickup",    desc: "Order now, collect when ready" },
+  { value: "dinein",   label: "Dine-in",   desc: "Sitting at a table, order via app" },
+];
 
 const SuggestionItem = ({ item }: { item: any }) => {
   const { addItem } = useCart();
@@ -28,13 +39,13 @@ const SuggestionItem = ({ item }: { item: any }) => {
       </div>
       <button
         onClick={handleAdd}
-        className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 ${
+        className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold btn-press ${
           added
             ? "bg-green-600/20 text-green-400 border border-green-600/30"
-            : "bg-primary text-primary-foreground hover:opacity-90"
+            : "bg-primary text-primary-foreground"
         }`}
       >
-        {added ? "Added ✓" : "Add"}
+        {added ? "Added" : "Add"}
       </button>
     </div>
   );
@@ -43,76 +54,101 @@ const SuggestionItem = ({ item }: { item: any }) => {
 const CartPage = () => {
   const { items, updateQuantity, removeItem, totalPrice, clearCart } = useCart();
   const { user, refreshProfile } = useAuth();
+  const { setCurrentOrder } = useApp();
   const navigate = useNavigate();
-  const [ordered, setOrdered] = useState(false);
-  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
+  const [orderType, setOrderType] = useState<OrderType>("pickup");
+  const [submitting, setSubmitting] = useState(false);
   const deliveryFee = items.length > 0 ? 20 : 0;
 
   const handleCheckout = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+
     const orderItems = items.map((i) => ({ name: i.name, qty: i.quantity, price: i.price }));
     const total = totalPrice + deliveryFee;
 
-    const { data, error } = await supabase.from("orders").insert({
-      user_id: user?.id || null,
-      items: orderItems,
-      total,
-    }).select("id").single();
-
-    if (error) {
+    let orderId: string;
+    try {
+      const row = await insertOrderWithArrivalCode({
+        user_id: user?.id || null,
+        items: orderItems,
+        total,
+        order_type: orderType,
+      });
+      orderId = row.id;
+    } catch {
       toast.error("Something went wrong. Try again.");
+      setSubmitting(false);
       return;
     }
 
-    // Also save to localStorage for backward compatibility
-    const order = { items: orderItems, total, status: "pending", createdAt: new Date().toISOString() };
+    const { data: full, error: fetchErr } = await supabase.from("orders").select("*").eq("id", orderId).single();
+    if (fetchErr || !full) {
+      toast.error("Order placed but tracking is unavailable.");
+      setSubmitting(false);
+      return;
+    }
+
+    saveOrderSnapshotForTracking({
+      id: full.id,
+      items: full.items,
+      total: Number(full.total),
+      status: full.status,
+      order_type: full.order_type as string | undefined,
+      eta_minutes: full.eta_minutes as number | null | undefined,
+      eta_set_at: full.eta_set_at as string | null | undefined,
+      created_at: full.created_at,
+      arrival_code: full.arrival_code as string | null | undefined,
+    });
+
+    const snap = loadOrderSnapshotFromStorage(full.id);
+    setCurrentOrder(
+      snap
+        ? { ...snap, id: full.id }
+        : {
+            id: full.id,
+            items: full.items,
+            total: Number(full.total),
+            status: String(full.status ?? "pending"),
+            order_type: full.order_type as string | undefined,
+            eta_minutes: full.eta_minutes as number | null | undefined,
+            eta_set_at: full.eta_set_at as string | null | undefined,
+            created_at: full.created_at,
+            arrival_code: full.arrival_code as string | null | undefined,
+          },
+    );
+
+    const order = {
+      id: full.id,
+      items: orderItems,
+      total,
+      status: "pending",
+      order_type: orderType,
+      createdAt: new Date().toISOString(),
+      arrival_code: full.arrival_code as string | undefined,
+    };
     const existing = JSON.parse(localStorage.getItem("berrylicious-orders") || "[]");
     existing.push(order);
     localStorage.setItem("berrylicious-orders", JSON.stringify(existing));
 
     clearCart();
     if (refreshProfile) await refreshProfile();
-    setLastOrderId(data?.id || null);
-    setOrdered(true);
+    navigate(`/order/${full.id}`);
+    setSubmitting(false);
   };
-
-  if (ordered) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 max-w-lg mx-auto text-center animate-fade-in">
-        <span className="text-5xl mb-4">📋</span>
-        <h1 className="font-display text-3xl font-bold text-foreground mb-2">Got your order — we're on it.</h1>
-        <p className="text-muted-foreground mb-8">You'll get live updates as we prepare it.</p>
-        <div className="flex gap-3 w-full">
-          {lastOrderId && (
-            <Link
-              to={`/order/${lastOrderId}`}
-              className="flex-1 bg-primary text-primary-foreground font-semibold py-3 rounded-lg text-center hover:opacity-90 transition-opacity"
-            >
-              Track Order →
-            </Link>
-          )}
-          <Link to="/" className="flex-1 border border-border text-foreground font-semibold py-3 rounded-lg text-center hover:bg-card transition-colors">
-            Back to Home
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   if (items.length === 0) {
     const popular = menuItems.filter((i) => i.popular).slice(0, 3);
 
     return (
-      <div className="min-h-screen pb-24 px-6 pt-6 max-w-lg mx-auto animate-fade-in">
+      <div className="min-h-screen pb-safe-nav px-6 pt-6 max-w-lg mx-auto animate-fade-in">
         <h1 className="font-display text-3xl font-bold mb-8">Your Order</h1>
 
-        {/* Empty state */}
         <div className="text-center py-8 mb-8">
-          <div className="text-5xl mb-4">🍽️</div>
           <p className="text-foreground font-semibold mb-1">Your cart is empty</p>
           <p className="text-muted-foreground text-sm">Start with something popular</p>
         </div>
 
-        {/* Suggestions */}
         <div>
           <h2 className="font-display text-lg font-semibold mb-3">Popular right now</h2>
           <div className="space-y-3">
@@ -124,17 +160,40 @@ const CartPage = () => {
 
         <Link
           to="/menu"
-          className="block w-full border border-primary text-primary font-semibold py-3.5 rounded-lg text-center hover:bg-primary/10 transition-colors mt-6"
+          className="block w-full border border-primary text-primary font-semibold py-3.5 rounded-lg text-center hover:bg-primary/10 transition-colors mt-6 btn-press"
         >
-          Browse Full Menu →
+          Browse Full Menu
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-24 px-6 pt-6 max-w-lg mx-auto">
+    <div className="min-h-screen pb-safe-nav px-6 pt-6 max-w-lg mx-auto animate-fade-in">
       <h1 className="font-display text-3xl font-bold mb-6">Your Order</h1>
+
+      {/* Order Type Selector */}
+      <div className="mb-6">
+        <p className="text-sm text-muted-foreground font-medium mb-3">How are you ordering?</p>
+        <div className="grid grid-cols-3 gap-2">
+          {orderTypeOptions.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setOrderType(opt.value)}
+              className={`py-3 px-2 rounded-lg text-center text-xs font-semibold border btn-press ${
+                orderType === opt.value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-foreground border-border hover:border-primary/40"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-muted-foreground text-xs mt-2">
+          {orderTypeOptions.find((o) => o.value === orderType)?.desc}
+        </p>
+      </div>
 
       <div className="space-y-4 mb-8">
         {items.map((item) => (
@@ -177,7 +236,7 @@ const CartPage = () => {
           <span>{formatPrice(totalPrice)}</span>
         </div>
         <div className="flex justify-between text-muted-foreground text-sm">
-          <span>Delivery</span>
+          <span>Service fee</span>
           <span>{formatPrice(deliveryFee)}</span>
         </div>
         <div className="border-t border-border pt-2 flex justify-between text-foreground font-semibold">
@@ -188,9 +247,10 @@ const CartPage = () => {
 
       <button
         onClick={handleCheckout}
-        className="w-full bg-primary text-primary-foreground font-semibold py-4 rounded-lg hover:opacity-90 transition-all active:scale-[0.97]"
+        disabled={submitting}
+        className="w-full bg-primary text-primary-foreground font-semibold py-4 rounded-lg btn-press disabled:opacity-50"
       >
-        Place Order
+        {submitting ? "Placing order..." : "Place Order"}
       </button>
     </div>
   );

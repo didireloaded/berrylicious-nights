@@ -8,6 +8,7 @@ interface Profile {
   total_orders: number;
   total_visits: number;
   last_order: any;
+  loyalty_points?: number | null;
 }
 
 interface AuthContextType {
@@ -38,12 +39,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(data);
   };
 
-  const checkAdmin = async (userId: string) => {
-    const { data } = await supabase.rpc("has_role", {
-      _user_id: userId,
-      _role: "admin",
-    });
-    setIsAdmin(!!data);
+  const checkAdmin = async (userId: string, email?: string | null) => {
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (data) {
+      setIsAdmin(true);
+      return;
+    }
+    const devList = (import.meta.env.VITE_DEV_ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    if (import.meta.env.DEV && email && devList.includes(email.toLowerCase())) {
+      setIsAdmin(true);
+      return;
+    }
+    setIsAdmin(false);
   };
 
   const refreshProfile = async () => {
@@ -55,8 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         setTimeout(() => {
-          fetchProfile(session.user.id);
-          checkAdmin(session.user.id);
+          void fetchProfile(session.user.id);
+          void checkAdmin(session.user.id, session.user.email);
         }, 0);
       } else {
         setProfile(null);
@@ -67,8 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
-        checkAdmin(session.user.id);
+        void fetchProfile(session.user.id);
+        void checkAdmin(session.user.id, session.user.email);
       }
       setLoading(false);
     });

@@ -8,39 +8,28 @@
   :root {
     --background: 0 0% 4.3%;
     --foreground: 0 0% 100%;
-
     --card: 0 0% 10.2%;
     --card-foreground: 0 0% 100%;
-
     --popover: 0 0% 7.8%;
     --popover-foreground: 0 0% 100%;
-
     --primary: 43 65% 52%;
     --primary-foreground: 0 0% 4.3%;
-
     --secondary: 0 0% 7.8%;
     --secondary-foreground: 0 0% 100%;
-
     --muted: 0 0% 16.5%;
     --muted-foreground: 0 0% 53.3%;
-
     --accent: 43 65% 52%;
     --accent-foreground: 0 0% 4.3%;
-
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 0 0% 16.5%;
     --input: 0 0% 16.5%;
     --ring: 43 65% 52%;
-
     --radius: 0.75rem;
-
     --surface: 0 0% 7.8%;
     --gold: 43 65% 52%;
     --gold-foreground: 0 0% 4.3%;
     --gold-muted: 43 40% 35%;
-
     --sidebar-background: 0 0% 7.8%;
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 43 65% 52%;
@@ -49,13 +38,25 @@
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 0 0% 16.5%;
     --sidebar-ring: 43 65% 52%;
-
     --font-display: 'Playfair Display', Georgia, serif;
     --font-body: 'DM Sans', system-ui, sans-serif;
+
+    /* Animation tokens — every motion uses these */
+    --duration-fast: 150ms;
+    --duration-normal: 200ms;
+    --duration-slow: 300ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
   }
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   * {
     @apply border-border;
   }
@@ -65,101 +66,196 @@
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: hsl(var(--primary) / 0.12);
+    touch-action: manipulation;
+    overscroll-behavior-y: none;
+  }
+
+  #root {
+    min-height: 100dvh;
+    min-height: 100vh;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
   }
+
+  button,
+  [role="button"],
+  a {
+    touch-action: manipulation;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @layer utilities {
-  .font-display {
-    font-family: var(--font-display);
-  }
-  .font-body {
-    font-family: var(--font-body);
-  }
+  .font-display { font-family: var(--font-display); }
+  .font-body { font-family: var(--font-body); }
 }
 
-/* Animations */
+/* ─────────────────────────────────────────────────────
+   GLOBAL ANIMATION SYSTEM
+   Rules:  150–300 ms · smooth easing · feedback or transition
+   ───────────────────────────────────────────────────── */
+
+/* 1. Keyframes */
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes slide-up {
   from { opacity: 0; transform: translateY(100%); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
+@keyframes slide-up-panel {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 @keyframes scale-pulse {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.3); }
+  50%      { transform: scale(1.2); }
 }
-
+@keyframes scale-bounce {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
 @keyframes draw-check {
-  0% { stroke-dashoffset: 24; }
+  0%   { stroke-dashoffset: 24; }
   100% { stroke-dashoffset: 0; }
 }
-
 @keyframes fill-bar {
   from { width: 0%; }
 }
-
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
+  0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .6; transform: scale(1.25); }
+}
+@keyframes eta-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .65; }
+}
+@keyframes plan-step-in {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes plan-result-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
+/* 2. Animation classes — all locked to 150–300 ms */
 .animate-fade-in {
-  animation: fade-in 0.5s ease-out forwards;
+  animation: fade-in var(--duration-slow) var(--ease-out) forwards;
 }
-
-/* Scrollbar hide utility */
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
 .animate-slide-up {
-  animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slide-up var(--duration-slow) var(--ease-out) forwards;
 }
-
+.animate-panel-up {
+  animation: slide-up-panel var(--duration-slow) var(--ease-out) forwards;
+}
 .animate-scale-pulse {
-  animation: scale-pulse 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: scale-pulse var(--duration-normal) var(--ease-out);
 }
-
+.animate-scale-bounce {
+  animation: scale-bounce var(--duration-slow) var(--ease-out);
+}
 .animate-draw-check {
-  animation: draw-check 0.6s ease-out forwards;
+  animation: draw-check var(--duration-slow) ease-out forwards;
   stroke-dasharray: 24;
   stroke-dashoffset: 24;
 }
-
 .animate-fill-bar {
-  animation: fill-bar 1s ease-out forwards;
+  animation: fill-bar 600ms ease-out forwards;
+}
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+.animate-eta-pulse {
+  animation: eta-pulse 2s ease-in-out infinite;
+}
+.animate-plan-step-in {
+  animation: plan-step-in var(--duration-normal) var(--ease-out) forwards;
+}
+.animate-plan-result-in {
+  animation: plan-result-in var(--duration-slow) var(--ease-out) forwards;
 }
 
+/* 3. Button press — reusable on any tappable element */
+.btn-press {
+  transition: transform var(--duration-fast) var(--ease-smooth),
+              opacity var(--duration-fast) var(--ease-smooth);
+  will-change: transform;
+}
+.btn-press:active {
+  transform: scale(0.96);
+  opacity: 0.9;
+}
+
+/* 4. Card hover / active — subtle lift or feedback */
+.card-interactive {
+  transition: transform var(--duration-normal) var(--ease-smooth),
+              border-color var(--duration-normal) var(--ease-smooth),
+              box-shadow var(--duration-normal) var(--ease-smooth);
+}
+.card-interactive:active {
+  transform: scale(0.98);
+}
+@media (hover: hover) {
+  .card-interactive:hover {
+    border-color: hsl(var(--primary) / 0.3);
+    box-shadow: 0 4px 12px hsl(var(--primary) / 0.05);
+  }
+}
+
+/* 5. Stagger delays for list items */
+.stagger-1 { animation-delay: 40ms; }
+.stagger-2 { animation-delay: 80ms; }
+.stagger-3 { animation-delay: 120ms; }
+.stagger-4 { animation-delay: 160ms; }
+.stagger-5 { animation-delay: 200ms; }
+.stagger-6 { animation-delay: 240ms; }
+
+/* 6. Glass panel */
+.glass {
+  background: hsl(var(--card) / 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* 7. Content padding above fixed bottom nav (+ cart bar when open). --pb-bottom-chrome set in AppProviders. */
+.pb-safe-nav {
+  padding-bottom: calc(var(--pb-bottom-chrome, 4rem) + env(safe-area-inset-bottom, 0px));
+}
+
+/* 8. Skeleton shimmer */
 .skeleton-shimmer {
   background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--surface)) 50%, hsl(var(--muted)) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* 9. Scrollbar hide */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
-::-webkit-scrollbar-track {
-  background: hsl(var(--background));
-}
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
-}
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
+/* 10. Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: hsl(var(--background)); }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
