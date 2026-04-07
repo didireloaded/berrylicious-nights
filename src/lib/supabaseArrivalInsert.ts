@@ -1,5 +1,8 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase as _supabase } from "@/integrations/supabase/client";
 import { generateArrivalCode } from "@/lib/arrivalCode";
+
+// Cast to any to avoid type mismatches with auto-generated types that may lag behind migrations
+const supabase = _supabase as any;
 
 const MAX_ATTEMPTS = 14;
 
