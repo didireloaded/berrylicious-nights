@@ -8,7 +8,7 @@ export function AdminMenuDisabledPanel() {
   const [disabled, setDisabled] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase.from("menu_item_disabled").select("menu_item_id");
+    const { data, error } = await (supabase as any).from("menu_item_disabled").select("menu_item_id");
     if (error) {
       toast.error(error.message);
       return;
