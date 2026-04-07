@@ -65,6 +65,24 @@ export type Database = {
         }
         Relationships: []
       }
+      menu_item_disabled: {
+        Row: {
+          created_at: string
+          id: string
+          menu_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          menu_item_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          menu_item_id?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           arrival_code: string | null
