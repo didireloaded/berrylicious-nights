@@ -17,10 +17,14 @@ import {
   BarChart3,
   MessageSquare,
   UtensilsCrossed,
-  ScanLine,
-  ListOrdered,
   ChevronRight,
   Home,
+  RefreshCw,
+  Users,
+  DollarSign,
+  TrendingUp,
+  AlertTriangle,
+  Filter,
 } from "lucide-react";
 import { AdminMessagesPanel } from "@/components/admin/AdminMessagesPanel";
 import { AdminArrivalVerify } from "@/components/admin/AdminArrivalVerify";
@@ -87,6 +91,14 @@ function isFreshPendingOrder(o: { status: string; created_at: string }) {
   return Number.isFinite(t) && Date.now() - t < 5 * 60 * 1000;
 }
 
+function timeAgo(dateStr: string) {
+  const mins = Math.round((Date.now() - new Date(dateStr).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ${mins % 60}m ago`;
+}
+
 /* ── Tab definitions ── */
 type AdminTab = "kitchen" | "bookings" | "events" | "analytics" | "messages" | "tools";
 
@@ -111,6 +123,7 @@ const AdminPage = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [updates, setUpdates] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [bookingFilter, setBookingFilter] = useState<string>("all");
   const [newEvent, setNewEvent] = useState({
     title: "", subtitle: "", type: "event",
     event_date: new Date().toISOString().split("T")[0],
@@ -120,14 +133,15 @@ const AdminPage = () => {
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
   const bootstrappedRef = useRef(false);
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
 
   /* ── Fetchers ── */
   const fetchBookings = useCallback(async () => {
-    const { data } = await supabase.from("bookings").select("*").order("created_at", { ascending: false }).limit(80);
+    const { data } = await supabase.from("bookings").select("*").order("created_at", { ascending: false }).limit(200);
     setBookings(data ?? []);
   }, []);
   const fetchOrders = useCallback(async () => {
-    const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(80);
+    const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(200);
     setOrders(data ?? []);
   }, []);
   const fetchUpdates = useCallback(async () => {
@@ -135,10 +149,15 @@ const AdminPage = () => {
     setUpdates(data ?? []);
   }, []);
 
+  const refreshAll = useCallback(() => {
+    fetchBookings(); fetchOrders(); fetchUpdates();
+    setLastRefresh(Date.now());
+  }, [fetchBookings, fetchOrders, fetchUpdates]);
+
   /* ── Realtime ── */
   useEffect(() => {
     if (!isAdmin) return;
-    fetchBookings(); fetchOrders(); fetchUpdates();
+    refreshAll();
     const channel = supabase
       .channel("admin-dashboard")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchOrders())
@@ -146,7 +165,7 @@ const AdminPage = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "updates" }, () => fetchUpdates())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [isAdmin, fetchBookings, fetchOrders, fetchUpdates]);
+  }, [isAdmin, refreshAll, fetchBookings, fetchOrders, fetchUpdates]);
 
   /* ── New order alert ── */
   useEffect(() => {
@@ -214,9 +233,17 @@ const AdminPage = () => {
   const popularLines = useMemo(() => getPopularItems(orders as any), [orders]);
   const eventsTonight = useMemo(() => updates.filter((u) => u.active && (u.event_date === todayStr || !u.event_date)), [updates, todayStr]);
   const selected = orders.find((o) => o.id === selectedId) ?? null;
+  const completedToday = useMemo(() => orders.filter(o => o.status === "completed" && String(o.created_at).startsWith(todayStr)), [orders, todayStr]);
+  const ordersToday = useMemo(() => orders.filter(o => String(o.created_at).startsWith(todayStr)), [orders, todayStr]);
+
+  const filteredBookingsToday = useMemo(() => {
+    if (bookingFilter === "all") return bookingsToday;
+    return bookingsToday.filter(b => b.status === bookingFilter);
+  }, [bookingsToday, bookingFilter]);
 
   const loadLabel = load === "high" ? "High" : load === "medium" ? "Medium" : "Low";
   const loadColor = load === "high" ? "text-destructive" : load === "medium" ? "text-amber-400" : "text-emerald-400";
+  const loadBg = load === "high" ? "bg-destructive/10" : load === "medium" ? "bg-amber-500/10" : "bg-emerald-500/10";
 
   /* ── Auth guards ── */
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
@@ -243,21 +270,35 @@ const AdminPage = () => {
               <LayoutDashboard className="w-6 h-6 text-primary" />
               <div>
                 <h1 className="font-display text-lg font-bold text-foreground leading-tight">Berrylicious Ops</h1>
-                <p className="text-[10px] text-muted-foreground">Live · {todayStr}</p>
+                <p className="text-[10px] text-muted-foreground">Live · {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</p>
               </div>
             </div>
 
-            {/* Stats row */}
-            <div className="hidden sm:flex items-center gap-3">
-              <StatPill label="Orders" value={String(activeCount)} />
-              <StatPill label="Revenue" value={formatPrice(revenueToday)} accent />
-              <StatPill label="Load" value={loadLabel} className={loadColor} icon={<Flame className="w-3 h-3" />} />
-              <StatPill label="Next 10m" value={`${bookingsNext10}`} sub="bookings" />
+            {/* Stats row — desktop */}
+            <div className="hidden md:flex items-center gap-2">
+              <StatPill icon={<ShoppingBag className="w-3 h-3" />} label="Active" value={String(activeCount)} />
+              <StatPill icon={<DollarSign className="w-3 h-3" />} label="Revenue" value={formatPrice(revenueToday)} accent />
+              <StatPill icon={<Flame className="w-3 h-3" />} label="Load" value={loadLabel} className={loadColor} bgClassName={loadBg} />
+              <StatPill icon={<Users className="w-3 h-3" />} label="Next 10m" value={`${bookingsNext10}`} sub="bookings" />
+              <StatPill icon={<TrendingUp className="w-3 h-3" />} label="Today" value={`${ordersToday.length}`} sub="orders" />
             </div>
 
-            <Link to="/" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-              <Home className="w-4 h-4" /> Exit
-            </Link>
+            <div className="flex items-center gap-2">
+              <button onClick={refreshAll} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors" aria-label="Refresh">
+                <RefreshCw className="w-4 h-4" />
+              </button>
+              <Link to="/" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <Home className="w-4 h-4" /> Exit
+              </Link>
+            </div>
+          </div>
+
+          {/* Stats row — mobile */}
+          <div className="flex md:hidden items-center gap-2 mt-2 overflow-x-auto scrollbar-hide pb-1">
+            <StatPill icon={<ShoppingBag className="w-3 h-3" />} label="Active" value={String(activeCount)} />
+            <StatPill icon={<DollarSign className="w-3 h-3" />} label="Revenue" value={formatPrice(revenueToday)} accent />
+            <StatPill icon={<Flame className="w-3 h-3" />} label="Load" value={loadLabel} className={loadColor} bgClassName={loadBg} />
+            <StatPill icon={<Users className="w-3 h-3" />} label="Bookings" value={`${bookingsToday.length}`} />
           </div>
         </div>
       </header>
@@ -271,7 +312,6 @@ const AdminPage = () => {
               const count = t.id === "kitchen" ? activeCount
                 : t.id === "bookings" ? bookingsToday.length
                 : t.id === "events" ? eventsTonight.length
-                : t.id === "messages" ? null
                 : null;
               return (
                 <button
@@ -299,11 +339,11 @@ const AdminPage = () => {
 
       {/* ── HINTS BAR ── */}
       {tab === "kitchen" && hints.length > 0 && (
-        <div className="bg-muted/30 border-b border-border">
+        <div className="bg-amber-500/5 border-b border-amber-500/20">
           <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-2 flex gap-4 overflow-x-auto scrollbar-hide">
             {hints.map((h, i) => (
-              <p key={i} className="text-[11px] text-muted-foreground whitespace-nowrap flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary/60 shrink-0" />
+              <p key={i} className="text-[11px] text-amber-400/90 whitespace-nowrap flex items-center gap-1.5">
+                <AlertTriangle className="w-3 h-3 shrink-0" />
                 {h}
               </p>
             ))}
@@ -318,46 +358,46 @@ const AdminPage = () => {
           {/* KITCHEN TAB */}
           {tab === "kitchen" && (
             <div className="flex flex-col xl:flex-row gap-5">
-              {/* Left: Kanban + detail */}
               <div className="flex-1 min-w-0 space-y-5">
                 {/* Kanban board */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <KanbanColumn title="New" emoji="📋" orders={grouped.pending} activeCount={activeCount}
-                    selectedId={selectedId} onSelect={setSelectedId} statusColor="border-t-primary" />
+                    selectedId={selectedId} onSelect={setSelectedId} statusColor="border-t-primary"
+                    onQuickAdvance={(id) => updateOrderStatus(id, "preparing")} />
                   <KanbanColumn title="Preparing" emoji="👨‍🍳" orders={grouped.preparing} activeCount={activeCount}
-                    selectedId={selectedId} onSelect={setSelectedId} statusColor="border-t-yellow-500" />
+                    selectedId={selectedId} onSelect={setSelectedId} statusColor="border-t-yellow-500"
+                    onQuickAdvance={(id) => updateOrderStatus(id, "ready")} />
                   <KanbanColumn title="Ready" emoji="🔥" orders={grouped.ready} activeCount={activeCount}
-                    selectedId={selectedId} onSelect={setSelectedId} statusColor="border-t-green-500" />
+                    selectedId={selectedId} onSelect={setSelectedId} statusColor="border-t-green-500"
+                    onQuickAdvance={(id) => updateOrderStatus(id, "completed")} />
                 </div>
 
-                {/* Order history (collapsed) */}
-                <details className="rounded-xl border border-border bg-card/50 overflow-hidden">
-                  <summary className="px-4 py-3 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-2">
-                    <Clock className="w-4 h-4" /> All orders ({orders.length})
-                  </summary>
-                  <div className="px-4 pb-4 space-y-1 max-h-64 overflow-y-auto">
-                    {orders.map((o) => (
-                      <div key={o.id} className="flex items-center justify-between text-xs py-2 border-b border-border/40 last:border-0">
-                        <span className="font-mono text-foreground">#{o.id.slice(0, 6)}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[o.status] ?? "bg-muted text-muted-foreground"}`}>{o.status}</span>
-                        <span className="text-primary font-semibold">{formatPrice(o.total)}</span>
-                        {getNextOrderStatus(o.status) && (
-                          <button onClick={() => updateOrderStatus(o.id, getNextOrderStatus(o.status)!)}
-                            className="text-primary font-semibold hover:underline">Advance</button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </details>
+                {/* Completed today */}
+                {completedToday.length > 0 && (
+                  <details className="rounded-xl border border-border bg-card/50 overflow-hidden">
+                    <summary className="px-4 py-3 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-2">
+                      <Check className="w-4 h-4" /> Completed today ({completedToday.length})
+                    </summary>
+                    <div className="px-4 pb-4 space-y-1 max-h-64 overflow-y-auto">
+                      {completedToday.map((o) => (
+                        <div key={o.id} className="flex items-center justify-between text-xs py-2 border-b border-border/40 last:border-0">
+                          <span className="font-mono text-foreground">#{o.id.slice(0, 6)}</span>
+                          <span className="text-muted-foreground">{timeAgo(o.created_at)}</span>
+                          <span className="text-primary font-semibold">{formatPrice(o.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </div>
 
               {/* Right: detail panel */}
-              <aside className="w-full xl:w-[340px] shrink-0 xl:sticky xl:top-20 self-start hidden xl:block">
+              <aside className="w-full xl:w-[380px] shrink-0 xl:sticky xl:top-20 self-start hidden xl:block">
                 <div className="rounded-xl border border-border bg-card p-5 min-h-[240px]">
                   {!selected ? (
                     <div className="flex flex-col items-center justify-center text-center text-muted-foreground text-sm py-16">
                       <ShoppingBag className="w-10 h-10 mb-3 opacity-30" />
-                      <p>Select an order</p>
+                      <p className="font-semibold">Select an order</p>
                       <p className="text-xs mt-1 opacity-70">Click a ticket for details + actions</p>
                     </div>
                   ) : (
@@ -372,19 +412,36 @@ const AdminPage = () => {
           {/* BOOKINGS TAB */}
           {tab === "bookings" && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <h2 className="font-display text-xl font-semibold text-foreground">Today's Bookings</h2>
-                <span className="text-sm text-muted-foreground">{bookingsToday.length} bookings</span>
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  {["all", "confirmed", "arrived", "seated", "cancelled"].map(f => (
+                    <button key={f} onClick={() => setBookingFilter(f)}
+                      className={`text-xs px-2.5 py-1 rounded-lg border transition-colors btn-press capitalize ${
+                        bookingFilter === f ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
+                      }`}>{f}</button>
+                  ))}
+                </div>
               </div>
-              {bookingsToday.length === 0 ? (
+
+              {/* Summary stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <MiniStat label="Total" value={bookingsToday.length} />
+                <MiniStat label="Confirmed" value={bookingsToday.filter(b => b.status === "confirmed").length} color="text-primary" />
+                <MiniStat label="Arrived" value={bookingsToday.filter(b => b.status === "arrived").length} color="text-emerald-400" />
+                <MiniStat label="Total guests" value={bookingsToday.reduce((s, b) => s + (b.guests || 0), 0)} />
+              </div>
+
+              {filteredBookingsToday.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground">
                   <CalendarDays className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>No bookings for today</p>
+                  <p>{bookingFilter === "all" ? "No bookings for today" : `No ${bookingFilter} bookings`}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {bookingsToday.map((b) => (
-                    <div key={b.id} className="rounded-xl border border-border bg-card p-4 card-interactive">
+                  {filteredBookingsToday.map((b) => (
+                    <div key={b.id} className="rounded-xl border border-border bg-card p-4 card-interactive hover:border-primary/30 transition-colors">
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <p className="text-foreground font-semibold">{b.time} · {b.guests} guests</p>
@@ -392,14 +449,19 @@ const AdminPage = () => {
                         </div>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColors[b.status] || "bg-muted text-muted-foreground"}`}>{b.status}</span>
                       </div>
-                      {b.special_requests && <p className="text-xs text-muted-foreground italic mb-2">"{b.special_requests}"</p>}
+                      {b.special_requests && <p className="text-xs text-muted-foreground italic mb-2 bg-muted/30 rounded-lg px-2 py-1">"{b.special_requests}"</p>}
                       {b.assigned_table_code && <p className="text-[11px] font-mono font-semibold text-foreground">Table {b.assigned_table_code}</p>}
                       {b.arrival_code && <p className="font-mono text-sm font-bold text-primary tracking-wide mt-1">{b.arrival_code}</p>}
-                      {b.arrival_verified_at && <p className="text-[10px] text-muted-foreground">Checked in {new Date(b.arrival_verified_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
+                      {b.arrival_verified_at && <p className="text-[10px] text-emerald-400">✓ Checked in {new Date(b.arrival_verified_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
                       <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
-                        <button onClick={() => updateBookingStatus(b.id, "confirmed")} className="text-[11px] font-semibold text-primary hover:underline btn-press">Confirm</button>
+                        {b.status !== "arrived" && b.status !== "seated" && (
+                          <button onClick={() => updateBookingStatus(b.id, "confirmed")} className="text-[11px] font-semibold text-primary hover:underline btn-press">Confirm</button>
+                        )}
+                        <button onClick={() => updateBookingStatus(b.id, "arrived")} className="text-[11px] font-semibold text-emerald-400 hover:underline btn-press">Arrived</button>
                         <button onClick={() => updateBookingStatus(b.id, "seated")} className="text-[11px] font-semibold text-sky-400 hover:underline btn-press">Seated</button>
-                        <button onClick={() => updateBookingStatus(b.id, "cancelled")} className="text-[11px] font-semibold text-destructive hover:underline btn-press">Cancel</button>
+                        {b.status !== "cancelled" && (
+                          <button onClick={() => updateBookingStatus(b.id, "cancelled")} className="text-[11px] font-semibold text-destructive hover:underline btn-press ml-auto">Cancel</button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -415,7 +477,7 @@ const AdminPage = () => {
                   <div className="px-4 pb-4 space-y-2 max-h-80 overflow-y-auto">
                     {bookings.filter(b => b.date !== todayStr).map((b) => (
                       <div key={b.id} className="flex items-center justify-between text-xs py-2 border-b border-border/40">
-                        <span className="text-foreground">{b.date} {b.time} · {b.guests}p</span>
+                        <span className="text-foreground">{b.date} {b.time} · {b.guests}p · {b.guest_name || "Guest"}</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[b.status] ?? "bg-muted text-muted-foreground"}`}>{b.status}</span>
                       </div>
                     ))}
@@ -444,16 +506,18 @@ const AdminPage = () => {
                     className="w-full bg-background border border-border rounded-lg py-2.5 px-3 text-sm [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-primary/30" />
                   <input type="text" value={newEvent.event_time} onChange={(e) => setNewEvent({ ...newEvent, event_time: e.target.value })}
                     placeholder="21:00" className="w-full bg-background border border-border rounded-lg py-2.5 px-3 text-foreground text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                  <input type="text" value={newEvent.available_slots_csv} onChange={(e) => setNewEvent({ ...newEvent, available_slots_csv: e.target.value })}
+                    placeholder="Available slots (comma sep)" className="w-full bg-background border border-border rounded-lg py-2.5 px-3 text-foreground text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:col-span-2" />
                 </div>
                 <div className="flex gap-2">
                   {["event", "special", "announcement"].map((t) => (
                     <button key={t} onClick={() => setNewEvent({ ...newEvent, type: t })}
-                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors btn-press ${
+                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors btn-press capitalize ${
                         newEvent.type === t ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
                       }`}>{t}</button>
                   ))}
                 </div>
-                <button onClick={addEvent} className="bg-primary text-primary-foreground text-sm font-semibold py-2.5 px-5 rounded-lg btn-press hover:opacity-90">Add event</button>
+                <button onClick={addEvent} disabled={!newEvent.title.trim()} className="bg-primary text-primary-foreground text-sm font-semibold py-2.5 px-5 rounded-lg btn-press hover:opacity-90 disabled:opacity-40">Add event</button>
               </div>
 
               {/* Active events */}
@@ -461,15 +525,19 @@ const AdminPage = () => {
                 {updates.map((u) => (
                   <div key={u.id} className="rounded-xl border border-border bg-card p-4 flex items-start justify-between card-interactive">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-[10px] text-primary font-bold uppercase tracking-wider">{u.type}</span>
                         {u.event_date && <span className="text-[10px] text-muted-foreground">{u.event_date}</span>}
+                        {u.event_time && <span className="text-[10px] text-muted-foreground">{u.event_time}</span>}
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${u.active ? "bg-emerald-500/20 text-emerald-400" : "bg-muted text-muted-foreground"}`}>
                           {u.active ? "Live" : "Off"}
                         </span>
                       </div>
                       <p className="text-foreground font-semibold">{u.title}</p>
                       {u.subtitle && <p className="text-sm text-muted-foreground">{u.subtitle}</p>}
+                      {u.available_slots?.length > 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-1">Slots: {u.available_slots.join(", ")}</p>
+                      )}
                     </div>
                     <div className="flex gap-1.5 shrink-0 ml-3">
                       <button onClick={() => toggleEvent(u.id, u.active)}
@@ -485,40 +553,102 @@ const AdminPage = () => {
                     </div>
                   </div>
                 ))}
-                {updates.length === 0 && <p className="text-muted-foreground text-center py-12">No events yet</p>}
+                {updates.length === 0 && <p className="text-muted-foreground text-center py-12">No events yet — create one above</p>}
               </div>
             </div>
           )}
 
           {/* ANALYTICS TAB */}
           {tab === "analytics" && (
-            <div className="max-w-2xl space-y-5">
+            <div className="max-w-4xl space-y-5">
               <h2 className="font-display text-xl font-semibold text-foreground">Shift Analytics</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <AnalyticCard label="Total Orders" value={String(shiftStats.totalOrders)} />
-                <AnalyticCard label="Peak Hour" value={shiftStats.peakHour} />
-                <AnalyticCard label="Top Item" value={shiftStats.mostOrdered} />
+
+              {/* Key metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <AnalyticCard label="Total Orders" value={String(shiftStats.totalOrders)} icon={<ShoppingBag className="w-4 h-4 text-primary" />} />
+                <AnalyticCard label="Today" value={String(ordersToday.length)} icon={<TrendingUp className="w-4 h-4 text-emerald-400" />} />
+                <AnalyticCard label="Peak Hour" value={shiftStats.peakHour} icon={<Clock className="w-4 h-4 text-amber-400" />} />
+                <AnalyticCard label="Revenue" value={formatPrice(revenueToday)} accent icon={<DollarSign className="w-4 h-4 text-primary" />} />
               </div>
 
-              {/* Mobile stats */}
-              <div className="sm:hidden grid grid-cols-2 gap-3">
-                <AnalyticCard label="Active" value={String(activeCount)} />
-                <AnalyticCard label="Revenue" value={formatPrice(revenueToday)} accent />
-              </div>
-
-              {popularLines.length > 0 && (
-                <div className="rounded-xl border border-border bg-card p-5">
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Popular items</h3>
-                  <div className="space-y-2">
-                    {popularLines.map(([name, count], i) => (
-                      <div key={name} className="flex items-center justify-between text-sm">
-                        <span className="text-foreground"><span className="text-muted-foreground mr-2">{i + 1}.</span>{name}</span>
-                        <span className="text-muted-foreground font-mono">{count}×</span>
+              {/* Order pipeline */}
+              <div className="rounded-xl border border-border bg-card p-5">
+                <h3 className="text-sm font-semibold text-foreground mb-4">Order Pipeline</h3>
+                <div className="space-y-3">
+                  {[
+                    { status: "pending", count: grouped.pending.length, color: "bg-primary/60" },
+                    { status: "preparing", count: grouped.preparing.length, color: "bg-yellow-500/60" },
+                    { status: "ready", count: grouped.ready.length, color: "bg-green-500/60" },
+                    { status: "completed", count: grouped.completed.length, color: "bg-muted-foreground/40" },
+                  ].map(({ status, count, color }) => {
+                    const total = Math.max(orders.length, 1);
+                    const pct = Math.round((count / total) * 100);
+                    return (
+                      <div key={status}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="text-muted-foreground capitalize">{status}</span>
+                          <span className="text-foreground font-medium">{count} ({pct}%)</span>
+                        </div>
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
+                        </div>
                       </div>
-                    ))}
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Top items + booking stats */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {popularLines.length > 0 && (
+                  <div className="rounded-xl border border-border bg-card p-5">
+                    <h3 className="text-sm font-semibold text-foreground mb-3">Most Ordered</h3>
+                    <div className="space-y-2">
+                      {popularLines.map(([name, count], i) => (
+                        <div key={name} className="flex items-center justify-between text-sm">
+                          <span className="text-foreground">
+                            <span className="text-muted-foreground mr-2 font-mono text-xs">{i + 1}.</span>{name}
+                          </span>
+                          <span className="text-primary font-bold font-mono">{count}×</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Booking Stats</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Today's bookings</span>
+                      <span className="text-foreground font-semibold">{bookingsToday.length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Guests expected</span>
+                      <span className="text-foreground font-semibold">{bookingsToday.reduce((s, b) => s + (b.guests || 0), 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Arrived</span>
+                      <span className="text-emerald-400 font-semibold">{bookingsToday.filter(b => b.status === "arrived" || b.status === "seated").length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Cancelled</span>
+                      <span className="text-destructive font-semibold">{bookingsToday.filter(b => b.status === "cancelled").length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">All-time bookings</span>
+                      <span className="text-foreground font-semibold">{bookings.length}</span>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
+
+              {/* Completed today */}
+              <div className="rounded-xl border border-border bg-card p-5">
+                <h3 className="text-sm font-semibold text-foreground mb-1">Completed Today</h3>
+                <p className="text-3xl font-bold text-primary">{completedToday.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">orders fulfilled · {formatPrice(revenueToday)} revenue</p>
+              </div>
             </div>
           )}
 
@@ -527,13 +657,42 @@ const AdminPage = () => {
 
           {/* TOOLS TAB */}
           {tab === "tools" && (
-            <div className="space-y-5 max-w-3xl">
+            <div className="space-y-6 max-w-4xl">
               <h2 className="font-display text-xl font-semibold text-foreground">Admin Tools</h2>
+
+              {/* Tool cards in a grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <AdminArrivalVerify onVerified={() => { fetchBookings(); fetchOrders(); }} />
                 <AdminWaitlistPanel />
               </div>
-              <AdminMenuDisabledPanel />
+
+              <div>
+                <h3 className="font-display text-lg font-semibold text-foreground mb-3">Menu Availability (86 Board)</h3>
+                <AdminMenuDisabledPanel />
+              </div>
+
+              {/* Quick stats */}
+              <div className="rounded-xl border border-border bg-card p-5">
+                <h3 className="text-sm font-semibold text-foreground mb-3">System Status</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{orders.length}</p>
+                    <p className="text-xs text-muted-foreground">Total orders</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{bookings.length}</p>
+                    <p className="text-xs text-muted-foreground">Total bookings</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{updates.length}</p>
+                    <p className="text-xs text-muted-foreground">Events</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-primary">{formatPrice(revenueToday)}</p>
+                    <p className="text-xs text-muted-foreground">Today revenue</p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -543,7 +702,9 @@ const AdminPage = () => {
       {tab === "kitchen" && selected && (
         <div className="xl:hidden fixed inset-0 z-50 bg-background/98 overflow-y-auto animate-fade-in">
           <div className="px-4 pt-4 pb-24 max-w-lg mx-auto">
-            <button onClick={() => setSelectedId(null)} className="text-sm text-primary font-medium mb-4 btn-press">← Back to board</button>
+            <button onClick={() => setSelectedId(null)} className="text-sm text-primary font-medium mb-4 btn-press flex items-center gap-1">
+              <ChevronRight className="w-4 h-4 rotate-180" /> Back to board
+            </button>
             <OrderDetailInline order={selected} activeCount={activeCount}
               onStatusChange={updateOrderStatus} onSetETA={setOrderETA} />
           </div>
@@ -556,33 +717,46 @@ const AdminPage = () => {
 export default AdminPage;
 
 /* ═══════════════════════════════════════════════════════════════
-   SUB-COMPONENTS (inlined to keep admin self-contained)
+   SUB-COMPONENTS
    ═══════════════════════════════════════════════════════════════ */
 
-function StatPill({ label, value, accent, className, icon, sub }: {
-  label: string; value: string; accent?: boolean; className?: string; icon?: React.ReactNode; sub?: string;
+function StatPill({ label, value, accent, className, icon, sub, bgClassName }: {
+  label: string; value: string; accent?: boolean; className?: string; icon?: React.ReactNode; sub?: string; bgClassName?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card/80 px-3 py-1.5 min-w-[100px]">
+    <div className={`rounded-lg border border-border px-3 py-1.5 min-w-[90px] shrink-0 ${bgClassName || "bg-card/80"}`}>
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">{icon}{label}</p>
-      <p className={`text-base font-bold ${accent ? "text-primary" : className || "text-foreground"}`}>{value}</p>
+      <p className={`text-sm font-bold leading-tight ${accent ? "text-primary" : className || "text-foreground"}`}>{value}</p>
       {sub && <p className="text-[9px] text-muted-foreground -mt-0.5">{sub}</p>}
     </div>
   );
 }
 
-function AnalyticCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function MiniStat({ label, value, color }: { label: string; value: number; color?: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card/80 px-3 py-2 text-center">
+      <p className={`text-lg font-bold ${color || "text-foreground"}`}>{value}</p>
+      <p className="text-[10px] text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function AnalyticCard({ label, value, accent, icon }: { label: string; value: string; accent?: boolean; icon?: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
+      <div className="flex items-center gap-2 mb-1">
+        {icon}
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      </div>
       <p className={`text-lg font-bold truncate ${accent ? "text-primary" : "text-foreground"}`}>{value}</p>
     </div>
   );
 }
 
-function KanbanColumn({ title, emoji, orders, activeCount, selectedId, onSelect, statusColor }: {
+function KanbanColumn({ title, emoji, orders, activeCount, selectedId, onSelect, statusColor, onQuickAdvance }: {
   title: string; emoji: string; orders: AdminOrderLike[]; activeCount: number;
   selectedId: string | null; onSelect: (id: string) => void; statusColor: string;
+  onQuickAdvance: (id: string) => void;
 }) {
   return (
     <div className={`rounded-xl border border-border bg-card/80 flex flex-col border-t-2 ${statusColor}`}>
@@ -605,16 +779,25 @@ function KanbanColumn({ title, emoji, orders, activeCount, selectedId, onSelect,
               } ${urgent ? "ring-2 ring-inset ring-primary/60" : ""} ${high ? "ring-1 ring-orange-500/40" : ""}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-bold text-foreground font-mono">#{o.id.slice(0, 6)}</span>
-                <span className="text-[10px] text-muted-foreground">{estimatePrepMinutes(o, activeCount)}m</span>
+                <span className="text-[10px] text-muted-foreground">{estimatePrepMinutes(o, activeCount)}m · {timeAgo(o.created_at)}</span>
               </div>
               <p className="text-[11px] text-muted-foreground truncate mt-1">
                 {Array.isArray(o.items) ? (o.items as any[]).map((i: any) => i.name).join(", ") : "—"}
               </p>
-              <div className="flex items-center gap-2 mt-1.5">
-                {(o as any).order_type && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{typeBadge[(o as any).order_type] || (o as any).order_type}</span>
-                )}
-                <span className="text-[10px] text-primary font-bold">{formatPrice(Number(o.total) || 0)}</span>
+              <div className="flex items-center justify-between gap-2 mt-1.5">
+                <div className="flex items-center gap-1.5">
+                  {(o as any).order_type && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{typeBadge[(o as any).order_type] || (o as any).order_type}</span>
+                  )}
+                  <span className="text-[10px] text-primary font-bold">{formatPrice(Number(o.total) || 0)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onQuickAdvance(o.id); }}
+                  className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded hover:bg-primary/20 transition-colors"
+                >
+                  Advance →
+                </button>
               </div>
             </button>
           );
@@ -644,15 +827,22 @@ function OrderDetailInline({ order: o, activeCount, onStatusChange, onSetETA }: 
       <div className="text-xs text-muted-foreground space-y-0.5">
         <p>Suggested prep ~{estimatePrepMinutes(o, activeCount)} min</p>
         <p>{new Date(o.created_at).toLocaleString()}</p>
+        <p className="text-foreground/60">{timeAgo(o.created_at)}</p>
       </div>
 
       {/* Total + codes */}
       <p className="text-foreground font-bold text-xl">{formatPrice(o.total)}</p>
-      {o.arrival_code && <p className="font-mono text-sm font-bold text-primary tracking-wide">{o.arrival_code}</p>}
-      {o.arrival_verified_at && <p className="text-[10px] text-muted-foreground">Verified {new Date(o.arrival_verified_at).toLocaleString()}</p>}
+      {o.arrival_code && (
+        <div className="flex items-center gap-2">
+          <p className="font-mono text-sm font-bold text-primary tracking-wide">{o.arrival_code}</p>
+          <span className="text-[10px] text-muted-foreground">arrival code</span>
+        </div>
+      )}
+      {o.arrival_verified_at && <p className="text-[10px] text-emerald-400">✓ Verified {new Date(o.arrival_verified_at).toLocaleString()}</p>}
 
       {/* Items */}
       <div className="rounded-lg border border-border bg-background/50 p-3 space-y-2">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Items</p>
         {Array.isArray(o.items) && o.items.map((item: any, i: number) => (
           <div key={i} className="flex justify-between text-sm">
             <span className="text-foreground">{item.name} × {item.qty}</span>
@@ -665,8 +855,8 @@ function OrderDetailInline({ order: o, activeCount, onStatusChange, onSetETA }: 
       {o.status === "preparing" && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Set ETA</p>
-          <div className="flex gap-2">
-            {[10, 15, 20, 30].map((mins) => (
+          <div className="flex gap-2 flex-wrap">
+            {[10, 15, 20, 25, 30].map((mins) => (
               <button key={mins} onClick={() => onSetETA(o.id, mins)}
                 className={`flex items-center gap-1 rounded-lg border px-3 py-2 text-xs transition-colors btn-press ${
                   o.eta_minutes === mins ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
@@ -675,6 +865,11 @@ function OrderDetailInline({ order: o, activeCount, onStatusChange, onSetETA }: 
               </button>
             ))}
           </div>
+          {o.eta_minutes && o.eta_set_at && (
+            <p className="text-[10px] text-muted-foreground">
+              ETA set {Math.round((Date.now() - new Date(o.eta_set_at).getTime()) / 60000)}m ago → {o.eta_minutes}m
+            </p>
+          )}
         </div>
       )}
 
