@@ -220,6 +220,33 @@ export type Database = {
         }
         Relationships: []
       }
+      shift_reports: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          report_date: string
+          report_type: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          report_date: string
+          report_type?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          report_date?: string
+          report_type?: string
+        }
+        Relationships: []
+      }
       updates: {
         Row: {
           active: boolean
