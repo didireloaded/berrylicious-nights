@@ -80,7 +80,7 @@ const TABS: { id: AdminTab; label: string; icon: typeof ShoppingBag }[] = [
   { id: "bookings", label: "Bookings", icon: CalendarDays },
   { id: "events", label: "Events", icon: Megaphone },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
-  { id: "insights", label: "AI Insights", icon: Brain },
+  { id: "insights", label: "Overview", icon: Brain },
   { id: "messages", label: "Messages", icon: MessageSquare },
   { id: "tools", label: "Tools", icon: UtensilsCrossed },
 ];
@@ -607,14 +607,13 @@ const AdminPage = () => {
             </div>
           )}
 
-          {/* AI INSIGHTS TAB */}
+          {/* OVERVIEW TAB */}
           {tab === "insights" && (
             <div className="max-w-4xl space-y-4">
               <div className="flex items-center gap-2">
-                <h2 className="font-display text-lg font-semibold text-foreground">AI Insights</h2>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">Powered by AI</span>
+                <h2 className="font-display text-lg font-semibold text-foreground">Overview</h2>
               </div>
-              <p className="text-xs text-muted-foreground -mt-2">Get AI-generated reports and recommendations based on your live operational data.</p>
+              <p className="text-xs text-muted-foreground -mt-2">Reports and recommendations based on your live operational data.</p>
               <AdminAIInsights orders={orders} bookings={bookings} />
             </div>
           )}
