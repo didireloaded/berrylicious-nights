@@ -235,10 +235,10 @@ const AdminPage = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* ── TOP BAR ── */}
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border/60">
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border/60" id="admin-header">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
           {/* Top row */}
-          <div className="flex items-center justify-between h-14">
+          <div className="flex items-center justify-between h-12 sm:h-14">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                 <LayoutDashboard className="w-4 h-4 text-primary" />
@@ -273,10 +273,10 @@ const AdminPage = () => {
         </div>
       </header>
 
-      {/* ── TAB BAR ── */}
-      <nav className="sticky top-[calc(3.5rem+2.5rem)] z-20 border-b border-border/40 bg-background/60 backdrop-blur-lg">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
-          <div className="flex gap-0.5 overflow-x-auto scrollbar-hide py-1.5">
+      {/* ── TAB BAR ── (not sticky on mobile to avoid overlap with header) */}
+      <nav className="z-20 border-b border-border/40 bg-background/60 backdrop-blur-lg">
+        <div className="max-w-[1600px] mx-auto">
+          <div className="flex gap-0.5 overflow-x-auto scrollbar-hide py-1.5 px-4 sm:px-6">
             {TABS.map((t) => {
               const active = tab === t.id;
               const count = t.id === "kitchen" ? activeCount

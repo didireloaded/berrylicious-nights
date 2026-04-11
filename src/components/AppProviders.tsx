@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { CartProvider, useCart } from "@/context/CartContext";
 import { AppProvider } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
@@ -46,6 +46,18 @@ function BottomChromePaddingSync() {
   return null;
 }
 
+/** Hide bottom chrome on admin page */
+function ChromeWrapper() {
+  const { pathname } = useLocation();
+  if (pathname === "/admin") return null;
+  return (
+    <>
+      <CartBar />
+      <BottomNav />
+    </>
+  );
+}
+
 const AppProviders = () => {
   return (
     <CartProvider>
@@ -77,8 +89,7 @@ const AppProviders = () => {
             </Routes>
           </Suspense>
         </main>
-        <CartBar />
-        <BottomNav />
+        <ChromeWrapper />
         </AboutSheetProvider>
       </BrowserRouter>
       </AppProvider>
