@@ -66,14 +66,14 @@ const MenuCard = memo(function MenuCard({ item, disabled }: { item: MenuItem; di
 
   if (disabled) {
     return (
-      <div className="group block h-full bg-card rounded-lg overflow-hidden border border-border opacity-60 pointer-events-none">{inner}</div>
+      <div className="group block h-full glass-card rounded-lg overflow-hidden opacity-60 pointer-events-none">{inner}</div>
     );
   }
 
   return (
     <Link
       to={`/menu/${item.id}`}
-      className="group block h-full bg-card rounded-lg overflow-hidden border border-border card-interactive transition-transform duration-150 ease-out active:scale-[0.96] active:ring-2 active:ring-primary/35 active:ring-offset-2 active:ring-offset-background"
+      className="group block h-full glass-card rounded-lg overflow-hidden card-interactive transition-transform duration-150 ease-out active:scale-[0.96] active:ring-2 active:ring-primary/35 active:ring-offset-2 active:ring-offset-background"
     >
       {inner}
     </Link>

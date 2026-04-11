@@ -52,13 +52,13 @@ const PopularCard = memo(function PopularCard({ item, disabled }: { item: MenuIt
   );
 
   if (disabled) {
-    return <div className="shrink-0 w-36 touch-manipulation bg-card rounded-lg overflow-hidden border border-border opacity-55 pointer-events-none">{body}</div>;
+    return <div className="shrink-0 w-36 touch-manipulation glass-card rounded-lg overflow-hidden opacity-55 pointer-events-none">{body}</div>;
   }
 
   return (
     <Link
       to={`/menu/${item.id}`}
-      className="shrink-0 w-36 touch-manipulation bg-card rounded-lg overflow-hidden border border-border card-interactive"
+      className="shrink-0 w-36 touch-manipulation glass-card rounded-lg overflow-hidden card-interactive"
     >
       {body}
     </Link>
