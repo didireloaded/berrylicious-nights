@@ -27,6 +27,7 @@ import {
 import { executePlanBookAndOrder } from "@/services/planCheckout";
 import { clearPlanDraft, readPlanDraft, writePlanDraft } from "@/lib/planDraft";
 import { HostYourEventTab } from "@/components/HostYourEventTab";
+import { RestaurantChatSheet } from "@/components/RestaurantChatSheet";
 import { cn } from "@/lib/utils";
 
 type Step = 1 | 2 | 3;
