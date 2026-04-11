@@ -275,8 +275,8 @@ const AdminPage = () => {
 
       {/* ── TAB BAR ── (not sticky on mobile to avoid overlap with header) */}
       <nav className="z-20 border-b border-border/40 bg-background/60 backdrop-blur-lg">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
-          <div className="flex gap-0.5 overflow-x-auto scrollbar-hide py-1.5 -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="max-w-[1600px] mx-auto">
+          <div className="flex gap-0.5 overflow-x-auto scrollbar-hide py-1.5 px-4 sm:px-6">
             {TABS.map((t) => {
               const active = tab === t.id;
               const count = t.id === "kitchen" ? activeCount
