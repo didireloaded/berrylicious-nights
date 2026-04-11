@@ -8,7 +8,7 @@ type ChatListRow = {
   id: string;
   user_id: string;
   updated_at: string;
-  profiles: { display_name: string | null } | null;
+  display_name: string | null;
 };
 
 type MsgRow = {
@@ -30,13 +30,26 @@ export function AdminMessagesPanel() {
   const fetchChats = useCallback(async () => {
     const { data, error } = await (supabase as any)
       .from("restaurant_chats")
-      .select("id, user_id, updated_at, profiles(display_name)")
+      .select("id, user_id, updated_at")
       .order("updated_at", { ascending: false });
     if (error) {
       toast.error(error.message);
       return;
     }
-    setChats((data ?? []) as unknown as ChatListRow[]);
+    // Fetch display names from profiles
+    const rows = (data ?? []) as { id: string; user_id: string; updated_at: string }[];
+    const userIds = [...new Set(rows.map((r) => r.user_id))];
+    let nameMap: Record<string, string | null> = {};
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, display_name")
+        .in("user_id", userIds);
+      for (const p of profiles ?? []) {
+        nameMap[p.user_id] = p.display_name;
+      }
+    }
+    setChats(rows.map((r) => ({ ...r, display_name: nameMap[r.user_id] ?? null })));
   }, []);
 
   const loadMessages = useCallback(async (chatId: string) => {
@@ -128,7 +141,7 @@ export function AdminMessagesPanel() {
         <div className="overflow-y-auto flex-1 p-2 space-y-1">
           {chats.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">No conversations yet</p>}
           {chats.map((c) => {
-            const label = c.profiles?.display_name?.trim() || c.user_id.slice(0, 8);
+            const label = c.display_name?.trim() || c.user_id.slice(0, 8);
             const active = c.id === selectedChatId;
             return (
               <button
@@ -157,7 +170,7 @@ export function AdminMessagesPanel() {
           <>
             <div className="px-3 py-2 border-b border-border">
               <p className="text-sm font-bold text-foreground">
-                {selected?.profiles?.display_name?.trim() || "Guest"}{" "}
+                {selected?.display_name?.trim() || "Guest"}{" "}
                 <span className="text-xs font-normal text-muted-foreground">({selected?.user_id.slice(0, 8)}…)</span>
               </p>
             </div>
