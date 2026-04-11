@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/context/AppContext";
 import heroImage from "@/assets/hero-restaurant.jpg";
 import gallery1 from "@/assets/gallery-1.jpg";
@@ -20,6 +20,7 @@ import { CalendarDays, ShoppingBag, MessageCircle, Sparkles, Instagram, Heart, U
 import { RestaurantChatSheet } from "@/components/RestaurantChatSheet";
 import { clientOfTheDay } from "@/data/clientOfTheDay";
 import { getHomePromoTeaser } from "@/data/promoSpotlight";
+import { useScrollRevealContainer } from "@/hooks/useScrollReveal";
 
 const heroVideoUrl = (import.meta.env.VITE_HERO_VIDEO_URL ?? "").trim();
 
@@ -126,6 +127,7 @@ const HomePage = () => {
   }, [todayStr, nightBlurb, crowdLoading, crowd?.level]);
 
   const timeCtx = useMemo(() => getHomeTimeContext(new Date(nowTick)), [nowTick]);
+  const scrollContainer = useScrollRevealContainer<HTMLDivElement>(0.08, 80);
 
   const heroGoldLine =
     updates.length > 0
@@ -306,10 +308,10 @@ const HomePage = () => {
         </div>
       </section>
 
-      <div className="px-6 max-w-lg mx-auto space-y-10 mt-10">
+      <div ref={scrollContainer} className="px-6 max-w-lg mx-auto space-y-10 mt-10">
         {/* 3. Events — compact grid */}
         {updates.length > 0 && (
-          <section className="animate-fade-in">
+          <section className="scroll-reveal">
             <h2 className="font-display text-xl font-semibold text-foreground mb-3">Events</h2>
             <div className="grid grid-cols-2 gap-2.5">
               {updates.map((update) => {
@@ -331,7 +333,7 @@ const HomePage = () => {
         )}
 
         {/* Social hook — story-style entry points (replaces busy menu grid) */}
-        <section className="animate-fade-in">
+        <section className="scroll-reveal">
           <h2 className="font-display text-lg font-semibold text-foreground">The room tonight</h2>
           <p className="text-xs text-muted-foreground mt-1 mb-4 leading-relaxed">
             Peek the feed, browse the menu, and see who we&apos;re celebrating tonight — before you pick plates.
@@ -418,7 +420,7 @@ const HomePage = () => {
 
         {/* Decision shortcuts — popular tonight */}
         {popularItems.length > 0 && (
-          <section className="animate-fade-in">
+          <section className="scroll-reveal">
             <h2 className="font-display text-lg font-semibold text-foreground">Popular tonight</h2>
             <p className="text-xs text-muted-foreground mt-1 mb-3">Crowd favourites — tap to add or open the dish.</p>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-6 px-6 scrollbar-hide snap-x snap-mandatory">
@@ -454,7 +456,7 @@ const HomePage = () => {
         )}
 
         {trendingDrinks.length > 0 && (
-          <section className="animate-fade-in">
+          <section className="scroll-reveal">
             <h2 className="font-display text-lg font-semibold text-foreground">Trending drinks</h2>
             <p className="text-xs text-muted-foreground mt-1 mb-3">Bar picks that pair with the room tonight.</p>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-6 px-6 scrollbar-hide snap-x snap-mandatory">
@@ -497,7 +499,7 @@ const HomePage = () => {
 
         {/* Welcome back */}
         {user && displayName && (
-          <section className="animate-fade-in">
+          <section className="scroll-reveal">
             <div className="glass-card rounded-lg p-4">
               <p className="text-foreground font-semibold">Welcome back, {displayName}</p>
               {profile?.last_order && (
