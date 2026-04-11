@@ -141,7 +141,7 @@ export function AdminMessagesPanel() {
         <div className="overflow-y-auto flex-1 p-2 space-y-1">
           {chats.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">No conversations yet</p>}
           {chats.map((c) => {
-            const label = c.profiles?.display_name?.trim() || c.user_id.slice(0, 8);
+            const label = c.display_name?.trim() || c.user_id.slice(0, 8);
             const active = c.id === selectedChatId;
             return (
               <button
@@ -170,7 +170,7 @@ export function AdminMessagesPanel() {
           <>
             <div className="px-3 py-2 border-b border-border">
               <p className="text-sm font-bold text-foreground">
-                {selected?.profiles?.display_name?.trim() || "Guest"}{" "}
+                {selected?.display_name?.trim() || "Guest"}{" "}
                 <span className="text-xs font-normal text-muted-foreground">({selected?.user_id.slice(0, 8)}…)</span>
               </p>
             </div>
