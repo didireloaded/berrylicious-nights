@@ -10,21 +10,29 @@ import PageLoader from "@/components/PageLoader";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { AboutSheetProvider } from "@/context/AboutSheetContext";
 
-const HomePage = lazy(() => import("@/pages/HomePage"));
-const MenuPage = lazy(() => import("@/pages/MenuPage"));
-const MenuItemPage = lazy(() => import("@/pages/MenuItemPage"));
-const PromoSpotlightPage = lazy(() => import("@/pages/PromoSpotlightPage"));
-const AboutRouteRedirect = lazy(() => import("@/pages/AboutRouteRedirect"));
-const BookingPage = lazy(() => import("@/pages/BookingPage"));
-const BookingSuccessPage = lazy(() => import("@/pages/BookingSuccessPage"));
-const CartPage = lazy(() => import("@/pages/CartPage"));
-const PlanMyNightPage = lazy(() => import("@/pages/PlanMyNightPage"));
-const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
-const AuthPage = lazy(() => import("@/pages/AuthPage"));
-const AdminPage = lazy(() => import("@/pages/AdminPage"));
-const OrderTrackingPage = lazy(() => import("@/pages/OrderTrackingPage"));
-const MessagesPage = lazy(() => import("@/pages/MessagesPage"));
-const NotFound = lazy(() => import("@/pages/NotFound"));
+/** Auto-retry dynamic imports once on failure (stale cache after rebuild). */
+function retryImport<T>(fn: () => Promise<T>): Promise<T> {
+  return fn().catch(() => {
+    // Force reload from server on stale chunk hash
+    return fn();
+  });
+}
+
+const HomePage = lazy(() => retryImport(() => import("@/pages/HomePage")));
+const MenuPage = lazy(() => retryImport(() => import("@/pages/MenuPage")));
+const MenuItemPage = lazy(() => retryImport(() => import("@/pages/MenuItemPage")));
+const PromoSpotlightPage = lazy(() => retryImport(() => import("@/pages/PromoSpotlightPage")));
+const AboutRouteRedirect = lazy(() => retryImport(() => import("@/pages/AboutRouteRedirect")));
+const BookingPage = lazy(() => retryImport(() => import("@/pages/BookingPage")));
+const BookingSuccessPage = lazy(() => retryImport(() => import("@/pages/BookingSuccessPage")));
+const CartPage = lazy(() => retryImport(() => import("@/pages/CartPage")));
+const PlanMyNightPage = lazy(() => retryImport(() => import("@/pages/PlanMyNightPage")));
+const ProfilePage = lazy(() => retryImport(() => import("@/pages/ProfilePage")));
+const AuthPage = lazy(() => retryImport(() => import("@/pages/AuthPage")));
+const AdminPage = lazy(() => retryImport(() => import("@/pages/AdminPage")));
+const OrderTrackingPage = lazy(() => retryImport(() => import("@/pages/OrderTrackingPage")));
+const MessagesPage = lazy(() => retryImport(() => import("@/pages/MessagesPage")));
+const NotFound = lazy(() => retryImport(() => import("@/pages/NotFound")));
 
 /** In-app order toasts + browser Notification API (web). */
 function OrderNotificationEffects() {
