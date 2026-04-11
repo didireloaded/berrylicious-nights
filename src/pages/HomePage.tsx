@@ -234,7 +234,7 @@ const HomePage = () => {
             <button
               type="button"
               onClick={() => setSelectedEvent(updates[0])}
-              className="w-full text-left rounded-2xl border border-white/10 bg-black/45 px-4 py-4 backdrop-blur-md card-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              className="w-full text-left rounded-2xl glass-strong px-4 py-4 card-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             >
               <p className="text-[22px] font-bold leading-tight text-white">{timeCtx.heroTitle}</p>
               <p className="mt-1 text-[15px] font-semibold leading-snug text-primary">{heroGoldLine}</p>
@@ -245,7 +245,7 @@ const HomePage = () => {
               </p>
             </button>
           ) : (
-            <div className="rounded-2xl border border-white/10 bg-black/45 px-4 py-4 backdrop-blur-md">
+            <div className="rounded-2xl glass-strong px-4 py-4">
               <p className="text-[22px] font-bold leading-tight text-white">{timeCtx.heroTitle}</p>
               <p className="mt-1 text-[15px] font-semibold leading-snug text-primary">{heroGoldLine}</p>
               <p className="mt-1 text-xs text-white/50 leading-snug">{timeCtx.heroSubtitle}</p>
@@ -257,7 +257,7 @@ const HomePage = () => {
           )}
 
           {/* 2. Primary action — Plan first (menu + preorder continuity) */}
-          <div className="mt-5 rounded-[20px] bg-[#1A1A1A] px-5 py-5 shadow-2xl ring-1 ring-white/10">
+          <div className="mt-5 rounded-[20px] glass-card px-5 py-5 shadow-2xl">
             <p className="text-xl font-bold leading-tight text-white">Tonight is sorted</p>
             <p className="mt-1.5 text-sm leading-relaxed text-white/55">
               {nightBlurb.time} · {nightBlurb.food} · {nightBlurb.drink}
@@ -319,7 +319,7 @@ const HomePage = () => {
                     key={update.id}
                     type="button"
                     onClick={() => setSelectedEvent(update)}
-                    className="rounded-xl border border-border bg-[#1A1A1A] p-2.5 text-left transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 card-interactive btn-press"
+                    className="rounded-xl glass-card p-2.5 text-left transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 card-interactive btn-press"
                   >
                     <h3 className="line-clamp-2 text-sm font-semibold text-white">{update.title}</h3>
                     <p className="mt-1.5 text-xs text-white/50">{evTime}</p>
@@ -368,8 +368,7 @@ const HomePage = () => {
               href="https://instagram.com/berrylicious__restaurant"
               target="_blank"
               rel="noopener noreferrer"
-              className="snap-start shrink-0 w-[148px] rounded-2xl border border-border bg-card p-4 text-left shadow-md shadow-black/10 transition-colors hover:border-primary/30 btn-press"
-            >
+              className="snap-start shrink-0 w-[148px] rounded-2xl glass-card p-4 text-left shadow-md shadow-black/10 transition-colors hover:border-primary/30 btn-press"
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-500/15 text-pink-400 mb-3">
                 <Instagram className="h-5 w-5" />
               </div>
@@ -379,7 +378,7 @@ const HomePage = () => {
             <button
               type="button"
               onClick={() => openAbout()}
-              className="snap-start shrink-0 w-[148px] rounded-2xl border border-border bg-card p-4 text-left shadow-md shadow-black/10 transition-colors hover:border-primary/30 btn-press"
+              className="snap-start shrink-0 w-[148px] rounded-2xl glass-card p-4 text-left shadow-md shadow-black/10 transition-colors hover:border-primary/30 btn-press"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white mb-3">
                 <Heart className="h-5 w-5 text-primary" />
@@ -388,7 +387,7 @@ const HomePage = () => {
               <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">Hours, contact, gallery — the vibe in one place.</p>
             </button>
           </div>
-          <div className="mt-5 rounded-2xl border border-border/80 bg-gradient-to-br from-card to-background/80 px-4 py-4">
+          <div className="mt-5 rounded-2xl glass-subtle px-4 py-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-primary mb-3">Right now</p>
             <div className="flex gap-3 text-sm text-muted-foreground leading-snug">
               <Users className="w-5 h-5 shrink-0 text-primary mt-0.5" aria-hidden />
@@ -425,7 +424,7 @@ const HomePage = () => {
               {popularItems.map((item) => (
                 <div key={item.id} className="w-[120px] shrink-0 snap-start touch-manipulation">
                   <Link to={`/menu/${item.id}`} className="block">
-                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                     <div className="overflow-hidden rounded-xl glass-card">
                       <img
                         src={item.image}
                         alt=""
@@ -461,7 +460,7 @@ const HomePage = () => {
               {trendingDrinks.map((item) => (
                 <div key={item.id} className="w-[120px] shrink-0 snap-start touch-manipulation">
                   <Link to={`/menu/${item.id}`} className="block">
-                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                    <div className="overflow-hidden rounded-xl glass-card">
                       <img
                         src={item.image}
                         alt=""
@@ -498,7 +497,7 @@ const HomePage = () => {
         {/* Welcome back */}
         {user && displayName && (
           <section className="animate-fade-in">
-            <div className="bg-card border border-border rounded-lg p-4">
+            <div className="glass-card rounded-lg p-4">
               <p className="text-foreground font-semibold">Welcome back, {displayName}</p>
               {profile?.last_order && (
                 <p className="text-muted-foreground text-sm mt-1">
