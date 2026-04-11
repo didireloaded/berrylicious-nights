@@ -119,6 +119,7 @@ const PlanMyNightPage = () => {
   const { user, profile, refreshProfile } = useAuth();
   const { setCurrentOrder } = useApp();
   const [submitting, setSubmitting] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [people, setPeople] = useState<PlanPeople | null>(null);
   const [vibe, setVibe] = useState<PlanVibe | null>(null);
