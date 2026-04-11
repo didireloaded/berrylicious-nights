@@ -46,9 +46,9 @@ export function RestaurantChatSheet({ open, onOpenChange }: RestaurantChatSheetP
               <MessageCircle className="h-6 w-6 text-primary" strokeWidth={2} />
             </div>
             <div>
-              <p className="font-display text-lg font-bold tracking-tight text-white">Chat with us</p>
+              <p className="font-display text-lg font-bold tracking-tight text-white">Berrylicious</p>
               <p className="mt-0.5 text-xs leading-snug text-white/55">
-                Tap your vibe for a suggested plan — or write below and the team will pick it up.
+                We're here to help — ask about the menu, events, or book a table.
               </p>
             </div>
           </div>
