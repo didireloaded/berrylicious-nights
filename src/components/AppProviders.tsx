@@ -46,6 +46,18 @@ function BottomChromePaddingSync() {
   return null;
 }
 
+/** Hide bottom chrome on admin page */
+function ChromeWrapper() {
+  const { pathname } = useLocation();
+  if (pathname === "/admin") return null;
+  return (
+    <>
+      <CartBar />
+      <BottomNav />
+    </>
+  );
+}
+
 const AppProviders = () => {
   return (
     <CartProvider>
@@ -77,8 +89,7 @@ const AppProviders = () => {
             </Routes>
           </Suspense>
         </main>
-        <CartBar />
-        <BottomNav />
+        <ChromeWrapper />
         </AboutSheetProvider>
       </BrowserRouter>
       </AppProvider>
