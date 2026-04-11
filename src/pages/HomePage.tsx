@@ -190,7 +190,7 @@ const HomePage = () => {
       {homePriority === "plan" && (
         <Link
           to="/plan"
-          className="fixed left-4 right-4 z-[55] mx-auto max-w-lg rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-center text-sm font-bold text-amber-100 shadow-lg backdrop-blur-md transition-colors hover:bg-amber-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 top-[max(12px,calc(env(safe-area-inset-top,0px)+8px))]"
+          className="fixed left-4 right-16 z-[55] max-w-lg rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-center text-sm font-bold text-amber-100 shadow-lg backdrop-blur-md transition-colors hover:bg-amber-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 top-[max(12px,calc(env(safe-area-inset-top,0px)+8px))]"
         >
           <span className="inline-flex items-center justify-center gap-2">
             <Sparkles className="h-4 w-4 shrink-0 text-primary" />
