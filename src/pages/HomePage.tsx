@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/context/AppContext";
 import heroImage from "@/assets/hero-restaurant.jpg";
 import gallery1 from "@/assets/gallery-1.jpg";
