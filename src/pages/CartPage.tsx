@@ -30,7 +30,7 @@ const SuggestionItem = ({ item }: { item: any }) => {
   };
 
   return (
-    <div className="flex items-center gap-3 bg-card border border-border rounded-lg p-3 animate-fade-in">
+    <div className="flex items-center gap-3 glass-card rounded-lg p-3 animate-fade-in">
       <img src={item.image} alt={item.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-foreground font-semibold text-sm truncate">{item.name}</p>
@@ -197,7 +197,7 @@ const CartPage = () => {
 
       <div className="space-y-4 mb-8">
         {items.map((item) => (
-          <div key={item.id} className="flex gap-3 bg-card border border-border rounded-lg p-3 animate-fade-in">
+          <div key={item.id} className="flex gap-3 glass-card rounded-lg p-3 animate-fade-in">
             <img src={item.image} alt={item.name} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between">
@@ -230,7 +230,7 @@ const CartPage = () => {
       </div>
 
       {/* Summary */}
-      <div className="bg-card border border-border rounded-lg p-4 mb-6 space-y-2">
+      <div className="glass-card rounded-lg p-4 mb-6 space-y-2">
         <div className="flex justify-between text-muted-foreground text-sm">
           <span>Subtotal</span>
           <span>{formatPrice(totalPrice)}</span>

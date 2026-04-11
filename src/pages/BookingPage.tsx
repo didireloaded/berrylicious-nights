@@ -158,7 +158,7 @@ const BookingPage = () => {
     <div className="min-h-screen pb-safe-nav px-6 pt-6 max-w-lg mx-auto animate-fade-in">
       <h1 className="font-display text-3xl font-bold mb-4">Book a table</h1>
 
-      <div className="mb-6 rounded-2xl border border-border bg-card px-4 py-4">
+      <div className="mb-6 rounded-2xl glass-card px-4 py-4">
         <p className="text-sm leading-relaxed text-muted-foreground">
           Best time tonight:{" "}
           <span className="font-semibold text-foreground">{bannerTime}</span>
@@ -196,7 +196,7 @@ const BookingPage = () => {
                     ? "border-primary bg-primary text-primary-foreground scale-[1.03] shadow-lg shadow-primary/25 ring-2 ring-primary/30"
                     : isSuggested
                       ? "border-primary bg-primary/20 text-foreground shadow-sm shadow-primary/10"
-                      : "border-border bg-[#1A1A1A] text-foreground hover:border-primary/35"
+                      : "border-border glass-subtle text-foreground hover:border-primary/35"
                 }`}
               >
                 <span className="flex items-center gap-2">
@@ -223,7 +223,7 @@ const BookingPage = () => {
             value={date}
             min={today}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full bg-card border border-border rounded-lg py-3 pl-10 pr-4 text-foreground focus:outline-none focus:border-primary transition-colors [color-scheme:dark]"
+            className="w-full glass-subtle border-0 rounded-lg py-3 pl-10 pr-4 text-foreground focus:outline-none focus:border-primary transition-colors [color-scheme:dark]"
           />
         </div>
       </div>
@@ -231,7 +231,7 @@ const BookingPage = () => {
       {/* Guests */}
       <div className="mb-6 animate-fade-in">
         <label className="text-sm text-muted-foreground font-medium mb-2 block">Guests</label>
-        <div className="flex items-center gap-4 bg-card border border-border rounded-lg p-3">
+        <div className="flex items-center gap-4 glass-subtle rounded-lg p-3">
           <button
             onClick={() => setGuests(Math.max(1, guests - 1))}
             className="w-10 h-10 rounded-lg bg-surface flex items-center justify-center hover:bg-muted transition-colors active:scale-95"
@@ -287,7 +287,7 @@ const BookingPage = () => {
       </div>
 
       {/* Waitlist */}
-      <div className="mb-8 rounded-2xl border border-border bg-card px-4 py-4">
+      <div className="mb-8 rounded-2xl glass-card px-4 py-4">
         <div className="flex items-center gap-2 text-foreground font-semibold text-sm">
           <ListOrdered className="w-4 h-4 text-primary shrink-0" />
           Smart waitlist
