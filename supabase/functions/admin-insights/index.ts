@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,12 +11,54 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // ── Auth: require admin role ──
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsErr } = await supabaseAuth.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const userId = claimsData.claims.sub as string;
+
+    // Check admin role using service role client
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    const { data: roleRow } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (!roleRow) {
+      return new Response(JSON.stringify({ error: "Admin access required" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Business logic ──
     const { orders, bookings, type = "shift-summary" } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    // Build context from the data
     const todayStr = new Date().toISOString().split("T")[0];
     const todayOrders = (orders || []).filter((o: any) => String(o.created_at).startsWith(todayStr));
     const completedToday = todayOrders.filter((o: any) => o.status === "completed");
@@ -28,7 +71,6 @@ serve(async (req) => {
       .filter((o: any) => ["completed", "ready", "preparing"].includes(o.status))
       .reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
 
-    // Item frequency
     const itemCounts: Record<string, number> = {};
     for (const o of orders || []) {
       if (Array.isArray(o.items)) {
@@ -44,7 +86,6 @@ serve(async (req) => {
       .slice(0, 8)
       .map(([name, count]) => `${name}: ${count}x`);
 
-    // Hour distribution
     const hourCounts: Record<number, number> = {};
     for (const o of orders || []) {
       const h = new Date(o.created_at).getHours();
@@ -52,12 +93,9 @@ serve(async (req) => {
     }
     const peakHour = Object.entries(hourCounts).sort((a, b) => Number(b[1]) - Number(a[1]))[0];
 
-    // Booking stats
     const arrivedBookings = todayBookings.filter((b: any) => b.status === "arrived" || b.status === "seated").length;
     const cancelledBookings = todayBookings.filter((b: any) => b.status === "cancelled").length;
     const totalGuests = todayBookings.reduce((s: number, b: any) => s + (b.guests || 0), 0);
-
-    // Average order value
     const avgOrderValue = todayOrders.length > 0 ? Math.round(revenue / todayOrders.length) : 0;
 
     const dataContext = `
