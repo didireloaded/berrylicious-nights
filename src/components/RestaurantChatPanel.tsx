@@ -136,7 +136,7 @@ export function RestaurantChatPanel({
     setThinking(true);
     try {
       const { data, error } = await supabase.functions.invoke("restaurant-chat-ai", {
-        body: { messages: recentMessages, userId: user.id },
+        body: { messages: recentMessages },
       });
 
       if (error) throw error;

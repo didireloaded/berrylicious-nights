@@ -34,14 +34,32 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, userId } = await req.json();
+    const { messages } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase env not configured");
+
+    // ── Extract authenticated user from JWT (optional — chat works for guests too) ──
+    let userId: string | null = null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const token = authHeader.replace("Bearer ", "");
+        const { data: claimsData } = await supabaseAuth.auth.getClaims(token);
+        if (claimsData?.claims?.sub) {
+          userId = claimsData.claims.sub as string;
+        }
+      } catch {
+        // Non-authenticated user — proceed without user context
+      }
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -77,7 +95,7 @@ serve(async (req) => {
         }).join("\n")
       : "No special events currently scheduled.";
 
-    // 3. User profile context (if logged in)
+    // 3. User profile context (if authenticated)
     let userContext = "";
     if (userId) {
       const { data: profile } = await supabase
@@ -93,7 +111,6 @@ serve(async (req) => {
         }
       }
 
-      // Check active bookings
       const todayStr = new Date().toISOString().split("T")[0];
       const { data: bookings } = await supabase
         .from("bookings")
@@ -107,7 +124,6 @@ serve(async (req) => {
         userContext += `\nUpcoming bookings: ${bookings.map((b: any) => `${b.date} at ${b.time} for ${b.guests} guests`).join("; ")}.`;
       }
 
-      // Check active orders
       const { data: activeOrders } = await supabase
         .from("orders")
         .select("status, items, total")
