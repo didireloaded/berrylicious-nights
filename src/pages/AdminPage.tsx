@@ -633,6 +633,31 @@ const AdminPage = () => {
                 <h3 className="font-display text-sm font-semibold text-foreground mb-3">Menu 86 Board</h3>
                 <AdminMenuDisabledPanel />
               </div>
+              <div className="rounded-xl border border-border/40 bg-card/60 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Instagram Sync</h3>
+                    <p className="text-[11px] text-muted-foreground/60 mt-0.5">Pull latest events from the Instagram page</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      toast.loading("Syncing Instagram…", { id: "ig-sync" });
+                      try {
+                        const { data, error } = await supabase.functions.invoke("sync-instagram");
+                        if (error) throw error;
+                        if (data?.error) { toast.error(data.error, { id: "ig-sync" }); return; }
+                        toast.success(data.message || "Sync complete", { id: "ig-sync" });
+                        fetchBookings();
+                      } catch (err: any) {
+                        toast.error("Instagram sync failed", { id: "ig-sync" });
+                      }
+                    }}
+                    className="text-xs bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Sync Now
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
