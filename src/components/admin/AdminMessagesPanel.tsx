@@ -8,7 +8,7 @@ type ChatListRow = {
   id: string;
   user_id: string;
   updated_at: string;
-  profiles: { display_name: string | null } | null;
+  display_name: string | null;
 };
 
 type MsgRow = {
