@@ -369,6 +369,7 @@ const HomePage = () => {
               target="_blank"
               rel="noopener noreferrer"
               className="snap-start shrink-0 w-[148px] rounded-2xl glass-card p-4 text-left shadow-md shadow-black/10 transition-colors hover:border-primary/30 btn-press"
+            >
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-500/15 text-pink-400 mb-3">
                 <Instagram className="h-5 w-5" />
               </div>
