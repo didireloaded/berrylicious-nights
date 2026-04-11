@@ -20,6 +20,7 @@ import { CalendarDays, ShoppingBag, MessageCircle, Sparkles, Instagram, Heart, U
 import { RestaurantChatSheet } from "@/components/RestaurantChatSheet";
 import { clientOfTheDay } from "@/data/clientOfTheDay";
 import { getHomePromoTeaser } from "@/data/promoSpotlight";
+import { useScrollRevealContainer } from "@/hooks/useScrollReveal";
 
 const heroVideoUrl = (import.meta.env.VITE_HERO_VIDEO_URL ?? "").trim();
 
