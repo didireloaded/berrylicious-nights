@@ -36,7 +36,7 @@ const CartBar = () => {
       <Link
         to="/cart"
         ref={barRef as any}
-        className="flex min-h-[44px] touch-manipulation items-center justify-between bg-primary text-primary-foreground rounded-xl px-4 py-2.5 shadow-lg shadow-primary/20 btn-press max-w-lg mx-auto pointer-events-auto"
+        className="flex min-h-[44px] touch-manipulation items-center justify-between bg-primary text-primary-foreground rounded-xl px-4 py-2.5 shadow-lg shadow-primary/25 btn-press max-w-lg mx-auto pointer-events-auto backdrop-blur-md"
       >
         <div className="flex items-center gap-3">
           <div className="relative">
