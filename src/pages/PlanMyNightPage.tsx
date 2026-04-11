@@ -473,6 +473,7 @@ const PlanMyNightPage = () => {
       </div>
       )}
 
+      <RestaurantChatSheet open={chatOpen} onOpenChange={setChatOpen} />
     </div>
   );
 };
