@@ -173,7 +173,7 @@ const HomePage = () => {
       {homePriority === "order" && currentOrder && (
         <Link
           to={`/order/${currentOrder.id}`}
-          className="fixed left-4 right-4 z-[55] mx-auto max-w-lg rounded-2xl border border-primary/40 bg-primary/15 px-4 py-3 text-center text-sm font-bold text-primary shadow-lg backdrop-blur-md transition-colors hover:bg-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 top-[max(12px,calc(env(safe-area-inset-top,0px)+8px))]"
+          className="fixed left-4 right-16 z-[55] max-w-lg rounded-2xl border border-primary/40 bg-primary/15 px-4 py-3 text-center text-sm font-bold text-primary shadow-lg backdrop-blur-md transition-colors hover:bg-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 top-[max(12px,calc(env(safe-area-inset-top,0px)+8px))]"
         >
           Order live — {String(currentOrder.status)} · tap to track
         </Link>
@@ -182,7 +182,7 @@ const HomePage = () => {
         <Link
           to="/booking/success"
           state={currentBooking}
-          className="fixed left-4 right-4 z-[55] mx-auto max-w-lg rounded-2xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3 text-center text-sm font-bold text-emerald-200 shadow-lg backdrop-blur-md transition-colors hover:bg-emerald-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40 top-[max(12px,calc(env(safe-area-inset-top,0px)+8px))]"
+          className="fixed left-4 right-16 z-[55] max-w-lg rounded-2xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3 text-center text-sm font-bold text-emerald-200 shadow-lg backdrop-blur-md transition-colors hover:bg-emerald-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40 top-[max(12px,calc(env(safe-area-inset-top,0px)+8px))]"
         >
           Table tonight {currentBooking.time} · {currentBooking.guests} guests — details and code
         </Link>
