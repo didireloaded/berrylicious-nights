@@ -162,7 +162,7 @@ const MenuPage = () => {
             {displayedItems.map((item, index) => (
               <div
                 key={item.id}
-                className={`animate-fade-in stagger-${Math.min(index + 1, 6)} opacity-0`}
+                className={`animate-fade-in stagger-${Math.min(index + 1, 6)} opacity-0 h-full`}
                 style={{ animationFillMode: "forwards" }}
               >
                 <MenuCard item={item} disabled={isUnavailable(item.id)} />
