@@ -127,6 +127,7 @@ const HomePage = () => {
   }, [todayStr, nightBlurb, crowdLoading, crowd?.level]);
 
   const timeCtx = useMemo(() => getHomeTimeContext(new Date(nowTick)), [nowTick]);
+  const scrollContainer = useScrollRevealContainer<HTMLDivElement>(0.08, 80);
 
   const heroGoldLine =
     updates.length > 0
