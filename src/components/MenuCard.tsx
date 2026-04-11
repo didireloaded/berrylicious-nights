@@ -25,7 +25,7 @@ const MenuCard = memo(function MenuCard({ item, disabled }: { item: MenuItem; di
 
   const inner = (
     <>
-      <div className="relative overflow-hidden aspect-square">
+      <div className="relative overflow-hidden aspect-[4/3]">
         <img
           src={item.image}
           alt={item.name}
@@ -39,7 +39,7 @@ const MenuCard = memo(function MenuCard({ item, disabled }: { item: MenuItem; di
           </span>
         ) : null}
         {item.popular && !disabled && (
-          <span className="absolute top-1.5 left-1.5 bg-primary text-primary-foreground text-[9px] font-semibold px-1.5 py-0.5 rounded">
+          <span className="absolute top-1 left-1 bg-primary text-primary-foreground text-[8px] font-semibold px-1.5 py-0.5 rounded">
             Popular
           </span>
         )}
