@@ -308,10 +308,10 @@ const HomePage = () => {
         </div>
       </section>
 
-      <div className="px-6 max-w-lg mx-auto space-y-10 mt-10">
+      <div ref={scrollContainer} className="px-6 max-w-lg mx-auto space-y-10 mt-10">
         {/* 3. Events — compact grid */}
         {updates.length > 0 && (
-          <section className="animate-fade-in">
+          <section className="scroll-reveal">
             <h2 className="font-display text-xl font-semibold text-foreground mb-3">Events</h2>
             <div className="grid grid-cols-2 gap-2.5">
               {updates.map((update) => {
