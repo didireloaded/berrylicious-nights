@@ -417,16 +417,25 @@ const PlanMyNightPage = () => {
               <p className="mt-2 text-sm text-muted-foreground">+ {plan.extras.map((e) => e.name).join(", ")}</p>
             )}
             <p className="mt-4 text-base font-bold text-primary">Table ready</p>
-            <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{plan.note}</p>
+             <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{plan.note}</p>
 
-            <button
-              type="button"
-              onClick={reset}
-              className="mt-10 w-full text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Start over
-            </button>
-          </div>
+             <button
+               type="button"
+               onClick={() => setChatOpen(true)}
+               className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 py-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/20 btn-press"
+             >
+               <MessageCircle className="h-4 w-4" />
+               Need to tweak anything? Chat with us
+             </button>
+
+             <button
+               type="button"
+               onClick={reset}
+               className="mt-4 w-full text-sm text-muted-foreground transition-colors hover:text-foreground"
+             >
+               Start over
+             </button>
+           </div>
         )}
           </>
         )}
