@@ -44,8 +44,8 @@ const MenuCard = memo(function MenuCard({ item, disabled }: { item: MenuItem; di
           </span>
         )}
       </div>
-      <div className="p-1.5">
-        <h3 className="font-display text-foreground text-[11px] sm:text-xs font-semibold truncate leading-tight">{item.name}</h3>
+      <div className="p-1">
+        <h3 className="font-display text-foreground text-[10px] sm:text-xs font-semibold truncate leading-tight">{item.name}</h3>
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-primary font-semibold text-xs">{formatPrice(item.price)}</span>
           {!disabled ? (
