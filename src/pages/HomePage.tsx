@@ -333,7 +333,7 @@ const HomePage = () => {
         )}
 
         {/* Social hook — story-style entry points (replaces busy menu grid) */}
-        <section className="animate-fade-in">
+        <section className="scroll-reveal">
           <h2 className="font-display text-lg font-semibold text-foreground">The room tonight</h2>
           <p className="text-xs text-muted-foreground mt-1 mb-4 leading-relaxed">
             Peek the feed, browse the menu, and see who we&apos;re celebrating tonight — before you pick plates.
@@ -420,7 +420,7 @@ const HomePage = () => {
 
         {/* Decision shortcuts — popular tonight */}
         {popularItems.length > 0 && (
-          <section className="animate-fade-in">
+          <section className="scroll-reveal">
             <h2 className="font-display text-lg font-semibold text-foreground">Popular tonight</h2>
             <p className="text-xs text-muted-foreground mt-1 mb-3">Crowd favourites — tap to add or open the dish.</p>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-6 px-6 scrollbar-hide snap-x snap-mandatory">
@@ -456,7 +456,7 @@ const HomePage = () => {
         )}
 
         {trendingDrinks.length > 0 && (
-          <section className="animate-fade-in">
+          <section className="scroll-reveal">
             <h2 className="font-display text-lg font-semibold text-foreground">Trending drinks</h2>
             <p className="text-xs text-muted-foreground mt-1 mb-3">Bar picks that pair with the room tonight.</p>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-6 px-6 scrollbar-hide snap-x snap-mandatory">
@@ -499,7 +499,7 @@ const HomePage = () => {
 
         {/* Welcome back */}
         {user && displayName && (
-          <section className="animate-fade-in">
+          <section className="scroll-reveal">
             <div className="glass-card rounded-lg p-4">
               <p className="text-foreground font-semibold">Welcome back, {displayName}</p>
               {profile?.last_order && (
