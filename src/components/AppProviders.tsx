@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { CartProvider, useCart } from "@/context/CartContext";
 import { AppProvider } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
