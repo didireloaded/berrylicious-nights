@@ -228,11 +228,37 @@
 .stagger-5 { animation-delay: 200ms; }
 .stagger-6 { animation-delay: 240ms; }
 
-/* 6. Glass panel */
+/* 6. Glass panel system */
 .glass {
-  background: hsl(var(--card) / 0.7);
+  background: hsl(var(--card) / 0.55);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid hsl(0 0% 100% / 0.08);
+}
+.glass-subtle {
+  background: hsl(0 0% 100% / 0.04);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid hsl(0 0% 100% / 0.06);
+}
+.glass-strong {
+  background: hsl(0 0% 100% / 0.07);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid hsl(0 0% 100% / 0.12);
+}
+.glass-card {
+  background: hsl(var(--card) / 0.45);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid hsl(0 0% 100% / 0.08);
+  box-shadow: 0 4px 24px hsl(0 0% 0% / 0.25), inset 0 1px 0 hsl(0 0% 100% / 0.05);
+}
+.glass-nav {
+  background: hsl(var(--background) / 0.75);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid hsl(0 0% 100% / 0.06);
 }
 
 /* 7. Content padding above fixed bottom nav (+ cart bar when open). --pb-bottom-chrome set in AppProviders. */
