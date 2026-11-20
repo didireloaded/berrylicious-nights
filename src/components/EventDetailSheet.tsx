@@ -2,10 +2,6 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { CalendarDays, Sparkles, UtensilsCrossed } from "lucide-react";
-import heroImage from "@/assets/hero-restaurant.jpg";
-import gallery1 from "@/assets/gallery-1.jpg";
-import gallery2 from "@/assets/gallery-2.jpg";
-import gallery3 from "@/assets/gallery-3.jpg";
 import { slotLabel } from "@/lib/bookingSlots";
 import {
   computeOpenSlotsForDate,
@@ -15,14 +11,6 @@ import {
   type BookingNavState,
   type HomeUpdateRow,
 } from "@/lib/eventBooking";
-
-const EVENT_IMAGES = [gallery1, gallery2, gallery3, heroImage];
-
-function imageForEvent(id: string) {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h + id.charCodeAt(i)) % EVENT_IMAGES.length;
-  return EVENT_IMAGES[h];
-}
 
 function formatNightLabel(isoDate: string) {
   try {
@@ -89,10 +77,9 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
 
   if (!event) return null;
 
-  const imageSrc = imageForEvent(event.id);
   const details =
     event.subtitle?.trim() ||
-    "Reserve a table or explore the menu — walk-ins welcome while space lasts.";
+    "Explore the menu or check available reservation times for this date.";
 
   const eventDate = resolveEventDate(event);
   const headlineTime = resolveHeadlineTime(event);
@@ -136,15 +123,7 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-2">
-          <div className="overflow-hidden rounded-xl">
-            <img
-              src={imageSrc}
-              alt=""
-              className="h-44 w-full object-cover"
-              decoding="async"
-            />
-          </div>
-          <p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-primary">
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-primary">
             {event.type}
           </p>
           <h2 id="event-sheet-title" className="font-display mt-1 text-xl font-bold leading-tight text-foreground">
@@ -200,7 +179,7 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-center text-sm font-bold text-primary-foreground btn-press"
           >
             <CalendarDays className="h-5 w-5 shrink-0" />
-            Book for this event
+            {slotsLoading || slotsError || openSlots.length === 0 ? "Check table availability" : "Book for this event"}
           </button>
           <Link
             to="/plan"
