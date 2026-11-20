@@ -42,6 +42,7 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
   const navigate = useNavigate();
   const [openSlots, setOpenSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState(false);
 
   useEffect(() => {
     if (!event) return;
@@ -49,11 +50,20 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
     const candidates = resolveBaseSlots(event);
     let cancelled = false;
     setSlotsLoading(true);
-    void computeOpenSlotsForDate(date, candidates).then((open) => {
-      if (cancelled) return;
-      setOpenSlots(open);
-      setSlotsLoading(false);
-    });
+    setSlotsError(false);
+    void computeOpenSlotsForDate(date, candidates)
+      .then((open) => {
+        if (cancelled) return;
+        setOpenSlots(open);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSlotsError(true);
+        setOpenSlots([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSlotsLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -149,9 +159,13 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
           <p className="mt-6 text-sm font-semibold text-foreground">Available tables</p>
           {slotsLoading ? (
             <p className="mt-2 text-xs text-muted-foreground">Checking what&apos;s open…</p>
+          ) : slotsError ? (
+            <p role="alert" className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              We couldn't check live availability. Please try booking directly.
+            </p>
           ) : openSlots.length === 0 ? (
-            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-              No open slots for the listed times on this night — continue to choose any time on the booking screen.
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              No tables currently show as available for these times. Try another date.
             </p>
           ) : (
             <div className="mt-3 flex flex-wrap gap-2">
