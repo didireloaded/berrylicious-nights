@@ -51,7 +51,7 @@ const BookingSuccessPage = () => {
       </div>
 
       <h1 className="font-display text-3xl font-bold text-foreground mb-2">
-        Your table is booked
+        {booking ? "Your table is booked" : "Reservation not found"}
       </h1>
 
       {booking ? (
@@ -119,7 +119,7 @@ const BookingSuccessPage = () => {
           to="/menu"
           className="flex-1 bg-primary text-primary-foreground font-semibold py-4 rounded-lg text-center btn-press"
         >
-          Skip the wait — Pre-order now →
+          {booking ? "Explore the menu" : "Browse menu"}
         </Link>
         <Link
           to="/"
