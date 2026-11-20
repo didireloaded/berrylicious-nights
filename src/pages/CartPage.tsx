@@ -146,8 +146,8 @@ const CartPage = () => {
     const popular = menuItems.filter((i) => i.popular).slice(0, 3);
 
     return (
-      <div className="min-h-screen pb-safe-nav px-6 pt-6 max-w-lg mx-auto animate-fade-in">
-        <h1 className="font-display text-3xl font-bold mb-8">Your Order</h1>
+      <div className="min-h-dvh pb-safe-nav mx-auto max-w-[560px] bg-[#121212] px-5 pt-[max(34px,env(safe-area-inset-top,0px))] text-white sm:px-8">
+        <h1 className="font-display text-[38px] font-extrabold leading-tight tracking-[-0.055em] mb-8">Your Order</h1>
 
         <div className="text-center py-8 mb-8">
           <p className="text-foreground font-semibold mb-1">Your cart is empty</p>
@@ -165,7 +165,7 @@ const CartPage = () => {
 
         <Link
           to="/menu"
-          className="block w-full border border-primary text-primary font-semibold py-3.5 rounded-lg text-center hover:bg-primary/10 transition-colors mt-6 btn-press"
+          className="mt-7 flex min-h-12 w-full items-center justify-center rounded-full border border-[#ff5a1f] px-5 text-base font-semibold text-[#ff7b50] transition-colors hover:bg-[#ff5a1f]/10"
         >
           Browse Full Menu
         </Link>
@@ -174,18 +174,18 @@ const CartPage = () => {
   }
 
   return (
-    <div className="min-h-screen pb-safe-nav px-6 pt-6 max-w-lg mx-auto animate-fade-in">
-      <h1 className="font-display text-3xl font-bold mb-6">Your Order</h1>
+    <div className="min-h-dvh pb-safe-nav mx-auto max-w-[560px] bg-[#121212] px-5 pt-[max(34px,env(safe-area-inset-top,0px))] text-white sm:px-8">
+      <h1 className="font-display text-[38px] font-extrabold leading-tight tracking-[-0.055em] mb-8">Your Order</h1>
 
       {/* Order Type Selector */}
       <div className="mb-6">
         <p className="text-sm text-muted-foreground font-medium mb-3">How are you ordering?</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2.5">
           {orderTypeOptions.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setOrderType(opt.value)}
-              className={`py-3 px-2 rounded-lg text-center text-xs font-semibold border btn-press ${
+              className={`min-h-[58px] px-2 py-3 rounded-2xl text-center text-[13px] font-semibold border btn-press ${
                 orderType === opt.value
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-card text-foreground border-border hover:border-primary/40"
@@ -202,7 +202,7 @@ const CartPage = () => {
 
       <div className="space-y-4 mb-8">
         {items.map((item) => (
-          <div key={item.id} className="flex gap-3 rounded-xl border border-border bg-card p-4">
+          <div key={item.id} className="flex gap-3 rounded-[22px] border border-white/10 bg-[#242424] p-4">
             {item.verifiedImage && <img src={item.image} alt={item.name} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />}
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between">
@@ -235,7 +235,7 @@ const CartPage = () => {
       </div>
 
       {/* Summary */}
-      <div className="glass-card rounded-lg p-4 mb-6 space-y-2">
+      <div className="rounded-[22px] border border-white/10 bg-[#242424] p-5 mb-6 space-y-4">
         <div className="flex justify-between text-muted-foreground text-sm">
           <span>Subtotal</span>
           <span>{formatPrice(totalPrice)}</span>
@@ -249,7 +249,7 @@ const CartPage = () => {
       <button
         onClick={handleCheckout}
         disabled={submitting}
-        className="w-full bg-primary text-primary-foreground font-semibold py-4 rounded-lg btn-press disabled:opacity-50"
+        className="min-h-[56px] w-full rounded-full bg-[#ff5a1f] px-5 text-base font-semibold text-white transition-colors hover:bg-[#f76d3c] active:scale-[0.99] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
       >
         {submitting ? "Placing order..." : "Place Order"}
       </button>
