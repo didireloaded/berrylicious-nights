@@ -104,7 +104,7 @@ export default function MenuItemPage() {
           <p className="mt-3 max-w-[370px] text-[21px] font-medium leading-snug tracking-[-0.03em] text-white/90">{item.name}</p>
           <button
             type="button"
-            onClick={() => document.getElementById("dish-information")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            onClick={() => document.getElementById("dish-information")?.scrollIntoView({ block: "start" })}
             className="mt-6 inline-flex min-h-12 items-center gap-3 rounded-full border border-white/55 bg-white/10 px-5 text-[14px] font-medium text-white backdrop-blur-lg transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
           >
             <BookOpen className="h-4 w-4" aria-hidden="true" /> Information
