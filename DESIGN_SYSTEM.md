@@ -34,3 +34,16 @@ Legacy food assets show categories and are **illustrative**, not verified images
 - **Do not auto-publish production** until preview QA is complete
 
 Note: the current public hostname references Butchers Block while the app is branded Berrylicious. Confirm final branding before any production release.
+
+
+## November 2026 reference expansion
+
+- Search has a real featured-only toggle, not a cosmetic filter switch.
+- The category scroller uses circular photos with an orange selected ring. Category photos are illustrative and the visible category labels come from the actual menu.
+- Quick action pills Ask / Menu / Contact / Explore must navigate to real features. "Ask" opens the existing assistant, which requires authentication where the app already requires it. Contact opens the actual About/contact sheet.
+- The order banner must read real order state from Supabase when authorized. If only a local snapshot is available, clearly label it as last-known. Never invent drivers, ratings, exact ETAs, phone numbers or addresses.
+- A floating cart summary shows actual quantities and totals and stays clear of the primary bottom navigation.
+- The cart uses list rows, 44px-or-better quantity targets and an accurate N$ order summary. The real checkout currently places restaurant orders. There is **no integrated card-payment gateway**, so never show a fake Visa card, "Pay now" button, promo form or payment success.
+- No placeholder maps or map/list toggle for a single restaurant. Add a map feature only when backed by verified locations and an actual map service.
+- Avoid hard-coded USD prices, demo users, app reviews, Unsplash random photos and fake offer prices.
+- Photo-led screens must remain usable on 320-390px phones, and every floating element must leave room for buttons and the safe area.
