@@ -38,7 +38,7 @@ const BookingPage = () => {
   const [waitlistBusy, setWaitlistBusy] = useState(false);
   const [waitlistSnap, setWaitlistSnap] = useState<{ position: number; est: number } | null>(null);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = getWindhoekDateISO();
 
   useEffect(() => {
     let cancelled = false;
