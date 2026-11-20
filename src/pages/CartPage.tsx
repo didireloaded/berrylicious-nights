@@ -51,7 +51,14 @@ export default function CartPage() {
 
     // Guest RLS can block a follow-up SELECT even though INSERT succeeded.
     // Tracking still works from a stored snapshot, so never submit the same order again.
-    const { data: full } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
+    // An RLS-blocked read or a temporary network failure must not invite a duplicate order.
+    let full: Record<string, any> | null = null;
+    try {
+      const response = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
+      full = response.data as Record<string, any> | null;
+    } catch {
+      // The server already accepted the order, so continue with local tracking.
+    }
     const snapshot: TrackableOrderSnapshot = {
       id: orderId,
       items: full?.items ?? orderItems,
