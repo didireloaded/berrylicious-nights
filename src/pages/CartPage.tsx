@@ -58,14 +58,13 @@ const CartPage = () => {
   const navigate = useNavigate();
   const [orderType, setOrderType] = useState<OrderType>("pickup");
   const [submitting, setSubmitting] = useState(false);
-  const deliveryFee = items.length > 0 ? 20 : 0;
 
   const handleCheckout = async () => {
     if (submitting) return;
     setSubmitting(true);
 
     const orderItems = items.map((i) => ({ name: i.name, qty: i.quantity, price: i.price }));
-    const total = totalPrice + deliveryFee;
+    const total = totalPrice;
 
     let orderId: string;
     try {
@@ -235,13 +234,9 @@ const CartPage = () => {
           <span>Subtotal</span>
           <span>{formatPrice(totalPrice)}</span>
         </div>
-        <div className="flex justify-between text-muted-foreground text-sm">
-          <span>Service fee</span>
-          <span>{formatPrice(deliveryFee)}</span>
-        </div>
         <div className="border-t border-border pt-2 flex justify-between text-foreground font-semibold">
           <span>Total</span>
-          <span className="text-primary">{formatPrice(totalPrice + deliveryFee)}</span>
+          <span className="text-primary">{formatPrice(totalPrice)}</span>
         </div>
       </div>
 
