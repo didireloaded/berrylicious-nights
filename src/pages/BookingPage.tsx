@@ -139,9 +139,16 @@ const BookingPage = () => {
       ...(arrival_code ? { arrival_code } : {}),
       ...(assigned_table_code ? { assigned_table_code } : {}),
     };
-    const existing = JSON.parse(localStorage.getItem("berrylicious-bookings") || "[]");
-    existing.push(localData);
-    localStorage.setItem("berrylicious-bookings", JSON.stringify(existing));
+    // Local history is optional. A storage failure must never hide a confirmed server booking.
+    try {
+      const existing = JSON.parse(localStorage.getItem("berrylicious-bookings") || "[]");
+      if (Array.isArray(existing)) {
+        existing.push(localData);
+        localStorage.setItem("berrylicious-bookings", JSON.stringify(existing));
+      }
+    } catch {
+      // Booking was saved remotely and can still be shown to the guest.
+    }
 
     navigate("/booking/success", { state: localData });
   };
@@ -173,7 +180,7 @@ const BookingPage = () => {
       return;
     }
     if (phone.length < 6) {
-      toast.error("Add a phone number so we can text you when a table opens");
+      toast.error("Add a phone number the restaurant can use to contact you");
       return;
     }
     setWaitlistBusy(true);
@@ -204,8 +211,8 @@ const BookingPage = () => {
 
       <div className="mb-6 rounded-2xl glass-card px-4 py-4">
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Best time tonight:{" "}
-          <span className="font-semibold text-foreground">{bannerTime}</span>
+          Selected date:{" "}
+          <span className="font-semibold text-foreground">{date}</span>
           {checkingTimes ? " · Checking times" : timesError ? " · Availability unavailable" : tablesAlmostFull ? " · Limited availability" : " · Please select an open time"}
           {eventTimeSlots?.length && date === suggestedDate && suggestedDate ? " · Event night" : ""}
         </p>
