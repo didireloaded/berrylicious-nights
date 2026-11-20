@@ -31,7 +31,7 @@ const SuggestionItem = ({ item }: { item: any }) => {
 
   return (
     <div className="flex items-center gap-3 glass-card rounded-lg p-3 animate-fade-in">
-      <img src={item.image} alt={item.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+      {item.verifiedImage && <img src={item.image} alt={item.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />}
       <div className="flex-1 min-w-0">
         <p className="text-foreground font-semibold text-sm truncate">{item.name}</p>
         <p className="text-muted-foreground text-xs truncate">{item.description}</p>
@@ -196,8 +196,8 @@ const CartPage = () => {
 
       <div className="space-y-4 mb-8">
         {items.map((item) => (
-          <div key={item.id} className="flex gap-3 glass-card rounded-lg p-3 animate-fade-in">
-            <img src={item.image} alt={item.name} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
+          <div key={item.id} className="flex gap-3 rounded-xl border border-border bg-card p-4">
+            {item.verifiedImage && <img src={item.image} alt={item.name} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />}
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between">
                 <h3 className="font-display text-foreground font-semibold truncate">{item.name}</h3>
