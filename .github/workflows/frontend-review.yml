@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [refresh/editorial-restaurant-ux-2026]
+    branches: [main, feature/food-discovery-cart-polish-2026]
 
 jobs:
   verify:
@@ -16,15 +16,67 @@ jobs:
           node-version: "22"
           cache: "npm"
       - name: Install dependencies
-        # package-lock.json predates the PWA/auth additions, so npm ci is not usable yet.
-        run: npm install --no-audit --no-fund --legacy-peer-deps
+        id: install
+        continue-on-error: true
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund --legacy-peer-deps > qa-install.log 2>&1
+          result=$?
+          cat qa-install.log
+          exit $result
       - name: TypeScript diagnostics
-        run: npx tsc --noEmit -p tsconfig.app.json
+        id: typescript
+        if: steps.install.outcome == 'success'
         continue-on-error: true
+        shell: bash
+        run: |
+          npx tsc --noEmit -p tsconfig.app.json > qa-typescript.log 2>&1
+          result=$?
+          cat qa-typescript.log
+          exit $result
       - name: Build
-        run: npm run build
-      - name: Unit tests
-        run: npm test
-      - name: Lint (legacy code diagnostics)
-        run: npm run lint
+        id: build
+        if: steps.install.outcome == 'success'
         continue-on-error: true
+        shell: bash
+        run: |
+          npm run build > qa-build.log 2>&1
+          result=$?
+          cat qa-build.log
+          exit $result
+      - name: Unit tests
+        id: tests
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          npm test > qa-tests.log 2>&1
+          result=$?
+          cat qa-tests.log
+          exit $result
+      - name: Lint (legacy code diagnostics)
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          npm run lint > qa-lint.log 2>&1
+          result=$?
+          cat qa-lint.log
+          exit $result
+      - name: Upload diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-qa-logs
+          path: qa-*.log
+          if-no-files-found: warn
+      - name: Enforce build and tests
+        if: always()
+        shell: bash
+        env:
+          INSTALL: ${{ steps.install.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+        run: |
+          echo "Install: $INSTALL | Build: $BUILD | Tests: $TESTS"
+          test "$INSTALL" = success && test "$BUILD" = success && test "$TESTS" = success
