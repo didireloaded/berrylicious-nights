@@ -126,9 +126,15 @@ const CartPage = () => {
       createdAt: new Date().toISOString(),
       arrival_code: full.arrival_code as string | undefined,
     };
-    const existing = JSON.parse(localStorage.getItem("berrylicious-orders") || "[]");
-    existing.push(order);
-    localStorage.setItem("berrylicious-orders", JSON.stringify(existing));
+    try {
+      const existing = JSON.parse(localStorage.getItem("berrylicious-orders") || "[]");
+      if (Array.isArray(existing)) {
+        existing.push(order);
+        localStorage.setItem("berrylicious-orders", JSON.stringify(existing));
+      }
+    } catch {
+      // Successful remote order must not be blocked by unavailable browser storage.
+    }
 
     clearCart();
     if (refreshProfile) await refreshProfile();
