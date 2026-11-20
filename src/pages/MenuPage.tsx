@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import { menuItems, categories } from "@/data/menu";
 import MenuCard from "@/components/MenuCard";
-import PopularCard from "@/components/PopularCard";
 import { useMenuAvailability } from "@/hooks/useMenuAvailability";
 import { Input } from "@/components/ui/input";
 
@@ -52,20 +51,20 @@ const MenuPage = () => {
 
   return (
     <div className="pb-safe-nav animate-fade-in">
-      <div className="px-4 pt-2 max-w-lg mx-auto sm:px-6 sm:pt-3">
-        <h1 className="font-display text-2xl sm:text-3xl font-bold leading-tight">Our menu</h1>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-1 mb-2 leading-snug">
-          Crowd favourites, featured plates, then everything.
+      <div className="px-4 pt-2 max-w-6xl mx-auto sm:px-8 sm:pt-8">
+        <h1 className="font-display text-3xl sm:text-5xl font-semibold leading-tight">Explore the menu</h1>
+        <p className="text-sm text-muted-foreground mt-2 mb-6 leading-snug">
+          Find something for the table. Browse by course or search for a favourite.
         </p>
 
-        <div className="relative mb-2">
+        <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" aria-hidden />
           <Input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search dishes, ingredients…"
-            className="h-10 rounded-lg border-border bg-card/80 pl-9 pr-9 text-sm placeholder:text-muted-foreground/70"
+            className="h-12 rounded-lg border-border bg-card pl-10 pr-9 text-base placeholder:text-muted-foreground/70"
             aria-label="Search menu"
             autoComplete="off"
             enterKeyHint="search"
@@ -89,7 +88,7 @@ const MenuPage = () => {
               key={p.id}
               type="button"
               onClick={() => setLens(p.id)}
-              className={`shrink-0 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors btn-press ${
+              className={`shrink-0 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors btn-press ${
                 lens === p.id
                   ? "bg-primary text-primary-foreground shadow-md shadow-primary/15"
                   : "bg-card text-muted-foreground border border-border hover:text-foreground"
@@ -100,19 +99,6 @@ const MenuPage = () => {
           ))}
         </div>
 
-        {/* Most ordered strip — quick adds when browsing full menu */}
-        {lens === "all" && activeCategory === "All" && popular.length > 0 && (
-          <section className="mb-2 mt-2 animate-fade-in">
-            <h2 className="font-display text-sm font-semibold text-foreground">Most ordered</h2>
-            <p className="text-[11px] text-muted-foreground mb-1.5">One tap to cart.</p>
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 scrollbar-hide">
-              {popular.map((item) => (
-                <PopularCard key={item.id} item={item} disabled={isUnavailable(item.id)} />
-              ))}
-            </div>
-          </section>
-        )}
-
         {/* Category tabs — full menu lens only */}
         {lens === "all" && (
           <div className="flex gap-1.5 overflow-x-auto pb-1 mb-1.5 -mx-4 px-4 sm:-mx-6 sm:px-6 scrollbar-hide">
@@ -121,7 +107,7 @@ const MenuPage = () => {
                 key={cat}
                 type="button"
                 onClick={() => setActiveCategory(cat)}
-                className={`shrink-0 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors btn-press ${
+                className={`shrink-0 px-4 py-2.5 rounded-md text-sm font-medium transition-colors btn-press ${
                   activeCategory === cat
                     ? "bg-primary/15 text-primary border border-primary/30"
                     : "bg-card text-muted-foreground border border-border hover:text-foreground"
@@ -158,12 +144,12 @@ const MenuPage = () => {
             )}
           </p>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-2 gap-1 sm:gap-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {displayedItems.map((item, index) => (
               <div
                 key={item.id}
-                className={`animate-fade-in stagger-${Math.min(index + 1, 6)} opacity-0 h-full`}
-                style={{ animationFillMode: "forwards" }}
+                className="h-full"
+                
               >
                 <MenuCard item={item} disabled={isUnavailable(item.id)} />
               </div>
