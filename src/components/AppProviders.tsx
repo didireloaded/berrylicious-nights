@@ -5,6 +5,7 @@ import { AppProvider } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import { useCustomerOrderStatusNotifications } from "@/hooks/useCustomerOrderStatusNotifications";
 import BottomNav from "@/components/BottomNav";
+import SiteHeader from "@/components/SiteHeader";
 import CartBar from "@/components/CartBar";
 import PageLoader from "@/components/PageLoader";
 import { ScrollToTop } from "@/components/ScrollToTop";
@@ -45,7 +46,7 @@ function OrderNotificationEffects() {
 function BottomChromePaddingSync() {
   const { totalItems } = useCart();
   useEffect(() => {
-    const chrome = totalItems > 0 ? "7.75rem" : "4rem";
+    const chrome = totalItems > 0 ? "9rem" : "5.5rem";
     document.documentElement.style.setProperty("--pb-bottom-chrome", chrome);
     return () => {
       document.documentElement.style.removeProperty("--pb-bottom-chrome");
@@ -73,6 +74,7 @@ const AppProviders = () => {
       <BottomChromePaddingSync />
       <BrowserRouter>
         <AboutSheetProvider>
+        <SiteHeader />
         <ScrollToTop />
         <OrderNotificationEffects />
         <main id="main-content" tabIndex={-1} className="block min-h-dvh outline-none focus:outline-none">
