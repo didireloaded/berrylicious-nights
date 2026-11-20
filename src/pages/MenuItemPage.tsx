@@ -80,14 +80,12 @@ const MenuItemPage = () => {
 
   return (
     <div className="pb-safe-nav animate-fade-in">
-      {/* Image */}
-      <div className="relative">
-        <img
-          src={item.image}
-          alt={item.name}
-          className="w-full h-72 object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />
+      {/* Only show the image once staff verify it depicts this exact dish. */}
+      <div className={"relative " + (item.verifiedImage ? "h-72" : "h-24 border-b border-border bg-card")}>
+        {item.verifiedImage && (
+          <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+        )}
+        {item.verifiedImage && <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />}
 
         <button
           type="button"
@@ -113,8 +111,9 @@ const MenuItemPage = () => {
         </div>
       </div>
 
-      <div className="px-6 max-w-lg mx-auto -mt-6 relative">
-        <h1 className="font-display text-3xl font-bold text-foreground mb-1">
+      <div className="px-6 pt-6 max-w-3xl mx-auto relative">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-primary">{item.category}</p>
+        <h1 className="font-display text-3xl sm:text-4xl font-semibold text-foreground mb-2">
           {item.name}
         </h1>
         <p className="text-primary font-semibold text-xl mb-4">
@@ -129,14 +128,16 @@ const MenuItemPage = () => {
           <div className="flex items-center gap-3 bg-card border border-border rounded-lg px-3 py-2">
             <button
               onClick={() => setQty(Math.max(1, qty - 1))}
-              className="w-8 h-8 rounded bg-surface flex items-center justify-center hover:bg-muted transition-colors active:scale-95"
+              aria-label="Decrease quantity"
+              className="w-10 h-10 rounded bg-surface flex items-center justify-center hover:bg-muted transition-colors active:scale-95"
             >
               <Minus className="w-4 h-4 text-foreground" />
             </button>
             <span className="text-foreground font-semibold text-lg w-8 text-center">{qty}</span>
             <button
               onClick={() => setQty(qty + 1)}
-              className="w-8 h-8 rounded bg-surface flex items-center justify-center hover:bg-muted transition-colors active:scale-95"
+              aria-label="Increase quantity"
+              className="w-10 h-10 rounded bg-surface flex items-center justify-center hover:bg-muted transition-colors active:scale-95"
             >
               <Plus className="w-4 h-4 text-foreground" />
             </button>
@@ -158,12 +159,12 @@ const MenuItemPage = () => {
         {upsellItems.length > 0 && (
           <div>
             <h2 className="font-display text-lg font-semibold mb-1">Goes well with</h2>
-            <p className="text-xs text-muted-foreground mb-3">Drinks and sides guests often add with this dish.</p>
+            <p className="text-sm text-muted-foreground mb-3">Dishes and drinks you might enjoy alongside this one.</p>
             <div className="space-y-3">
               {upsellItems.map((r) => (
                 <div key={r.id} className="flex items-center gap-3 bg-card border border-border rounded-lg p-3">
                   <Link to={`/menu/${r.id}`} className="flex flex-1 min-w-0 items-center gap-3 hover:opacity-90">
-                    <img src={r.image} alt={r.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                    {r.verifiedImage && <img src={r.image} alt={r.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <p className="text-foreground font-semibold text-sm truncate">{r.name}</p>
                       <p className="text-muted-foreground text-xs truncate">{r.description}</p>
