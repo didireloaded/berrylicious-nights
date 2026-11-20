@@ -34,7 +34,7 @@ export default function MenuPage() {
     if (fromUrl && categories.includes(fromUrl)) setCategory(fromUrl);
     if (params.get("focusSearch") === "1") {
       searchInput.current?.focus();
-      searchInput.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      searchInput.current?.scrollIntoView({ block: "nearest" });
     }
   }, [params]);
 
