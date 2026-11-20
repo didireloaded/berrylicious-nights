@@ -164,8 +164,6 @@ const BookingPage = () => {
     if (nextOpenSlot) setSelectedTime(nextOpenSlot.time);
   }, [checkingTimes, timesError, bookedTimes, selectedTime, slotOptions]);
 
-  const bannerTime = recommendTime;
-
   const fullyBooked = useMemo(() => {
     if (slotOptions.length === 0) return false;
     const taken = new Set(bookedTimes);
