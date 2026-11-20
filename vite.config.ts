@@ -27,8 +27,8 @@ export default defineConfig(({ mode }) => ({
         short_name: "Berrylicious",
         description:
           "Book a table, browse the menu, and order — premium dining in Windhoek.",
-        theme_color: "#0b0b0b",
-        background_color: "#0b0b0b",
+        theme_color: "#121212",
+        background_color: "#121212",
         display: "standalone",
         display_override: ["standalone", "minimal-ui", "browser"],
         scope: "./",
