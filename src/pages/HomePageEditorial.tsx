@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, CalendarDays, MessageCircle, ShoppingBag } from "lucide-react";
 import heroImage from "@/assets/hero-restaurant.jpg";
@@ -21,6 +21,14 @@ export default function HomePageEditorial() {
   const [selectedEvent, setSelectedEvent] = useState<HomeUpdateRow | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduceMotion(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
   const featured = useMemo(() => menuItems.filter((item) => item.popular).slice(0, 4), []);
   const hasCurrentBooking = Boolean(currentBooking && currentBooking.date >= getWindhoekDateISO());
   const hasCurrentOrder = Boolean(
@@ -30,7 +38,7 @@ export default function HomePageEditorial() {
   return (
     <div className="min-h-dvh overflow-x-clip pb-safe-nav">
       <section className="relative isolate flex min-h-[680px] flex-col justify-end overflow-hidden lg:min-h-[720px]">
-        {heroVideoUrl && !videoFailed ? (
+        {heroVideoUrl && !videoFailed && !reduceMotion ? (
           <video
             autoPlay
             muted
