@@ -1,233 +1,139 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, CalendarDays, MessageCircle, ShoppingBag } from "lucide-react";
-import heroImage from "@/assets/hero-restaurant.jpg";
+import { ArrowRight, CalendarDays, MapPin, ShoppingBag } from "lucide-react";
+import heroFood from "@/assets/dish-burger.jpg";
+import detailFood from "@/assets/dish-lamb.jpg";
+import cocktail from "@/assets/dish-cocktail.jpg";
 import { useApp } from "@/context/AppContext";
 import { useActiveUpdates } from "@/hooks/useActiveUpdates";
 import { useAboutSheet } from "@/context/AboutSheetContext";
 import { EventDetailSheet } from "@/components/EventDetailSheet";
-import { RestaurantChatSheet } from "@/components/RestaurantChatSheet";
-import { menuItems } from "@/data/menu";
 import type { HomeUpdateRow } from "@/lib/eventBooking";
-import { formatPrice } from "@/lib/vibe";
 import { getWindhoekDateISO } from "@/lib/windhoekDate";
 
-const heroVideoUrl = (import.meta.env.VITE_HERO_VIDEO_URL ?? "").trim();
-
 export default function HomePageEditorial() {
-  const updates = useActiveUpdates();
   const { currentOrder, currentBooking } = useApp();
+  const updates = useActiveUpdates();
   const { openAbout } = useAboutSheet();
   const [selectedEvent, setSelectedEvent] = useState<HomeUpdateRow | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [videoFailed, setVideoFailed] = useState(false);
-  const [reduceMotion, setReduceMotion] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setReduceMotion(media.matches);
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
-  const featured = useMemo(() => menuItems.filter((item) => item.popular).slice(0, 4), []);
-  const hasCurrentBooking = Boolean(currentBooking && currentBooking.date >= getWindhoekDateISO());
-  const hasCurrentOrder = Boolean(
-    currentOrder && ["pending", "preparing", "ready"].includes(String(currentOrder.status)),
-  );
+  const hasOrder = Boolean(currentOrder && ["pending", "preparing", "ready"].includes(String(currentOrder.status)));
+  const hasBooking = Boolean(currentBooking && currentBooking.date >= getWindhoekDateISO());
+  const statusLink = useMemo(() => {
+    if (hasOrder && currentOrder) return { to: `/order/${currentOrder.id}`, label: "Track your order", state: undefined };
+    if (hasBooking && currentBooking) return { to: "/booking/success", label: "View your reservation", state: currentBooking };
+    return null;
+  }, [hasOrder, hasBooking, currentOrder, currentBooking]);
 
   return (
-    <div className="min-h-dvh overflow-x-clip pb-safe-nav">
-      <section className="relative isolate flex min-h-[680px] flex-col justify-end overflow-hidden lg:min-h-[720px]">
-        {heroVideoUrl && !videoFailed && !reduceMotion ? (
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            poster={heroImage}
-            onError={() => setVideoFailed(true)}
-            className="absolute inset-0 -z-20 h-full w-full object-cover"
-            aria-hidden="true"
-          >
-            <source src={heroVideoUrl} type="video/mp4" />
-          </video>
-        ) : (
-          <img
-            src={heroImage}
-            alt=""
-            width={1920}
-            height={1080}
-            fetchPriority="high"
-            decoding="async"
-            className="absolute inset-0 -z-20 h-full w-full object-cover"
-          />
-        )}
-        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-t from-background via-background/60 to-background/20 lg:bg-gradient-to-r lg:from-background/95 lg:via-background/65 lg:to-background/15" />
-        <div className="absolute inset-x-0 top-0 mx-auto flex w-full max-w-7xl items-center justify-between px-5 pt-[max(24px,env(safe-area-inset-top,0px))] lg:hidden">
-          <Link to="/" className="font-display text-2xl font-semibold tracking-tight text-white">
-            Berrylicious<span className="text-primary">.</span>
+    <div className="mx-auto min-h-dvh max-w-[560px] bg-[#121212] text-white">
+      <section className="relative isolate h-[100dvh] min-h-[640px] overflow-hidden bg-black">
+        <img
+          src={heroFood}
+          alt=""
+          fetchPriority="high"
+          decoding="async"
+          className="food-photo absolute inset-0 -z-20 h-full w-full object-cover object-[50%_25%]"
+        />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/45 via-black/10 via-[34%] to-black/90" aria-hidden="true" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/45 via-transparent to-transparent" aria-hidden="true" />
+
+        <header className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 px-5 pt-[max(30px,env(safe-area-inset-top,0px))] sm:px-7">
+          <Link to="/" aria-label="Berrylicious home" className="font-display text-[19px] font-extrabold tracking-[-0.055em] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+            berrylicious<span className="text-[#ff5a1f]">.</span>
           </Link>
-          <Link to="/booking" className="rounded-full border border-white/40 px-4 py-2.5 text-sm font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <Link to="/booking" className="flex min-h-10 shrink-0 items-center rounded-full border border-white/50 bg-black/20 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
             Book a table
           </Link>
-        </div>
-        <div className="mx-auto w-full max-w-7xl px-5 pb-20 pt-40 sm:px-8 lg:px-12 lg:pb-28">
-          <div className="max-w-[720px]">
-            <p className="mb-5 text-sm font-medium uppercase tracking-[0.2em] text-primary">Berrylicious · Windhoek</p>
-            <h1 className="font-display text-[clamp(3.35rem,9vw,6.6rem)] font-medium leading-[0.98] tracking-[-0.045em] text-white">
-              Come for dinner.<br />Stay for the night.
-            </h1>
-            <p className="mt-7 max-w-lg text-base leading-relaxed text-white/80 sm:text-lg">
-              Good food, drinks and time together. Make yourself at home.
-            </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link
-                to="/booking"
-                className="inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-primary px-7 py-3.5 text-base font-semibold text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              >
-                Book a table <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-              <Link
-                to="/menu"
-                className="inline-flex min-h-12 items-center justify-center gap-3 rounded-full border border-white/45 px-7 py-3.5 text-base font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              >
-                Explore the menu
-              </Link>
-            </div>
-          </div>
-          {(hasCurrentOrder || hasCurrentBooking) && (
-            <div className="mt-9 flex max-w-xl flex-col gap-3 rounded-2xl border border-white/20 bg-background/85 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-white">
-                  {hasCurrentOrder ? "Your order is in progress" : "You have an upcoming reservation"}
-                </p>
-                <p className="mt-1 text-sm text-white/70">
-                  {hasCurrentOrder ? "See the latest status of your order." : currentBooking?.date + " at " + currentBooking?.time}
-                </p>
-              </div>
-              <Link
-                to={hasCurrentOrder && currentOrder ? "/order/" + currentOrder.id : "/booking/success"}
-                state={!hasCurrentOrder ? currentBooking : undefined}
-                className="inline-flex items-center gap-2 self-start text-sm font-semibold text-primary sm:self-auto"
-              >
-                View details <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            </div>
-          )}
-        </div>
-      </section>
+        </header>
 
-      <section aria-labelledby="ways-heading" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
-        <div className="mb-11 max-w-2xl">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">Your evening, your way</p>
-          <h2 id="ways-heading" className="font-display text-4xl font-medium leading-tight text-foreground sm:text-5xl">
-            A place for the plans you make.
-          </h2>
-        </div>
-        <div className="divide-y divide-border border-y border-border">
-          {[
-            { num: "01", title: "Save your seat", text: "Choose the date, time and number of guests.", href: "/booking", action: "Reserve a table" },
-            { num: "02", title: "Pick what you love", text: "Browse the menu and order before you arrive.", href: "/menu", action: "Explore dishes" },
-            { num: "03", title: "Make a night of it", text: "Put together a dinner plan in a few simple steps.", href: "/plan", action: "Plan your evening" },
-          ].map((item) => (
-            <Link
-              key={item.num}
-              to={item.href}
-              className="group grid gap-3 py-6 transition-colors hover:bg-card/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:grid-cols-[60px_1fr_auto] sm:items-center sm:gap-8 sm:py-8"
-            >
-              <span className="text-sm font-medium text-primary">{item.num}</span>
-              <div>
-                <h3 className="font-display text-2xl font-medium text-foreground sm:text-3xl">{item.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground sm:text-base">{item.text}</p>
-              </div>
-              <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-                {item.action} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+        <div className="food-enter absolute inset-x-0 bottom-[138px] z-10 px-5 sm:px-7">
+          <p className="mb-4 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.19em] text-white/75">
+            <MapPin className="h-3 w-3 text-[#ff6b34]" aria-hidden="true" /> WINDHOEK, NAMIBIA
+          </p>
+          <h1 className="max-w-[510px] font-display text-[clamp(3.15rem,12.5vw,5.25rem)] font-extrabold leading-[0.95] tracking-[-0.075em] text-white">
+            <span className="block">Come</span>
+            <span className="flex items-center gap-[0.13em] whitespace-nowrap">
+              hungry.
+              <span className="relative inline-block h-[0.49em] w-[1.36em] shrink-0 overflow-hidden rounded-full border-2 border-white/60 bg-black/60 align-middle">
+                <img src={detailFood} alt="" className="h-full w-full object-cover" aria-hidden="true" />
               </span>
-            </Link>
-          ))}
+            </span>
+            <span className="block">Stay for</span>
+            <span className="flex items-center gap-[0.14em] whitespace-nowrap">
+              more.
+              <span className="relative inline-block h-[0.49em] w-[1.4em] shrink-0 overflow-hidden rounded-full border-2 border-white/60 bg-black/60 align-middle">
+                <img src={cocktail} alt="" className="h-full w-full object-cover" aria-hidden="true" />
+              </span>
+            </span>
+          </h1>
+          <p className="mt-5 max-w-[260px] text-[14px] leading-relaxed text-white/75">Good food. Good company. The rest is up to you.</p>
+        </div>
+
+        <div className="absolute bottom-6 left-5 z-20 max-w-[190px] sm:left-7">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">START HERE</span>
+          <span className="mt-1 block text-sm font-semibold">Explore the menu</span>
+        </div>
+        <div className="absolute -bottom-3 -right-3 z-20 h-[156px] w-[156px] rounded-tl-[110px] bg-white p-[12px]">
+          <Link
+            to="/menu"
+            aria-label="Explore the Berrylicious menu"
+            className="flex h-full w-full items-center justify-center rounded-tl-[98px] bg-[#ff5a1f] text-white transition-colors duration-200 hover:bg-[#fa703f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-inset"
+          >
+            <ArrowRight className="ml-6 mt-7 h-9 w-9 transition-transform duration-200 group-hover:translate-x-1" strokeWidth={2} aria-hidden="true" />
+          </Link>
         </div>
       </section>
 
-      <section aria-labelledby="menu-heading" className="border-y border-border bg-card/50">
-        <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20 lg:px-12 lg:py-28">
-          <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">From the menu</p>
-            <h2 id="menu-heading" className="font-display text-4xl font-medium leading-tight text-foreground sm:text-5xl">
-              Find your favourite.
-            </h2>
-            <p className="mt-5 max-w-sm text-base leading-relaxed text-muted-foreground">
-              Start with the dishes guests keep coming back for, then explore the full menu.
-            </p>
-            <Link to="/menu" className="mt-7 inline-flex min-h-11 items-center gap-3 border-b border-primary pb-1 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-              View full menu <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-          <div className="divide-y divide-border">
-            {featured.map((item) => (
-              <Link
-                key={item.id}
-                to={"/menu/" + item.id}
-                className="group flex items-start justify-between gap-6 py-5 first:pt-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <div className="min-w-0">
-                  <h3 className="font-display text-xl font-medium text-foreground sm:text-2xl">{item.name}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
-                </div>
-                <span className="shrink-0 pt-1 text-sm font-semibold text-primary">{formatPrice(item.price)}</span>
-              </Link>
-            ))}
-          </div>
+      {statusLink && (
+        <Link
+          to={statusLink.to}
+          state={statusLink.state}
+          className="flex items-center justify-between gap-4 border-b border-white/10 bg-[#202020] px-6 py-5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+        >
+          {statusLink.label} <ArrowRight className="h-5 w-5 text-[#ff5a1f]" />
+        </Link>
+      )}
+
+      <section className="px-6 py-16 sm:px-8" aria-labelledby="night-heading">
+        <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#ff794c]">MORE THAN A MEAL</p>
+        <h2 id="night-heading" className="mt-3 max-w-sm text-[38px] font-extrabold leading-[1.05] tracking-[-0.06em]">Make an evening of it.</h2>
+        <div className="mt-9 divide-y divide-white/10 border-y border-white/10">
+          <Link to="/booking" className="flex items-center justify-between gap-6 py-5 transition-colors hover:text-[#ff8358] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]">
+            <span><span className="block text-lg font-semibold">Reserve a table</span><span className="mt-1 block text-sm text-white/50">Choose your date and time.</span></span><CalendarDays className="h-6 w-6 shrink-0" strokeWidth={1.6} />
+          </Link>
+          <Link to="/plan" className="flex items-center justify-between gap-6 py-5 transition-colors hover:text-[#ff8358] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]">
+            <span><span className="block text-lg font-semibold">Plan your night</span><span className="mt-1 block text-sm text-white/50">Build your evening in a few steps.</span></span><ArrowRight className="h-6 w-6 shrink-0" strokeWidth={1.6} />
+          </Link>
+          <Link to="/cart" className="flex items-center justify-between gap-6 py-5 transition-colors hover:text-[#ff8358] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]">
+            <span><span className="block text-lg font-semibold">Your order</span><span className="mt-1 block text-sm text-white/50">See what is in your bag.</span></span><ShoppingBag className="h-6 w-6 shrink-0" strokeWidth={1.6} />
+          </Link>
         </div>
       </section>
 
       {updates.length > 0 && (
-        <section aria-labelledby="events-heading" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">At Berrylicious</p>
-          <h2 id="events-heading" className="font-display text-4xl font-medium text-foreground sm:text-5xl">What's happening</h2>
-          <div className="mt-9 divide-y divide-border border-y border-border">
-            {updates.slice(0, 6).map((event) => (
+        <section className="border-t border-white/10 px-6 py-12 sm:px-8" aria-labelledby="events-heading">
+          <h2 id="events-heading" className="text-[29px] font-semibold tracking-tight">What's happening</h2>
+          <div className="mt-5 divide-y divide-white/10">
+            {updates.slice(0, 5).map((event) => (
               <button
                 type="button"
                 key={event.id}
                 onClick={() => setSelectedEvent(event)}
-                className="group flex w-full items-center justify-between gap-6 py-6 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="flex min-h-[76px] w-full items-center justify-between gap-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
               >
-                <span>
-                  <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-primary">{event.type}</span>
-                  <span className="mt-2 block font-display text-2xl font-medium text-foreground">{event.title}</span>
-                  {event.subtitle && <span className="mt-2 block text-sm text-muted-foreground">{event.subtitle}</span>}
-                </span>
-                <ArrowRight className="h-5 w-5 shrink-0 text-primary transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                <span><span className="text-[11px] font-semibold uppercase tracking-wide text-[#ff8054]">{event.type}</span><span className="mt-1 block text-[16px] font-semibold">{event.title}</span></span>
+                <ArrowRight className="h-5 w-5 shrink-0" />
               </button>
             ))}
           </div>
         </section>
       )}
 
-      <section className="border-t border-border bg-card">
-        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-9 px-5 py-20 sm:px-8 lg:flex-row lg:items-center lg:px-12 lg:py-24">
-          <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">See you soon</p>
-            <h2 className="font-display text-4xl font-medium text-foreground sm:text-5xl">There's a seat for you.</h2>
-            <p className="mt-4 max-w-md text-base leading-relaxed text-muted-foreground">Planning something or just looking for dinner? Start with a table.</p>
-          </div>
-          <Link to="/booking" className="inline-flex min-h-12 shrink-0 items-center gap-3 rounded-full bg-primary px-7 py-3.5 text-base font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-            Book a table <CalendarDays className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </div>
-      </section>
-      <footer className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-9 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">
-        <span>Berrylicious · Windhoek, Namibia</span>
-        <div className="flex flex-wrap gap-x-6 gap-y-3">
-          <button type="button" onClick={openAbout} className="text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">About & contact</button>
-          <button type="button" onClick={() => setChatOpen(true)} className="inline-flex items-center gap-2 text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><MessageCircle className="h-4 w-4" aria-hidden="true" /> Ask us</button>
-          <Link to="/cart" className="inline-flex items-center gap-2 text-foreground underline-offset-4 hover:underline"><ShoppingBag className="h-4 w-4" aria-hidden="true" /> Your order</Link>
-          <a href="https://instagram.com/berrylicious__restaurant" rel="noreferrer noopener" target="_blank" className="text-foreground underline-offset-4 hover:underline">Instagram</a>
-        </div>
+      <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-white/10 px-6 py-8 text-[13px] text-white/55 sm:px-8">
+        <span>Berrylicious · Windhoek</span>
+        <button type="button" onClick={openAbout} className="text-white underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]">About & contact</button>
       </footer>
       <EventDetailSheet event={selectedEvent} onClose={() => setSelectedEvent(null)} />
-      <RestaurantChatSheet open={chatOpen} onOpenChange={setChatOpen} />
     </div>
   );
 }
