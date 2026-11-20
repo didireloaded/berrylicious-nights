@@ -1,4 +1,4 @@
-import { MapPin, Phone, Mail, Clock, Star, Instagram } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, Instagram } from "lucide-react";
 import { Link } from "react-router-dom";
 import gallery1 from "@/assets/gallery-1.jpg";
 import gallery2 from "@/assets/gallery-2.jpg";
@@ -40,7 +40,7 @@ export function AboutSheet({ open, onOpenChange }: AboutSheetProps) {
               <div>
                 <p className="font-display text-2xl font-bold text-foreground">About Berrylicious</p>
                 <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-                  <Star className="h-4 w-4 fill-primary text-primary" /> 4.5 · Restaurant &amp; Lounge
+                  Restaurant &amp; Lounge
                 </p>
               </div>
             </div>

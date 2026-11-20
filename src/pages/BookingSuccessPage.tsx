@@ -51,7 +51,7 @@ const BookingSuccessPage = () => {
       </div>
 
       <h1 className="font-display text-3xl font-bold text-foreground mb-2">
-        You're all set 🎉
+        {booking ? "Your table is booked" : "Reservation not found"}
       </h1>
 
       {booking ? (
@@ -105,12 +105,12 @@ const BookingSuccessPage = () => {
           <p className="text-muted-foreground text-sm mb-8">
             {booking.arrival_code
               ? "Keep the code handy — we’ll match you in seconds at the door."
-              : "We'll remind you 1 hour before. See you then. 🍸"}
+              : "Save these details and bring them with you when you arrive."}
           </p>
         </>
       ) : (
         <p className="text-muted-foreground text-lg mb-8">
-          Your table is confirmed. We'll see you soon 🍽️
+          No reservation details were found. You can make a booking below.
         </p>
       )}
 
@@ -119,7 +119,7 @@ const BookingSuccessPage = () => {
           to="/menu"
           className="flex-1 bg-primary text-primary-foreground font-semibold py-4 rounded-lg text-center btn-press"
         >
-          Skip the wait — Pre-order now →
+          {booking ? "Explore the menu" : "Browse menu"}
         </Link>
         <Link
           to="/"

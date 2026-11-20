@@ -1,82 +1,74 @@
-import { memo, useState, useRef } from "react";
+import { memo } from "react";
+import { Link } from "react-router-dom";
+import { ArrowUpRight, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
+import { menuArtwork } from "@/lib/menuArtwork";
 import type { MenuItem } from "@/data/menu";
 import { formatPrice } from "@/lib/vibe";
-import { Plus } from "lucide-react";
-import { Link } from "react-router-dom";
 
-const MenuCard = memo(function MenuCard({ item, disabled }: { item: MenuItem; disabled?: boolean }) {
+const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: MenuItem; disabled?: boolean }) {
   const { addItem } = useCart();
-  const [bounce, setBounce] = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
+  const artwork = menuArtwork(item);
 
-  const handleAdd = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const add = () => {
+    if (disabled) return;
     addItem(item);
-
-    setBounce(true);
-    setTimeout(() => setBounce(false), 300);
-
-    if (typeof navigator !== "undefined" && navigator.vibrate) {
-      navigator.vibrate(10);
-    }
+    toast.success(`${item.name} added to your order`);
   };
 
-  const inner = (
-    <>
-      <div className="relative overflow-hidden aspect-[4/3]">
-        <img
-          src={item.image}
-          alt={item.name}
-          loading="lazy"
-          decoding="async"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90"
-        />
-        {disabled ? (
-          <span className="absolute inset-0 flex items-center justify-center bg-background/70 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-            Off tonight
-          </span>
-        ) : null}
-        {item.popular && !disabled && (
-          <span className="absolute top-1 left-1 bg-primary text-primary-foreground text-[8px] font-semibold px-1.5 py-0.5 rounded">
-            Popular
-          </span>
+  return (
+    <article className={"relative mt-12 flex min-w-0 flex-col justify-between rounded-[27px] bg-[#242424] px-4 pb-4 pt-[72px] transition-transform duration-200 " + (disabled ? "opacity-55" : "hover:-translate-y-1")}>
+      <Link
+        to={`/menu/${item.id}`}
+        className="group absolute -top-11 left-1/2 flex h-[112px] w-[112px] -translate-x-1/2 items-center justify-center overflow-hidden rounded-full border-[5px] border-[#121212] bg-[#303030] shadow-[0_12px_20px_rgba(0,0,0,0.22)] outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+        aria-label={`View ${item.name}`}
+      >
+        {artwork.src ? (
+          <img
+            src={artwork.src}
+            alt={artwork.isExactDish ? item.name : ""}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.08]"
+          />
+        ) : (
+          <span className="max-w-[80px] text-center text-[11px] font-bold uppercase tracking-[0.12em] text-white/65">{item.category}</span>
         )}
-      </div>
-      <div className="p-1">
-        <h3 className="font-display text-foreground text-[10px] sm:text-xs font-semibold truncate leading-tight">{item.name}</h3>
-        <div className="flex items-center justify-between mt-0.5">
-          <span className="text-primary font-semibold text-xs">{formatPrice(item.price)}</span>
-          {!disabled ? (
-            <button
-              ref={btnRef}
-              onClick={handleAdd}
-              className={`shrink-0 w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center btn-press ${bounce ? "animate-scale-bounce" : ""}`}
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            <span className="text-[9px] text-muted-foreground">—</span>
+      </Link>
+      <div className="mt-3 flex flex-1 flex-col">
+        <Link to={`/menu/${item.id}`} className="min-h-[55px] text-[17px] font-semibold leading-[1.2] tracking-[-0.035em] text-white outline-none focus-visible:underline">
+          {item.name}
+        </Link>
+        <p className="mt-2 line-clamp-2 min-h-[38px] text-[12px] leading-[1.45] text-[#a4a4a4]">{item.description}</p>
+        <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#ff7b50]">{item.category}</div>
+        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+          <div>
+            <span className="block text-[17px] font-semibold tracking-tight text-white">{formatPrice(item.price)}</span>
+            {disabled && <span className="mt-1 block text-xs text-white/50">Unavailable</span>}
+          </div>
+          {!disabled && (
+            <div className="flex items-center gap-1.5">
+              <Link
+                to={`/menu/${item.id}`}
+                aria-label={`Details for ${item.name}`}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+              >
+                <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              <button
+                type="button"
+                onClick={add}
+                aria-label={`Add ${item.name} to order`}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#121212] transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+              >
+                <Plus className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
           )}
         </div>
       </div>
-    </>
-  );
-
-  if (disabled) {
-    return (
-      <div className="group block h-full glass-card rounded-lg overflow-hidden opacity-60 pointer-events-none">{inner}</div>
-    );
-  }
-
-  return (
-    <Link
-      to={`/menu/${item.id}`}
-      className="group block h-full glass-card rounded-lg overflow-hidden card-interactive transition-transform duration-150 ease-out active:scale-[0.96] active:ring-2 active:ring-primary/35 active:ring-offset-2 active:ring-offset-background"
-    >
-      {inner}
-    </Link>
+    </article>
   );
 });
 

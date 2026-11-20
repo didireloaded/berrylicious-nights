@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeUpdateRow, type HomeUpdateRow } from "@/lib/eventBooking";
+import { getWindhoekDateISO } from "@/lib/windhoekDate";
 
 /** Active `updates` rows (events & specials) visible to guests. */
 export function useActiveUpdates(): HomeUpdateRow[] {
@@ -8,7 +9,7 @@ export function useActiveUpdates(): HomeUpdateRow[] {
 
   useEffect(() => {
     const fetchUpdates = async () => {
-      const today = new Date().toISOString().split("T")[0];
+      const today = getWindhoekDateISO();
       const { data } = await supabase
         .from("updates")
         .select("id, title, subtitle, type, event_date, event_time, available_slots, expires_at")

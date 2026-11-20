@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { STANDARD_SLOT_TIMES } from "@/lib/bookingSlots";
 import { parseRpcBookedTimes } from "@/lib/bookingRpc";
+import { getWindhoekDateISO } from "@/lib/windhoekDate";
 
 export type HomeUpdateRow = {
   id: string;
@@ -45,7 +46,7 @@ export function normalizeUpdateRow(row: Record<string, unknown>): HomeUpdateRow 
 
 /** Event night: explicit event_date, else expires_at date, else today. */
 export function resolveEventDate(ev: HomeUpdateRow): string {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getWindhoekDateISO();
   if (ev.event_date?.trim()) return ev.event_date.trim();
   if (ev.expires_at?.trim()) return ev.expires_at.split("T")[0];
   return today;
@@ -66,7 +67,7 @@ export async function fetchBookedTimesForDate(date: string): Promise<string[]> {
   const { data, error } = await (supabase as any).rpc("booked_table_times", { p_date: date });
   if (error) {
     console.warn("[eventBooking] booked_table_times:", error.message);
-    return [];
+    throw error;
   }
   return parseRpcBookedTimes(data);
 }

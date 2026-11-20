@@ -23,7 +23,7 @@ const AuthPage = () => {
       if (error) {
         toast.error(error);
       } else {
-        toast.success("Welcome back 👋");
+        toast.success("Welcome back");
         navigate(redirectTo, { replace: true });
       }
     } else {
@@ -36,7 +36,7 @@ const AuthPage = () => {
       if (error) {
         toast.error(error);
       } else {
-        toast.success("Account created! Check your email to verify 📧");
+        toast.success("Account created. Check your email to verify.");
         setIsLogin(true);
       }
     }

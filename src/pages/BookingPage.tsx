@@ -7,6 +7,8 @@ import { bookingTimeSlots } from "@/lib/bookingSlots";
 import type { BookingNavState } from "@/lib/eventBooking";
 import { insertBookingWithArrivalCode } from "@/lib/supabaseArrivalInsert";
 import { supabase } from "@/integrations/supabase/client";
+import { parseRpcBookedTimes } from "@/lib/bookingRpc";
+import { getWindhoekDateISO } from "@/lib/windhoekDate";
 
 const BookingPage = () => {
   const navigate = useNavigate();
@@ -21,7 +23,7 @@ const BookingPage = () => {
   const tablesAlmostFull = Boolean(planState?.tablesAlmostFull);
 
   const { user, profile } = useAuth();
-  const [date, setDate] = useState(() => suggestedDate || new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(() => suggestedDate || getWindhoekDateISO());
   const [selectedTime, setSelectedTime] = useState(() => suggestedTime.trim() || "19:30");
   const [guests, setGuests] = useState(
     typeof suggestedGuests === "number" && suggestedGuests > 0 ? suggestedGuests : 2,
@@ -31,19 +33,31 @@ const BookingPage = () => {
   const [guestPhone, setGuestPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
+  const [checkingTimes, setCheckingTimes] = useState(true);
+  const [timesError, setTimesError] = useState(false);
   const [waitlistBusy, setWaitlistBusy] = useState(false);
   const [waitlistSnap, setWaitlistSnap] = useState<{ position: number; est: number } | null>(null);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = getWindhoekDateISO();
 
   useEffect(() => {
     let cancelled = false;
-    void (supabase as any).rpc("booked_table_times", { p_date: date }).then(({ data }: any) => {
-      if (!cancelled) setBookedTimes((data as string[] | null) ?? []);
-    });
-    return () => {
-      cancelled = true;
-    };
+    setCheckingTimes(true);
+    setTimesError(false);
+    setBookedTimes([]);
+    void Promise.resolve((supabase as any).rpc("booked_table_times", { p_date: date }))
+      .then(({ data, error }: any) => {
+        if (cancelled) return;
+        if (error) throw error;
+        setBookedTimes(parseRpcBookedTimes(data));
+      })
+      .catch(() => {
+        if (!cancelled) setTimesError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingTimes(false);
+      });
+    return () => { cancelled = true; };
   }, [date]);
 
   const slotOptions = useMemo(() => {
@@ -63,13 +77,37 @@ const BookingPage = () => {
   }, [slotOptions, selectedTime]);
 
   const handleConfirm = async () => {
-    if (!date || !selectedTime) return;
+    if (loading || !date || !selectedTime) return;
+    if (checkingTimes || timesError) {
+      toast.error("Please wait while we check table availability, or try another date.");
+      return;
+    }
+    if (bookedTimes.includes(selectedTime)) {
+      toast.error("That time is already taken. Please select another.");
+      return;
+    }
     if (!user && !guestName.trim()) {
       toast.error("Please enter your name");
       return;
     }
 
     setLoading(true);
+    // Recheck at submission so a previously available slot is not offered after another booking.
+    try {
+      const { data, error } = await (supabase as any).rpc("booked_table_times", { p_date: date });
+      if (error) throw error;
+      const latestBooked = parseRpcBookedTimes(data);
+      if (latestBooked.includes(selectedTime)) {
+        setBookedTimes(latestBooked);
+        toast.error("That table time has just been taken. Pick another time.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      toast.error("We couldn't verify this time. Please try again.");
+      setLoading(false);
+      return;
+    }
     const bookingData = {
       user_id: user?.id || null,
       guest_name: user ? null : guestName,
@@ -101,9 +139,16 @@ const BookingPage = () => {
       ...(arrival_code ? { arrival_code } : {}),
       ...(assigned_table_code ? { assigned_table_code } : {}),
     };
-    const existing = JSON.parse(localStorage.getItem("berrylicious-bookings") || "[]");
-    existing.push(localData);
-    localStorage.setItem("berrylicious-bookings", JSON.stringify(existing));
+    // Local history is optional. A storage failure must never hide a confirmed server booking.
+    try {
+      const existing = JSON.parse(localStorage.getItem("berrylicious-bookings") || "[]");
+      if (Array.isArray(existing)) {
+        existing.push(localData);
+        localStorage.setItem("berrylicious-bookings", JSON.stringify(existing));
+      }
+    } catch {
+      // Booking was saved remotely and can still be shown to the guest.
+    }
 
     navigate("/booking/success", { state: localData });
   };
@@ -113,7 +158,11 @@ const BookingPage = () => {
     return slotOptions.find((s) => s.time === "19:30")?.time ?? slotOptions[0]?.time ?? "19:30";
   }, [suggestedTime, slotOptions]);
 
-  const bannerTime = recommendTime;
+  useEffect(() => {
+    if (checkingTimes || timesError || !bookedTimes.includes(selectedTime)) return;
+    const nextOpenSlot = slotOptions.find((slot) => !bookedTimes.includes(slot.time));
+    if (nextOpenSlot) setSelectedTime(nextOpenSlot.time);
+  }, [checkingTimes, timesError, bookedTimes, selectedTime, slotOptions]);
 
   const fullyBooked = useMemo(() => {
     if (slotOptions.length === 0) return false;
@@ -129,7 +178,7 @@ const BookingPage = () => {
       return;
     }
     if (phone.length < 6) {
-      toast.error("Add a phone number so we can text you when a table opens");
+      toast.error("Add a phone number the restaurant can use to contact you");
       return;
     }
     setWaitlistBusy(true);
@@ -160,9 +209,9 @@ const BookingPage = () => {
 
       <div className="mb-6 rounded-2xl glass-card px-4 py-4">
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Best time tonight:{" "}
-          <span className="font-semibold text-foreground">{bannerTime}</span>
-          {tablesAlmostFull ? " · Almost full" : " · Tables open"}
+          Selected date:{" "}
+          <span className="font-semibold text-foreground">{date}</span>
+          {checkingTimes ? " · Checking times" : timesError ? " · Availability unavailable" : tablesAlmostFull ? " · Limited availability" : " · Please select an open time"}
           {eventTimeSlots?.length && date === suggestedDate && suggestedDate ? " · Event night" : ""}
         </p>
         <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
@@ -182,16 +231,21 @@ const BookingPage = () => {
         <label className="text-sm font-semibold text-foreground mb-3 block">
           {eventTimeSlots?.length && date === suggestedDate ? "Your open times" : "Pick your time"}
         </label>
+        {timesError && <p role="alert" className="mb-3 text-sm text-amber-200">We couldn't check available tables. Please try another date or reload this page.</p>}
         <div className="flex gap-2 overflow-x-auto pb-1">
           {slotOptions.map((slot) => {
             const isSuggested = slot.time === recommendTime;
-            const selected = selectedTime === slot.time;
+            const isBooked = bookedTimes.includes(slot.time);
+            const selected = selectedTime === slot.time && !isBooked;
             return (
               <button
                 key={slot.time}
                 type="button"
                 onClick={() => setSelectedTime(slot.time)}
-                className={`shrink-0 px-4 py-3 rounded-xl text-sm font-medium border-2 flex flex-col items-start gap-0.5 btn-press transition-transform ${
+                disabled={checkingTimes || timesError || isBooked}
+                aria-pressed={selected}
+                aria-label={`${slot.time}, ${isBooked ? "fully booked" : slot.label}`}
+                className={`shrink-0 px-4 py-3 rounded-xl text-sm font-medium border-2 flex flex-col items-start gap-0.5 btn-press transition-transform disabled:cursor-not-allowed disabled:opacity-40 ${
                   selected
                     ? "border-primary bg-primary text-primary-foreground scale-[1.03] shadow-lg shadow-primary/25 ring-2 ring-primary/30"
                     : isSuggested
@@ -205,7 +259,7 @@ const BookingPage = () => {
                 </span>
                 <span className={`text-xs pl-6 ${selected ? "text-primary-foreground/85" : "text-muted-foreground"}`}>
                   {slot.label}
-                  {isSuggested && !selected ? " · suggested" : ""}
+                  {isBooked ? " · taken" : isSuggested && !selected ? " · suggested" : ""}
                 </span>
               </button>
             );
@@ -317,10 +371,10 @@ const BookingPage = () => {
       {/* Confirm */}
       <button
         onClick={handleConfirm}
-        disabled={!date || !selectedTime || loading || fullyBooked}
+        disabled={!date || !selectedTime || loading || checkingTimes || timesError || bookedTimes.includes(selectedTime) || fullyBooked}
         className="w-full bg-primary text-primary-foreground font-bold py-4 rounded-xl btn-press disabled:opacity-40 disabled:cursor-not-allowed text-base"
       >
-        {loading ? "Booking…" : fullyBooked ? "No open times — use waitlist above" : "Confirm my table"}
+        {loading ? "Booking…" : checkingTimes ? "Checking availability…" : timesError ? "Availability unavailable" : fullyBooked ? "No open times — use waitlist above" : "Confirm my table"}
       </button>
     </div>
   );

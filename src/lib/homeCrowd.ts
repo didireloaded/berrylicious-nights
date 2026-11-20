@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { parseRpcBookedTimes, parseRpcBookingCount } from "@/lib/bookingRpc";
 
-export type CrowdLevel = "quiet" | "moderate" | "busy";
+export type CrowdLevel = "quiet" | "moderate" | "busy" | "unknown";
 
 export type CrowdSnapshot = {
   level: CrowdLevel;
@@ -25,12 +25,14 @@ const LABELS: Record<CrowdLevel, string> = {
   quiet: "Quiet",
   moderate: "Moderate",
   busy: "Busy",
+  unknown: "Status unavailable",
 };
 
 const HINTS: Record<CrowdLevel, string> = {
   quiet: "Walk-in friendly right now.",
   moderate: "Steady energy — book to lock your time.",
   busy: "Almost full tonight — grab a table.",
+  unknown: "We can’t confirm how busy it is. Please check table availability.",
 };
 
 export async function fetchCrowdSnapshot(isoDate: string): Promise<CrowdSnapshot> {
@@ -42,16 +44,12 @@ export async function fetchCrowdSnapshot(isoDate: string): Promise<CrowdSnapshot
     (supabase as any).rpc("booked_table_times", { p_date: isoDate }),
   ]);
 
-  if (countRes.error) {
-    console.warn("[homeCrowd] active_bookings_count:", countRes.error.message);
-  } else {
-    bookingCount = parseRpcBookingCount(countRes.data);
+  if (countRes.error || slotsRes.error) {
+    console.warn("[homeCrowd] availability unavailable", countRes.error ?? slotsRes.error);
+    return { level: "unknown", label: LABELS.unknown, hint: HINTS.unknown, bookingCount: 0, bookedSlotCount: 0 };
   }
-  if (slotsRes.error) {
-    console.warn("[homeCrowd] booked_table_times:", slotsRes.error.message);
-  } else {
-    bookedSlots = parseRpcBookedTimes(slotsRes.data).length;
-  }
+  bookingCount = parseRpcBookingCount(countRes.data);
+  bookedSlots = parseRpcBookedTimes(slotsRes.data).length;
 
   const level = levelFromSignals(bookingCount, bookedSlots);
 
