@@ -6,28 +6,28 @@
 
 @layer base {
   :root {
-    --background: 0 0% 4.3%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 10.2%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 7.8%;
+    --background: 15 13% 7%;
+    --foreground: 38 22% 94%;
+    --card: 16 12% 11%;
+    --card-foreground: 38 22% 94%;
+    --popover: 16 12% 10%;
     --popover-foreground: 0 0% 100%;
-    --primary: 43 65% 52%;
+    --primary: 37 59% 66%;
     --primary-foreground: 0 0% 4.3%;
     --secondary: 0 0% 7.8%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 16.5%;
-    --muted-foreground: 0 0% 53.3%;
+    --muted: 16 10% 19%;
+    --muted-foreground: 31 10% 68%;
     --accent: 43 65% 52%;
     --accent-foreground: 0 0% 4.3%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 16.5%;
-    --input: 0 0% 16.5%;
-    --ring: 43 65% 52%;
+    --border: 25 9% 24%;
+    --input: 25 9% 24%;
+    --ring: 37 59% 66%;
     --radius: 0.75rem;
-    --surface: 0 0% 7.8%;
-    --gold: 43 65% 52%;
+    --surface: 16 12% 13%;
+    --gold: 37 59% 66%;
     --gold-foreground: 0 0% 4.3%;
     --gold-muted: 43 40% 35%;
     --sidebar-background: 0 0% 7.8%;
@@ -68,7 +68,6 @@
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: hsl(var(--primary) / 0.12);
     touch-action: manipulation;
-    overscroll-behavior-y: none;
   }
 
   #root {
@@ -228,37 +227,19 @@
 .stagger-5 { animation-delay: 200ms; }
 .stagger-6 { animation-delay: 240ms; }
 
-/* 6. Glass panel system */
-.glass {
-  background: hsl(var(--card) / 0.55);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid hsl(0 0% 100% / 0.08);
-}
-.glass-subtle {
-  background: hsl(0 0% 100% / 0.04);
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-  border: 1px solid hsl(0 0% 100% / 0.06);
-}
-.glass-strong {
-  background: hsl(0 0% 100% / 0.07);
-  backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid hsl(0 0% 100% / 0.12);
-}
-.glass-card {
-  background: hsl(var(--card) / 0.45);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  border: 1px solid hsl(0 0% 100% / 0.08);
-  box-shadow: 0 4px 24px hsl(0 0% 0% / 0.25), inset 0 1px 0 hsl(0 0% 100% / 0.05);
+/* Legacy glass class names retained for compatibility, now solid and faster to render. */
+.glass, .glass-subtle, .glass-strong, .glass-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 .glass-nav {
-  background: hsl(var(--background) / 0.75);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-top: 1px solid hsl(0 0% 100% / 0.06);
+  background: hsl(var(--background));
+  border-top: 1px solid hsl(var(--border));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* Scroll-reveal entrance animations */
