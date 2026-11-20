@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowRight, MapPin, Search, ShoppingBag, X } from "lucide-react";
+import { ArrowRight, MapPin, ShoppingBag } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { menuItems, categories } from "@/data/menu";
@@ -11,6 +11,9 @@ import { EventDetailSheet } from "@/components/EventDetailSheet";
 import type { HomeUpdateRow } from "@/lib/eventBooking";
 import { promoSpotlight, isPromoSpotlightActive } from "@/data/promoSpotlight";
 import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
+import { SearchAndCategories } from "@/components/SearchAndCategories";
+import { RestaurantActionPills } from "@/components/RestaurantActionPills";
+import { ActiveOrderBanner } from "@/components/ActiveOrderBanner";
 
 export default function MenuPage() {
   const [params] = useSearchParams();
@@ -62,7 +65,7 @@ export default function MenuPage() {
   };
 
   return (
-    <div className="min-h-dvh bg-[#121212] pb-32 text-white">
+    <div className={"min-h-dvh bg-[#121212] text-white " + (totalItems > 0 ? "pb-56" : "pb-32")}>
       <div className="mx-auto max-w-[560px] px-5 pt-[max(30px,env(safe-area-inset-top,0px))] sm:px-8">
         <header className="flex items-center justify-between gap-4">
           <Link to="/profile" className="group flex min-w-0 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]" aria-label="Open your profile">
@@ -78,6 +81,8 @@ export default function MenuPage() {
           </Link>
         </header>
 
+        <ActiveOrderBanner />
+
         <div className="mt-12">
           <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#ff7342]">THE BERRYLICIOUS MENU</p>
           <div className="mt-3 flex items-end justify-between gap-3">
@@ -89,40 +94,25 @@ export default function MenuPage() {
           <p className="mt-4 max-w-[380px] text-[14px] leading-relaxed text-white/55">Something good for tonight, picked your way.</p>
         </div>
 
-        <div className="relative mt-8">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/45" aria-hidden="true" />
-          <input
-            ref={searchInput}
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search the menu"
-            aria-label="Search food, drinks, or ingredients"
-            className="h-[52px] w-full rounded-[18px] border border-white/10 bg-[#232323] pl-12 pr-12 text-[15px] text-white placeholder:text-white/45 outline-none transition-colors focus:border-[#ff5a1f] focus:ring-1 focus:ring-[#ff5a1f]"
-          />
-          {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-white/65 hover:text-white"><X className="h-4 w-4" /></button>}
-        </div>
-
-        <div className="-mx-5 mt-5 flex gap-2 overflow-x-auto px-5 pb-2 scrollbar-hide sm:-mx-8 sm:px-8" role="group" aria-label="Filter by category">
-          {categories.map((name) => (
-            <button
-              type="button"
-              key={name}
-              onClick={() => setCategory(name)}
-              aria-pressed={category === name}
-              className={"shrink-0 rounded-full border px-4 py-2.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] " + (category === name ? "border-[#ff5a1f] bg-[#ff5a1f] text-white" : "border-white/15 bg-[#202020] text-white/65 hover:border-white/40 hover:text-white")}
-            >
-              {name}
-            </button>
-          ))}
+        <SearchAndCategories
+          ref={searchInput}
+          search={query}
+          onSearchChange={setQuery}
+          category={category}
+          onCategoryChange={setCategory}
+          featuredOnly={onlyFeatured}
+          onFeaturedToggle={() => setOnlyFeatured((value) => !value)}
+        />
+        <div className="mt-6">
+          <RestaurantActionPills />
         </div>
 
         {showPicks && (
           <section className="mt-11" aria-labelledby="house-picks-heading">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.13em] text-[#ff7342]">Selected from the menu</p>
-                <h2 id="house-picks-heading" className="mt-1.5 text-[30px] font-semibold tracking-[-0.055em]">House picks</h2>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.13em] text-[#ff7342]">From the menu</p>
+                <h2 id="house-picks-heading" className="mt-1.5 text-[30px] font-semibold tracking-[-0.055em]">Featured dishes</h2>
               </div>
               <button type="button" onClick={() => { setOnlyFeatured(true); setCategory("All"); }} className="mb-1 text-[13px] font-medium text-[#ff8157] hover:text-white">See all</button>
             </div>
@@ -132,7 +122,7 @@ export default function MenuPage() {
           </section>
         )}
 
-        <section className="mt-12" aria-labelledby="full-menu-heading">
+        <section id="menu-full-list" className="mt-12 scroll-mt-6" aria-labelledby="full-menu-heading">
           <div className="flex items-end justify-between gap-3">
             <div>
               <p className="text-[12px] font-semibold uppercase tracking-[0.13em] text-[#ff7342]">Explore</p>

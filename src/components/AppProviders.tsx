@@ -1,12 +1,13 @@
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { CartProvider } from "@/context/CartContext";
+import { CartProvider, useCart } from "@/context/CartContext";
 import { AppProvider } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import { useCustomerOrderStatusNotifications } from "@/hooks/useCustomerOrderStatusNotifications";
 import { AboutSheetProvider } from "@/context/AboutSheetContext";
 import { RestaurantAssistantProvider } from "@/context/RestaurantAssistantContext";
 import BottomNav from "@/components/BottomNav";
+import { FloatingCartBar } from "@/components/FloatingCartBar";
 import PageLoader from "@/components/PageLoader";
 import { ScrollToTop } from "@/components/ScrollToTop";
 
@@ -37,17 +38,18 @@ function OrderNotificationEffects() {
 }
 
 function BottomSpacing() {
+  const { totalItems } = useCart();
   useEffect(() => {
-    document.documentElement.style.setProperty("--pb-bottom-chrome", "7rem");
+    document.documentElement.style.setProperty("--pb-bottom-chrome", totalItems > 0 ? "12rem" : "7rem");
     return () => document.documentElement.style.removeProperty("--pb-bottom-chrome");
-  }, []);
+  }, [totalItems]);
   return null;
 }
 
 function ChromeWrapper() {
   const { pathname } = useLocation();
   const noNav = pathname === "/" || pathname === "/admin" || pathname.startsWith("/menu/");
-  return noNav ? null : <BottomNav />;
+  return noNav ? null : <><FloatingCartBar /><BottomNav /></>;
 }
 
 export default function AppProviders() {

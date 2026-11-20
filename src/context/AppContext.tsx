@@ -11,6 +11,34 @@ export type CurrentBookingState = {
 } | null;
 
 const SESSION_BOOKING_KEY = "berrylicious-session-booking";
+const ACTIVE_ORDER_KEY = "berrylicious-current-order";
+const ORDER_TTL_MS = 24 * 60 * 60 * 1000;
+
+function readActiveOrder(): CurrentOrderState {
+  try {
+    const raw = localStorage.getItem(ACTIVE_ORDER_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as { order?: CurrentOrderState; savedAt?: number };
+    if (!saved.order?.id || !saved.savedAt || Date.now() - saved.savedAt > ORDER_TTL_MS) {
+      localStorage.removeItem(ACTIVE_ORDER_KEY);
+      return null;
+    }
+    if (!["pending", "preparing", "ready"].includes(saved.order.status)) return null;
+    return saved.order;
+  } catch {
+    return null;
+  }
+}
+
+function writeActiveOrder(order: CurrentOrderState) {
+  try {
+    if (!order) localStorage.removeItem(ACTIVE_ORDER_KEY);
+    else localStorage.setItem(ACTIVE_ORDER_KEY, JSON.stringify({ order, savedAt: Date.now() }));
+  } catch {
+    // Storage can be unavailable in private browsing. The React state still works.
+  }
+}
+
 
 function readSessionBooking(): CurrentBookingState {
   try {
@@ -45,12 +73,19 @@ type AppContextValue = {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [currentOrder, setCurrentOrderState] = useState<CurrentOrderState>(null);
+  const [currentOrder, setCurrentOrderState] = useState<CurrentOrderState>(() => typeof localStorage !== "undefined" ? readActiveOrder() : null);
   const [currentBooking, setCurrentBookingRaw] = useState<CurrentBookingState>(() =>
     typeof sessionStorage !== "undefined" ? readSessionBooking() : null,
   );
 
-  const clearCurrentOrder = useCallback(() => setCurrentOrderState(null), []);
+  const clearCurrentOrder = useCallback(() => {
+    setCurrentOrderState(null);
+    writeActiveOrder(null);
+  }, []);
+  const setCurrentOrder = useCallback((order: CurrentOrderState) => {
+    setCurrentOrderState(order);
+    writeActiveOrder(order);
+  }, []);
   const clearCurrentBooking = useCallback(() => {
     setCurrentBookingRaw(null);
     writeSessionBooking(null);
@@ -64,13 +99,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       currentOrder,
-      setCurrentOrder: setCurrentOrderState,
+      setCurrentOrder,
       clearCurrentOrder,
       currentBooking,
       setCurrentBooking,
       clearCurrentBooking,
     }),
-    [currentOrder, clearCurrentOrder, currentBooking, setCurrentBooking, clearCurrentBooking],
+    [currentOrder, setCurrentOrder, clearCurrentOrder, currentBooking, setCurrentBooking, clearCurrentBooking],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

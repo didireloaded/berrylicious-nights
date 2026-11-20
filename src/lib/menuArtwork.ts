@@ -21,3 +21,9 @@ export function menuArtwork(item: MenuItem): { src: string | null; isExactDish: 
   if (item.verifiedImage) return { src: item.image, isExactDish: true };
   return { src: categoryPhotos[item.category] ?? null, isExactDish: false };
 }
+
+/** Photos illustrate category only, never assert that a pictured dish is the item for sale. */
+export function categoryArtwork(category: string): string | null {
+  if (category === "All") return dishBurger;
+  return categoryPhotos[category] ?? null;
+}
