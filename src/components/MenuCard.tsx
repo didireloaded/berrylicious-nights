@@ -1,55 +1,72 @@
 import { memo } from "react";
 import { Link } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { ArrowUpRight, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
+import { menuArtwork } from "@/lib/menuArtwork";
 import type { MenuItem } from "@/data/menu";
 import { formatPrice } from "@/lib/vibe";
 
 const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: MenuItem; disabled?: boolean }) {
   const { addItem } = useCart();
+  const artwork = menuArtwork(item);
+
+  const add = () => {
+    if (disabled) return;
+    addItem(item);
+    toast.success(`${item.name} added to your order`);
+  };
 
   return (
-    <article className="group flex h-full min-h-[200px] flex-col justify-between overflow-hidden rounded-2xl border border-border bg-card transition-colors duration-200 hover:border-primary/40">
+    <article className={"relative mt-12 flex min-w-0 flex-col justify-between rounded-[27px] bg-[#242424] px-4 pb-4 pt-[72px] transition-transform duration-200 " + (disabled ? "opacity-55" : "hover:-translate-y-1")}>
       <Link
-        to={"/menu/" + item.id}
-        className="block flex-1 p-5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
-        aria-label={"View " + item.name + " details"}
+        to={`/menu/${item.id}`}
+        className="group absolute -top-11 left-1/2 flex h-[112px] w-[112px] -translate-x-1/2 items-center justify-center overflow-hidden rounded-full border-[5px] border-[#121212] bg-[#303030] shadow-[0_12px_20px_rgba(0,0,0,0.22)] outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+        aria-label={`View ${item.name}`}
       >
-        {item.verifiedImage && (
+        {artwork.src ? (
           <img
-            src={item.image}
-            alt={item.name}
+            src={artwork.src}
+            alt={artwork.isExactDish ? item.name : ""}
             loading="lazy"
             decoding="async"
-            className="mb-4 aspect-[16/10] w-full rounded-lg object-cover"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.08]"
           />
+        ) : (
+          <span className="max-w-[80px] text-center text-[11px] font-bold uppercase tracking-[0.12em] text-white/65">{item.category}</span>
         )}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
-            {item.category}
-          </span>
-          {item.popular && !disabled && (
-            <span className="text-xs text-muted-foreground">Guest favourite</span>
+      </Link>
+      <div className="mt-3 flex flex-1 flex-col">
+        <Link to={`/menu/${item.id}`} className="min-h-[55px] text-[17px] font-semibold leading-[1.2] tracking-[-0.035em] text-white outline-none focus-visible:underline">
+          {item.name}
+        </Link>
+        <p className="mt-2 line-clamp-2 min-h-[38px] text-[12px] leading-[1.45] text-[#a4a4a4]">{item.description}</p>
+        <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#ff7b50]">{item.category}</div>
+        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+          <div>
+            <span className="block text-[17px] font-semibold tracking-tight text-white">{formatPrice(item.price)}</span>
+            {disabled && <span className="mt-1 block text-xs text-white/50">Unavailable</span>}
+          </div>
+          {!disabled && (
+            <div className="flex items-center gap-1.5">
+              <Link
+                to={`/menu/${item.id}`}
+                aria-label={`Details for ${item.name}`}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+              >
+                <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              <button
+                type="button"
+                onClick={add}
+                aria-label={`Add ${item.name} to order`}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#121212] transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+              >
+                <Plus className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
           )}
         </div>
-        <h3 className="font-display text-xl font-semibold leading-snug text-foreground">{item.name}</h3>
-        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
-      </Link>
-      <div className="flex items-center justify-between border-t border-border/80 px-5 py-3.5">
-        <span className="text-base font-semibold text-foreground">{formatPrice(item.price)}</span>
-        {disabled ? (
-          <span className="text-sm text-muted-foreground">Unavailable</span>
-        ) : (
-          <button
-            type="button"
-            onClick={() => addItem(item)}
-            aria-label={"Add " + item.name + " to order"}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full bg-primary px-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            <span className="sr-only sm:not-sr-only">Add</span>
-          </button>
-        )}
       </div>
     </article>
   );
