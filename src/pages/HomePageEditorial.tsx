@@ -46,7 +46,7 @@ export default function HomePageEditorial() {
           </Link>
         </header>
 
-        <div className="food-enter absolute inset-x-0 bottom-[138px] z-10 px-5 sm:px-7">
+        <div className="food-enter absolute inset-x-0 bottom-[166px] z-10 px-5 sm:px-7">
           <p className="mb-4 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.19em] text-white/75">
             <MapPin className="h-3 w-3 text-[#ff6b34]" aria-hidden="true" /> WINDHOEK, NAMIBIA
           </p>
@@ -79,7 +79,7 @@ export default function HomePageEditorial() {
             aria-label="Explore the Berrylicious menu"
             className="flex h-full w-full items-center justify-center rounded-tl-[98px] bg-[#ff5a1f] text-white transition-colors duration-200 hover:bg-[#fa703f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-inset"
           >
-            <ArrowRight className="ml-6 mt-7 h-9 w-9 transition-transform duration-200 group-hover:translate-x-1" strokeWidth={2} aria-hidden="true" />
+            <ArrowRight className="ml-6 mt-7 h-9 w-9 transition-transform duration-200" strokeWidth={2} aria-hidden="true" />
           </Link>
         </div>
       </section>
