@@ -13,6 +13,7 @@ import { promoSpotlight, isPromoSpotlightActive } from "@/data/promoSpotlight";
 import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
 import { SearchAndCategories } from "@/components/SearchAndCategories";
 import { RestaurantActionPills } from "@/components/RestaurantActionPills";
+import { ActiveOrderBanner } from "@/components/ActiveOrderBanner";
 
 export default function MenuPage() {
   const [params] = useSearchParams();
@@ -64,7 +65,7 @@ export default function MenuPage() {
   };
 
   return (
-    <div className="min-h-dvh bg-[#121212] pb-32 text-white">
+    <div className={"min-h-dvh bg-[#121212] text-white " + (totalItems > 0 ? "pb-56" : "pb-32")}>
       <div className="mx-auto max-w-[560px] px-5 pt-[max(30px,env(safe-area-inset-top,0px))] sm:px-8">
         <header className="flex items-center justify-between gap-4">
           <Link to="/profile" className="group flex min-w-0 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]" aria-label="Open your profile">
@@ -79,6 +80,8 @@ export default function MenuPage() {
             {totalItems > 0 && <span className="absolute -right-1 -top-1 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-[#ff5a1f] px-1 text-[11px] font-bold">{totalItems > 99 ? "99+" : totalItems}</span>}
           </Link>
         </header>
+
+        <ActiveOrderBanner />
 
         <div className="mt-12">
           <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#ff7342]">THE BERRYLICIOUS MENU</p>
