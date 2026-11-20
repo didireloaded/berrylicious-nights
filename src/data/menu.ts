@@ -14,6 +14,8 @@ export interface MenuItem {
   description: string;
   price: number;
   image: string;
+  /** Set true only after this photo has been verified to depict the exact dish. */
+  verifiedImage?: boolean;
   category: string;
   featured?: boolean;
   popular?: boolean;
