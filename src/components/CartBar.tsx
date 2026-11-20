@@ -30,7 +30,7 @@ const CartBar = () => {
 
   return (
     <div
-      className="fixed left-0 right-0 z-50 px-4 animate-slide-up pointer-events-none"
+      className="fixed left-0 right-0 z-50 px-4 animate-slide-up pointer-events-none lg:!bottom-6"
       style={{ bottom: "calc(var(--pb-bottom-chrome, 5.5rem) - 3.75rem + env(safe-area-inset-bottom, 0px))" }}
     >
       <Link
