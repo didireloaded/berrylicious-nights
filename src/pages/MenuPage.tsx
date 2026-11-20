@@ -111,8 +111,8 @@ export default function MenuPage() {
           <section className="mt-11" aria-labelledby="house-picks-heading">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.13em] text-[#ff7342]">Selected from the menu</p>
-                <h2 id="house-picks-heading" className="mt-1.5 text-[30px] font-semibold tracking-[-0.055em]">House picks</h2>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.13em] text-[#ff7342]">From the menu</p>
+                <h2 id="house-picks-heading" className="mt-1.5 text-[30px] font-semibold tracking-[-0.055em]">Featured dishes</h2>
               </div>
               <button type="button" onClick={() => { setOnlyFeatured(true); setCategory("All"); }} className="mb-1 text-[13px] font-medium text-[#ff8157] hover:text-white">See all</button>
             </div>
