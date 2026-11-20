@@ -120,7 +120,7 @@ const MenuPage = () => {
         )}
 
         {lens !== "all" && (
-          <p className="text-[11px] text-muted-foreground mb-1.5 mt-1">
+          <p className="text-sm text-muted-foreground mb-3 mt-2">
             {lens === "popular" ? "What everyone’s ordering right now." : "Chef’s spotlight picks tonight."}
           </p>
         )}
@@ -145,11 +145,10 @@ const MenuPage = () => {
           </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {displayedItems.map((item, index) => (
+            {displayedItems.map((item) => (
               <div
                 key={item.id}
                 className="h-full"
-                
               >
                 <MenuCard item={item} disabled={isUnavailable(item.id)} />
               </div>
