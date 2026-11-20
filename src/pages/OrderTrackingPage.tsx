@@ -6,7 +6,6 @@ import { formatPrice } from "@/lib/vibe";
 import { menuItems } from "@/data/menu";
 import { useCart } from "@/context/CartContext";
 import { useApp } from "@/context/AppContext";
-import { estimateETA } from "@/services/ai";
 import heroImage from "@/assets/hero-restaurant.jpg";
 import { ArrowLeft, Clock, CheckCircle2, ChefHat, Package, Plus } from "lucide-react";
 import { notifyOrderStatusTransition, requestOrderNotificationPermission } from "@/lib/orderStatusNotify";
@@ -28,7 +27,7 @@ const statusHeadline: Record<string, string> = {
 
 const statusSubline: Record<string, string> = {
   pending: "Hang tight — we’re lining everything up.",
-  preparing: "Chef started your order — almost ready.",
+  preparing: "The kitchen is preparing your order. We will update you when it is ready.",
   ready: "Almost there — head to the counter or your table when you’re ready.",
   completed: "Thanks for choosing Berrylicious tonight.",
 };
@@ -174,10 +173,6 @@ const OrderTrackingPage = () => {
   const subline = statusSubline[order.status] ?? statusSubline.pending;
   const detailedStatus = getDetailedStatus(order.status, etaRemaining);
   const isActive = order.status !== "completed";
-  const lineItemCount = Array.isArray(order.items)
-    ? (order.items as { qty?: number }[]).reduce((n, it) => n + (Number(it.qty) > 0 ? Number(it.qty) : 1), 0)
-    : 0;
-  const roughEtaHint = estimateETA(0, lineItemCount);
 
   return (
     <div className="min-h-screen relative">
@@ -227,9 +222,9 @@ const OrderTrackingPage = () => {
             {subline}
           </p>
           <p className="text-foreground text-sm font-semibold mt-2.5 animate-fade-in">{detailedStatus}</p>
-          {isActive && order.status !== "ready" && (
-            <p className="text-muted-foreground text-xs mt-1.5">
-              Typical prep from here ~{roughEtaHint} min (varies with the kitchen queue).
+          {isActive && etaRemaining !== null && order.status !== "ready" && (
+            <p className="text-muted-foreground text-sm mt-1.5">
+              Estimated preparation time remaining: about {etaRemaining} min. This may change with the kitchen queue.
             </p>
           )}
 
