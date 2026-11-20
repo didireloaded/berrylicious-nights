@@ -19,7 +19,7 @@ function retryImport<T>(fn: () => Promise<T>): Promise<T> {
   });
 }
 
-const HomePage = lazy(() => retryImport(() => import("@/pages/HomePage")));
+const HomePage = lazy(() => retryImport(() => import("@/pages/HomePageEditorial")));
 const MenuPage = lazy(() => retryImport(() => import("@/pages/MenuPage")));
 const MenuItemPage = lazy(() => retryImport(() => import("@/pages/MenuItemPage")));
 const PromoSpotlightPage = lazy(() => retryImport(() => import("@/pages/PromoSpotlightPage")));
