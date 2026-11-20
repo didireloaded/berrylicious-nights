@@ -2,8 +2,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { GeneratedPlan } from "@/lib/planMyNight";
 import { saveOrderSnapshotForTracking } from "@/lib/orderTrackingStorage";
 import { insertOrderAndBookingWithSharedArrivalCode } from "@/lib/supabaseArrivalInsert";
+import { getWindhoekDateISO } from "@/lib/windhoekDate";
 
-const SERVICE_FEE = 20;
 const DEFAULT_ETA_MINUTES = 25;
 
 export type OrderLine = { name: string; qty: number; price: number };
@@ -38,8 +38,8 @@ export async function executePlanBookAndOrder(opts: {
 }): Promise<string> {
   const lines = buildOrderLinesFromPlan(opts.plan);
   const sub = subtotal(lines);
-  const total = sub + SERVICE_FEE;
-  const today = new Date().toISOString().split("T")[0];
+  const total = sub;
+  const today = getWindhoekDateISO();
   const nowIso = new Date().toISOString();
 
   const orderRow = {
