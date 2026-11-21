@@ -15,7 +15,8 @@ function retryImport<T>(fn: () => Promise<T>): Promise<T> {
   return fn().catch(() => fn());
 }
 
-const HomePage = lazy(() => retryImport(() => import("@/pages/HomePageEditorial")));
+const WelcomePage = lazy(() => retryImport(() => import("@/pages/HomePageEditorial")));
+const DashboardHomePage = lazy(() => retryImport(() => import("@/pages/DashboardHomePage")));
 const MenuPage = lazy(() => retryImport(() => import("@/pages/MenuPage")));
 const DrinksPage = lazy(() => retryImport(() => import("@/pages/DrinksPage")));
 const EventsPage = lazy(() => retryImport(() => import("@/pages/EventsPage")));
@@ -25,7 +26,6 @@ const AboutRouteRedirect = lazy(() => retryImport(() => import("@/pages/AboutRou
 const BookingPage = lazy(() => retryImport(() => import("@/pages/BookingPage")));
 const BookingSuccessPage = lazy(() => retryImport(() => import("@/pages/BookingSuccessPage")));
 const CartPage = lazy(() => retryImport(() => import("@/pages/CartPage")));
-const PlanMyNightPage = lazy(() => retryImport(() => import("@/pages/PlanMyNightPage")));
 const ProfilePage = lazy(() => retryImport(() => import("@/pages/ProfilePage")));
 const AuthPage = lazy(() => retryImport(() => import("@/pages/AuthPage")));
 const AdminPage = lazy(() => retryImport(() => import("@/pages/AdminPage")));
@@ -67,7 +67,8 @@ export default function AppProviders() {
               <main id="main-content" tabIndex={-1} className="min-h-dvh outline-none focus:outline-none">
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
-                    <Route path="/" element={<HomePage />} />
+                    <Route path="/" element={<WelcomePage />} />
+                    <Route path="/home" element={<DashboardHomePage />} />
                     <Route path="/menu" element={<MenuPage />} />
                     <Route path="/food" element={<Navigate to="/menu" replace />} />
                     <Route path="/drinks" element={<DrinksPage />} />
@@ -78,8 +79,8 @@ export default function AppProviders() {
                     <Route path="/booking" element={<BookingPage />} />
                     <Route path="/booking/success" element={<BookingSuccessPage />} />
                     <Route path="/cart" element={<CartPage />} />
-                    <Route path="/plan" element={<PlanMyNightPage />} />
-                    <Route path="/plan-my-night" element={<Navigate to="/plan" replace />} />
+                    <Route path="/plan" element={<Navigate to="/booking" replace />} />
+                    <Route path="/plan-my-night" element={<Navigate to="/booking" replace />} />
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/messages" element={<MessagesPage />} />
                     <Route path="/auth" element={<AuthPage />} />

@@ -24,6 +24,17 @@ const supabase = _supabase as unknown as DynamicSupabaseClient;
 
 const MAX_ATTEMPTS = 14;
 
+function generateUuid(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 function isUniqueViolation(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const e = err as { code?: string; message?: string };
@@ -51,26 +62,58 @@ function isSchemaCacheOrMissingColumnError(err: unknown): boolean {
   );
 }
 
+/**
+ * Guests (`user_id == null`) are allowed to INSERT into `bookings` and `orders`,
+ * but RLS restricts SELECT to `auth.uid() = user_id` or admins. Calling `.select()`
+ * on a guest insert causes Postgres to evaluate the SELECT policy on RETURNING and fail
+ * with 42501. Passing a client-generated UUID and inserting without `.select()` lets
+ * guest orders and bookings succeed cleanly against the server.
+ */
 export async function insertBookingWithArrivalCode(
   row: Record<string, unknown>,
-): Promise<{ arrival_code: string | null; assigned_table_code: string | null }> {
+): Promise<{ booking_id: string | null; arrival_code: string | null; assigned_table_code: string | null }> {
+  const isGuest = !row.user_id;
+
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     const arrival_code = generateArrivalCode();
+    if (isGuest) {
+      const id = generateUuid();
+      const { error } = await supabase.from("bookings").insert({ ...row, id, arrival_code });
+      if (!error) {
+        return { booking_id: id, arrival_code, assigned_table_code: null };
+      }
+      if (isSchemaCacheOrMissingColumnError(error)) {
+        const legacyId = generateUuid();
+        const { error: legErr } = await supabase.from("bookings").insert({ ...row, id: legacyId });
+        if (!legErr) return { booking_id: legacyId, arrival_code: null, assigned_table_code: null };
+        throw legErr ?? error;
+      }
+      if (!isUniqueViolation(error)) throw error;
+      continue;
+    }
+
     const { data, error } = await supabase
       .from("bookings")
       .insert({ ...row, arrival_code })
       .select("*")
       .single();
     if (!error && data) {
-      const inserted = data as { arrival_code?: string | null; assigned_table_code?: string | null };
+      const inserted = data as { id?: string | null; arrival_code?: string | null; assigned_table_code?: string | null };
       return {
+        booking_id: inserted.id ? String(inserted.id) : null,
         arrival_code: inserted.arrival_code ?? null,
         assigned_table_code: inserted.assigned_table_code ?? null,
       };
     }
     if (error && isSchemaCacheOrMissingColumnError(error)) {
-      const { error: legErr } = await supabase.from("bookings").insert(row).select("id").single();
-      if (!legErr) return { arrival_code: null, assigned_table_code: null };
+      const { data: legacy, error: legErr } = await supabase.from("bookings").insert(row).select("id").single();
+      if (!legErr) {
+        return {
+          booking_id: legacy?.id ? String(legacy.id) : null,
+          arrival_code: null,
+          assigned_table_code: null,
+        };
+      }
       throw legErr ?? error;
     }
     if (!isUniqueViolation(error)) throw error;
@@ -81,8 +124,26 @@ export async function insertBookingWithArrivalCode(
 export async function insertOrderWithArrivalCode(
   row: Record<string, unknown>,
 ): Promise<{ id: string; arrival_code: string | null }> {
+  const isGuest = !row.user_id;
+
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     const arrival_code = generateArrivalCode();
+    if (isGuest) {
+      const id = generateUuid();
+      const { error } = await supabase.from("orders").insert({ ...row, id, arrival_code });
+      if (!error) {
+        return { id, arrival_code };
+      }
+      if (isSchemaCacheOrMissingColumnError(error)) {
+        const legacyId = generateUuid();
+        const { error: legErr } = await supabase.from("orders").insert({ ...row, id: legacyId });
+        if (!legErr) return { id: legacyId, arrival_code: null };
+        throw legErr ?? error;
+      }
+      if (!isUniqueViolation(error)) throw error;
+      continue;
+    }
+
     const { data, error } = await supabase
       .from("orders")
       .insert({ ...row, arrival_code })
@@ -105,6 +166,19 @@ async function insertOrderAndBookingLegacy(opts: {
   orderRow: Record<string, unknown>;
   bookingWithoutPreOrder: Record<string, unknown>;
 }): Promise<{ orderId: string; arrival_code: null }> {
+  const isGuest = !opts.orderRow.user_id;
+  if (isGuest) {
+    const orderId = generateUuid();
+    const { error: orderErr } = await supabase.from("orders").insert({ ...opts.orderRow, id: orderId });
+    if (orderErr) throw orderErr;
+    const { error: bookErr } = await supabase.from("bookings").insert({
+      ...opts.bookingWithoutPreOrder,
+      pre_order: { order_id: orderId },
+    });
+    if (bookErr) throw bookErr;
+    return { orderId, arrival_code: null };
+  }
+
   const { data: insertedOrder, error: orderErr } = await supabase
     .from("orders")
     .insert(opts.orderRow)
@@ -123,13 +197,42 @@ async function insertOrderAndBookingLegacy(opts: {
   return { orderId, arrival_code: null };
 }
 
-/** Same code on preorder order + linked booking (Plan my night). */
+/** Same code on preorder order + linked booking. */
 export async function insertOrderAndBookingWithSharedArrivalCode(opts: {
   orderRow: Record<string, unknown>;
   bookingWithoutPreOrder: Record<string, unknown>;
 }): Promise<{ orderId: string; arrival_code: string | null }> {
+  const isGuest = !opts.orderRow.user_id;
+
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     const arrival_code = generateArrivalCode();
+    if (isGuest) {
+      const orderId = generateUuid();
+      const { error: orderErr } = await supabase
+        .from("orders")
+        .insert({ ...opts.orderRow, id: orderId, arrival_code });
+      if (orderErr) {
+        if (isSchemaCacheOrMissingColumnError(orderErr)) {
+          return await insertOrderAndBookingLegacy(opts);
+        }
+        if (isUniqueViolation(orderErr)) continue;
+        throw orderErr;
+      }
+      const { error: bookErr } = await supabase.from("bookings").insert({
+        ...opts.bookingWithoutPreOrder,
+        arrival_code,
+        pre_order: { order_id: orderId },
+      });
+      if (bookErr) {
+        if (isSchemaCacheOrMissingColumnError(bookErr)) {
+          return await insertOrderAndBookingLegacy(opts);
+        }
+        if (isUniqueViolation(bookErr)) continue;
+        throw bookErr;
+      }
+      return { orderId, arrival_code };
+    }
+
     const { data: insertedOrder, error: orderErr } = await supabase
       .from("orders")
       .insert({ ...opts.orderRow, arrival_code })

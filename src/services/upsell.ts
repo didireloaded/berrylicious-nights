@@ -2,17 +2,16 @@ import { menuItems, type MenuItem } from "@/data/menu";
 
 /** Pairings and combos — deterministic rules, no external AI. */
 const DRINK_IDS_BY_MAIN_CATEGORY: Record<string, string[]> = {
-  "Choice Cuts": ["16", "33", "14"],
-  "Kick Start": ["17", "14"],
-  Poultry: ["17", "26", "14"],
-  Combos: ["14", "32", "19"],
-  "Land + Sea": ["17", "26", "14"],
-  Mains: ["14", "16", "17"],
-  Burgers: ["14", "32", "19"],
-  Starters: ["16", "17"],
-  Salads: ["17", "32"],
-  Sides: ["14", "19"],
-  Desserts: ["15", "19"],
+  "Choice Cuts": ["16", "wn-rb-chocolate-block", "14"],
+  "Butcher's Choice": ["16", "wn-pt-kanonkop-kadette", "14"],
+  "Kick Start": ["17", "wn-sb-springfield", "14"],
+  Poultry: ["17", "wn-ch-springfield-wy", "15"],
+  Combos: ["14", "jr-pimms", "19"],
+  "Land + Sea": ["17", "wn-sb-springfield", "14"],
+  Burgers: ["14", "jr-pimms", "19"],
+  Salads: ["17", "jr-pimms"],
+  "Sides & Sauces": ["14", "19"],
+  Desserts: ["wn-ds-lormarins-lbv", "19", "14"],
 };
 
 const MENU_BY_ID = new Map<string, MenuItem>(menuItems.map((m) => [m.id, m]));
@@ -30,6 +29,19 @@ export function getUpsellItems(itemId: string, limit = 4): MenuItem[] {
   const out: MenuItem[] = [];
   const seen = new Set<string>([itemId]);
 
+  if (base.menuSection === "drinks") {
+    // Pair drinks with signature starters & cuts
+    for (const id of ["1", "3", "7", "8", "12"]) {
+      const m = byId(id);
+      if (m && !seen.has(m.id)) {
+        seen.add(m.id);
+        out.push(m);
+      }
+      if (out.length >= limit) return out;
+    }
+    return out.slice(0, limit);
+  }
+
   const drinkIds = DRINK_IDS_BY_MAIN_CATEGORY[base.category] ?? ["14", "16", "17"];
   for (const id of drinkIds) {
     const m = byId(id);
@@ -42,9 +54,9 @@ export function getUpsellItems(itemId: string, limit = 4): MenuItem[] {
 
   if (
     base.category === "Choice Cuts" ||
+    base.category === "Butcher's Choice" ||
     base.category === "Combos" ||
     base.category === "Land + Sea" ||
-    base.category === "Mains" ||
     base.category === "Burgers"
   ) {
     for (const id of SIDE_DESSERT_IDS) {
@@ -61,7 +73,7 @@ export function getUpsellItems(itemId: string, limit = 4): MenuItem[] {
     if (out.length >= limit) break;
     if (seen.has(m.id)) continue;
     if (m.category === base.category) continue;
-    if (m.category === "Drinks" || m.popular) {
+    if (m.menuSection === "drinks" || m.popular) {
       out.push(m);
       seen.add(m.id);
     }

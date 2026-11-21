@@ -11,8 +11,15 @@ const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: Menu
   const { addItem } = useCart();
   const artwork = menuArtwork(item);
 
+  const isSeasonalQuote = Boolean(item.priceLabel);
+  const priceText = item.priceLabel
+    ? item.priceLabel
+    : item.variations && item.variations.length > 1
+      ? `From ${formatPrice(Math.min(...item.variations.map((v) => v.price)))}`
+      : formatPrice(item.price);
+
   const add = () => {
-    if (disabled) return;
+    if (disabled || isSeasonalQuote) return;
     addItem(item);
     toast.success(`${item.name} added to your order`);
   };
@@ -47,7 +54,7 @@ const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: Menu
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
           <div>
             <span className="block text-[17px] font-semibold tracking-tight text-white">
-              {item.variations && item.variations.length > 1 ? `From ${formatPrice(item.price)}` : formatPrice(item.price)}
+              {priceText}
             </span>
             {disabled && <span className="mt-1 block text-xs text-white/50">Unavailable</span>}
           </div>
@@ -60,14 +67,16 @@ const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: Menu
               >
                 <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
               </Link>
-              <button
-                type="button"
-                onClick={add}
-                aria-label={`Add ${item.name} to order`}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#121212] transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-              >
-                <Plus className="h-5 w-5" aria-hidden="true" />
-              </button>
+              {!isSeasonalQuote && (
+                <button
+                  type="button"
+                  onClick={add}
+                  aria-label={`Add ${item.name} to order`}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#121212] transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+                >
+                  <Plus className="h-5 w-5" aria-hidden="true" />
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Calendar, Clock, Instagram, MapPin } from "lucide-react";
 import { butcherBlockEvents } from "@/data/eventsData";
@@ -6,23 +6,49 @@ import { useActiveUpdates } from "@/hooks/useActiveUpdates";
 import { EventDetailSheet } from "@/components/EventDetailSheet";
 import type { HomeUpdateRow } from "@/lib/eventBooking";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
+import dishCocktail from "@/assets/dish-cocktail.jpg";
+import dishLamb from "@/assets/dish-lamb.jpg";
+import dishBurger from "@/assets/dish-burger.jpg";
+
+const FALLBACK_EVENT_IMAGES = [dishCocktail, dishLamb, dishBurger];
 
 export default function EventsPage() {
   const updates = useActiveUpdates();
   const { totalItems } = useCart();
+  const { user, profile } = useAuth();
   const [selectedEvent, setSelectedEvent] = useState<HomeUpdateRow | null>(null);
 
-  const openEventSheet = (title: string) => {
-    const match = updates.find((u) => u.title.toLowerCase() === title.toLowerCase()) ?? updates[0] ?? null;
-    if (match) setSelectedEvent(match);
-  };
+  const guestSavedName =
+    typeof localStorage !== "undefined" ? localStorage.getItem("butcher-block-guest-name") : null;
+  const displayName = (profile?.display_name || user?.user_metadata?.full_name || guestSavedName || "Guest").trim();
+  const initial = displayName.charAt(0).toUpperCase();
+
+  const eventCards = useMemo(() => {
+    const staticByTitle = new Map(
+      butcherBlockEvents.map((e) => [e.title.toLowerCase(), e]),
+    );
+    return updates.map((u, idx) => {
+      const staticMatch = staticByTitle.get(u.title.toLowerCase());
+      return {
+        row: u,
+        id: u.id,
+        title: u.title,
+        tag: staticMatch?.tag ?? (u.type || "Event"),
+        date: staticMatch?.date ?? (u.event_date || u.type || "Upcoming"),
+        time: staticMatch?.time ?? (u.event_time ? `From ${u.event_time}` : "Evening"),
+        description: staticMatch?.description ?? (u.subtitle || "Reserve your table at Butcher Block Steakhouse, Am Weinberg Estate."),
+        image: staticMatch?.image ?? FALLBACK_EVENT_IMAGES[idx % FALLBACK_EVENT_IMAGES.length],
+      };
+    });
+  }, [updates]);
 
   return (
     <div className={"min-h-dvh bg-[#121212] text-white " + (totalItems > 0 ? "pb-56" : "pb-36")}>
       <div className="mx-auto max-w-[560px] px-5 pt-[max(30px,env(safe-area-inset-top,0px))] sm:px-8">
         <header className="flex items-center justify-between gap-4">
           <Link
-            to="/"
+            to="/home"
             aria-label="Back to Home"
             className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#242424] text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
           >
@@ -31,28 +57,37 @@ export default function EventsPage() {
           <span className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#ff7342]">
             AM WEINBERG ESTATE
           </span>
-          <Link
-            to="/booking"
-            className="flex min-h-10 shrink-0 items-center rounded-full border border-white/25 bg-[#242424] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-          >
-            Book table
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/booking"
+              className="flex min-h-10 shrink-0 items-center rounded-full border border-white/25 bg-[#242424] px-3.5 text-[12px] font-semibold text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+            >
+              Book
+            </Link>
+            <Link
+              to="/profile"
+              aria-label={`Profile: ${displayName}`}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-[#242424] text-xs font-semibold text-white transition-colors hover:border-[#ff5a1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+            >
+              {initial}
+            </Link>
+          </div>
         </header>
 
         <div className="mt-10">
           <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#ff7342]">
-            WHAT&apos;S HAPPENING
+            ON THE CALENDAR
           </p>
-          <h1 className="mt-3 text-[clamp(3rem,11vw,4.5rem)] font-extrabold leading-[0.98] tracking-[-0.065em]">
+          <h1 className="mt-3 text-[clamp(2.8rem,11vw,4.3rem)] font-extrabold leading-[0.98] tracking-[-0.065em]">
             Events &amp; Nights
           </h1>
           <p className="mt-4 max-w-[380px] text-[14px] leading-relaxed text-white/55">
-            Weekly steakhouse rituals and special celebrations at Butcher Block Windhoek.
+            Weekly steakhouse rituals and special evenings at Butcher Block Windhoek. Reserve a table to receive your reservation number.
           </p>
         </div>
 
         <div className="mt-8 space-y-5">
-          {butcherBlockEvents.map((event) => (
+          {eventCards.map((event) => (
             <article
               key={event.id}
               className="overflow-hidden rounded-[27px] border border-white/10 bg-[#242424] shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
@@ -95,10 +130,10 @@ export default function EventsPage() {
 
                 <button
                   type="button"
-                  onClick={() => openEventSheet(event.title)}
+                  onClick={() => setSelectedEvent(event.row)}
                   className="mt-5 flex min-h-12 w-full items-center justify-between rounded-full border border-white/15 bg-[#171717] px-5 text-[13px] font-semibold text-white transition-colors hover:border-[#ff5a1f] hover:bg-[#1e1e1e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
                 >
-                  <span>Make a Reservation</span>
+                  <span>Reserve a table</span>
                   <ArrowRight className="h-4 w-4 text-[#ff7b50]" aria-hidden="true" />
                 </button>
               </div>
@@ -106,7 +141,7 @@ export default function EventsPage() {
           ))}
         </div>
 
-        {/* Instagram & Private Events card matching existing editorial style */}
+        {/* Instagram feed card */}
         <section className="mt-10 rounded-[27px] border border-white/10 bg-[#202020] p-6">
           <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#ff7b50]">
             FOLLOW THE FLOOR
@@ -115,7 +150,7 @@ export default function EventsPage() {
             @butcherblocknamibia
           </h2>
           <p className="mt-2 text-[13px] leading-relaxed text-white/55">
-            Live table moments, seasonal cuts, and wine cellar evenings straight from Am Weinberg Estate.
+            Live announcements, seasonal specials, and cellar evenings straight from Butcher Block at Am Weinberg Estate.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <a
@@ -125,15 +160,8 @@ export default function EventsPage() {
               className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#ff5a1f] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[#fa703f]"
             >
               <Instagram className="h-4 w-4" aria-hidden="true" />
-              Open Instagram
+              Follow on Instagram
             </a>
-            <Link
-              to="/plan?tab=events"
-              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 px-5 text-[13px] font-semibold text-white transition-colors hover:bg-white/10"
-            >
-              Host a private event
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
           </div>
         </section>
       </div>

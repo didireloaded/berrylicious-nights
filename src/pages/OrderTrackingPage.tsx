@@ -7,7 +7,7 @@ import { menuItems } from "@/data/menu";
 import { useCart } from "@/context/CartContext";
 import { useApp } from "@/context/AppContext";
 import heroImage from "@/assets/hero-restaurant.jpg";
-import { ArrowLeft, Clock, CheckCircle2, ChefHat, Package, Plus } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, ChefHat, Package, Plus, ReceiptText } from "lucide-react";
 import { notifyOrderStatusTransition, requestOrderNotificationPermission } from "@/lib/orderStatusNotify";
 import { ArrivalCodeCard } from "@/components/ArrivalCodeCard";
 
@@ -20,19 +20,19 @@ const statusSteps = [
 
 const statusHeadline: Record<string, string> = {
   pending: "We've got your order",
-  preparing: "Your food's on the stove",
+  preparing: "Your order is on the grill",
   ready: "It's ready when you are",
   completed: "Enjoy every bite",
 };
 
 const statusSubline: Record<string, string> = {
-  pending: "Hang tight — we’re lining everything up.",
+  pending: "Hang tight — the kitchen has received your ticket.",
   preparing: "The kitchen is preparing your order. We will update you when it is ready.",
-  ready: "Almost there — head to the counter or your table when you’re ready.",
-  completed: "Thanks for choosing Butcher Block Steakhouse tonight.",
+  ready: "Ready — head to the counter or watch for your server.",
+  completed: "Thanks for dining with Butcher Block Steakhouse.",
 };
 
-const WHILE_WAIT_MENU_IDS = ["19", "14", "12"];
+const WHILE_WAIT_MENU_IDS = ["14", "12", "19"];
 
 const orderTypeLabels: Record<string, string> = {
   preorder: "Pre-order",
@@ -44,19 +44,47 @@ function getDetailedStatus(status: string, etaRemaining: number | null): string 
   if (status === "pending") return "Order received";
   if (status === "preparing") {
     if (etaRemaining !== null && etaRemaining >= 0 && etaRemaining <= 5) return "Almost ready";
-    if (etaRemaining === null || etaRemaining > 5) return "Chef started your order";
     return "Chef started your order";
   }
-  if (status === "ready") return "Ready for pickup";
-  if (status === "completed") return "Enjoy — everything’s yours";
+  if (status === "ready") return "Ready";
+  if (status === "completed") return "Completed";
   return "Order received";
 }
+
+function formatOrderNumber(id: string): string {
+  return `BB-${id.slice(0, 6).toUpperCase()}`;
+}
+
+type TrackedOrderItem = {
+  name?: string;
+  qty?: number;
+  price?: number;
+  weight?: string;
+  doneness?: string;
+  side?: string;
+  sauces?: string[];
+};
+
+type TrackedOrder = {
+  id: string;
+  items?: TrackedOrderItem[] | unknown;
+  total?: number;
+  status?: string;
+  order_type?: string | null;
+  table_number?: string | null;
+  scheduled_time?: string | null;
+  guest_name?: string | null;
+  eta_minutes?: number | null;
+  eta_set_at?: string | null;
+  created_at?: string;
+  arrival_code?: string | null;
+};
 
 const OrderTrackingPage = () => {
   const { id } = useParams();
   const { addItem } = useCart();
   const { setCurrentOrder, clearCurrentOrder, currentOrder } = useApp();
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [etaRemaining, setEtaRemaining] = useState<number | null>(null);
 
@@ -72,19 +100,31 @@ const OrderTrackingPage = () => {
     if (!id) return;
 
     const fetchOrder = async () => {
+      const snap = loadOrderSnapshotFromStorage(id);
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session && snap) {
+        setOrder(snap);
+        setLoading(false);
+        return;
+      }
       const { data } = await supabase
         .from("orders")
         .select("*")
         .eq("id", id)
-        .single();
-      const snap = loadOrderSnapshotFromStorage(id);
+        .maybeSingle();
       const row = data
-        ? { ...data, arrival_code: (data as { arrival_code?: string }).arrival_code ?? snap?.arrival_code }
+        ? {
+            ...data,
+            arrival_code: (data as { arrival_code?: string }).arrival_code ?? snap?.arrival_code,
+            table_number: snap?.table_number ?? null,
+            scheduled_time: snap?.scheduled_time ?? null,
+            guest_name: snap?.guest_name ?? null,
+          }
         : snap;
       setOrder(row);
       setLoading(false);
     };
-    fetchOrder();
+    void fetchOrder();
 
     const channel = supabase
       .channel(`order-${id}`)
@@ -92,12 +132,18 @@ const OrderTrackingPage = () => {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${id}` },
         (payload) => {
-          const neu = payload.new as { id?: string; status?: string };
+          const neu = payload.new as TrackedOrder;
           const oldRow = payload.old as { status?: string } | undefined;
           if (neu?.id && neu.status) {
             notifyOrderStatusTransition(neu.id, oldRow?.status, neu.status);
           }
-          setOrder(neu);
+          const snap = loadOrderSnapshotFromStorage(id);
+          setOrder({
+            ...neu,
+            table_number: snap?.table_number ?? null,
+            scheduled_time: snap?.scheduled_time ?? null,
+            guest_name: snap?.guest_name ?? null,
+          });
         },
       )
       .subscribe();
@@ -115,6 +161,9 @@ const OrderTrackingPage = () => {
       total: Number(order.total) || 0,
       status: String(order.status ?? "pending"),
       order_type: order.order_type,
+      table_number: order.table_number ?? null,
+      scheduled_time: order.scheduled_time ?? null,
+      guest_name: order.guest_name ?? null,
       eta_minutes: order.eta_minutes ?? null,
       eta_set_at: order.eta_set_at ?? null,
       created_at: order.created_at,
@@ -152,7 +201,7 @@ const OrderTrackingPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm px-6 text-center">
-        One moment — pulling up your order…
+        One moment — pulling up your receipt…
       </div>
     );
   }
@@ -161,56 +210,80 @@ const OrderTrackingPage = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
         <p className="text-muted-foreground text-lg mb-4">Order not found</p>
-        <Link to="/" className="text-primary font-semibold hover:opacity-80">Back to Home</Link>
+        <Link to="/home" className="text-primary font-semibold hover:opacity-80">Back to Home</Link>
       </div>
     );
   }
 
-  const currentIndex = statusSteps.findIndex((s) => s.key === order.status);
+  const currentIndex = Math.max(0, statusSteps.findIndex((s) => s.key === order.status));
   const progressPercent = Math.round((currentIndex / (statusSteps.length - 1)) * 100);
   const typeLabel = orderTypeLabels[order.order_type] ?? "Order";
   const headline = statusHeadline[order.status] ?? statusHeadline.pending;
   const subline = statusSubline[order.status] ?? statusSubline.pending;
   const detailedStatus = getDetailedStatus(order.status, etaRemaining);
   const isActive = order.status !== "completed";
+  const orderNumber = formatOrderNumber(String(order.id));
+  const placedTime = order.created_at
+    ? new Date(order.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
+    : "";
+
+  const fulfillmentSummary =
+    order.order_type === "dinein" && order.table_number
+      ? `Dine-in · ${order.table_number}`
+      : order.scheduled_time
+        ? `${typeLabel} · ${order.scheduled_time}`
+        : typeLabel;
 
   return (
-    <div className="min-h-screen relative">
+    <div className="min-h-dvh relative flex flex-col justify-end">
       {/* Background image + overlay */}
-      <div className="absolute inset-0">
+      <div className="fixed inset-0 -z-10">
         <img
           src={heroImage}
           alt=""
           className="w-full h-full object-cover"
           decoding="async"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/60 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/45 via-background/75 to-background" />
       </div>
 
       {/* Back button */}
-      <Link
-        to="/"
-        className="absolute top-6 left-6 z-20 w-10 h-10 rounded-full glass border border-white/10 flex items-center justify-center btn-press"
-      >
-        <ArrowLeft className="w-5 h-5 text-foreground" />
-      </Link>
+      <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-[max(20px,env(safe-area-inset-top,0px))] pb-3 max-w-lg w-full mx-auto">
+        <Link
+          to="/home"
+          aria-label="Back to Home"
+          className="w-10 h-10 rounded-full glass border border-white/10 flex items-center justify-center btn-press"
+        >
+          <ArrowLeft className="w-5 h-5 text-foreground" />
+        </Link>
+        <span className="rounded-full glass border border-white/15 px-3.5 py-1.5 text-xs font-bold tracking-wider text-foreground">
+          #{orderNumber}
+        </span>
+      </div>
 
-      {/* Glass panel — pinned to bottom */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 animate-panel-up pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
-        <div className="glass border-t border-white/10 rounded-t-3xl px-6 pt-6 pb-6 max-w-lg mx-auto">
+      {/* Glass panel */}
+      <div className="relative z-10 mt-6 w-full animate-panel-up pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
+        <div className="glass border-t border-white/10 rounded-t-3xl px-6 pt-6 pb-8 max-w-lg mx-auto">
 
           {/* Order meta row */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-start justify-between gap-3 mb-4">
             <div>
-              <p className="text-foreground font-display text-xl font-bold">
-                Order #{order.id.slice(0, 8)}
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary">
+                Order Number
               </p>
-              <p className="text-muted-foreground text-xs mt-0.5">
-                {formatPrice(Number(order.total))} · {typeLabel}
+              <p className="text-foreground font-display text-2xl font-bold tracking-tight mt-0.5">
+                #{orderNumber}
+              </p>
+              <p className="text-muted-foreground text-xs mt-1">
+                {fulfillmentSummary}
+                {order.guest_name ? ` · ${order.guest_name}` : ""}
               </p>
             </div>
             {isActive && (
-              <div className="w-3 h-3 rounded-full bg-primary animate-pulse-dot" />
+              <div className="mt-1 flex items-center gap-2 rounded-full border border-primary/35 bg-primary/15 px-3 py-1">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse-dot" />
+                <span className="text-[11px] font-semibold text-primary">{detailedStatus}</span>
+              </div>
             )}
           </div>
 
@@ -218,13 +291,12 @@ const OrderTrackingPage = () => {
           <p className="text-foreground text-lg font-semibold leading-snug animate-fade-in">
             {headline}
           </p>
-          <p className="text-muted-foreground text-sm mt-1.5 leading-relaxed animate-fade-in">
+          <p className="text-muted-foreground text-sm mt-1 leading-relaxed animate-fade-in">
             {subline}
           </p>
-          <p className="text-foreground text-sm font-semibold mt-2.5 animate-fade-in">{detailedStatus}</p>
           {isActive && etaRemaining !== null && order.status !== "ready" && (
-            <p className="text-muted-foreground text-sm mt-1.5">
-              Estimated preparation time remaining: about {etaRemaining} min. This may change with the kitchen queue.
+            <p className="text-primary text-xl font-bold mt-2.5 animate-fade-in animate-eta-pulse">
+              About {etaRemaining} min to go
             </p>
           )}
 
@@ -238,30 +310,19 @@ const OrderTrackingPage = () => {
             </div>
           )}
 
-          {/* ETA */}
-          {etaRemaining !== null && order.status !== "completed" && order.status !== "ready" && (
-            <p className="text-primary text-2xl font-bold mt-3 animate-fade-in animate-eta-pulse">
-              About {etaRemaining} min to go
-            </p>
-          )}
-
           {/* Stepper */}
-          <div className="mt-6 mb-2">
-            {/* Track */}
+          <div className="mt-6 mb-5">
             <div className="relative h-1.5 rounded-full bg-border overflow-hidden">
               <div
                 className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all duration-700"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-
-            {/* Dots + labels */}
             <div className="flex justify-between mt-3">
               {statusSteps.map((step, i) => {
                 const done = i <= currentIndex;
                 const active = i === currentIndex;
                 const Icon = step.icon;
-
                 return (
                   <div key={step.key} className="flex flex-col items-center gap-1" style={{ width: `${100 / statusSteps.length}%` }}>
                     <div
@@ -269,8 +330,8 @@ const OrderTrackingPage = () => {
                         active
                           ? "bg-primary text-primary-foreground scale-110 ring-4 ring-primary/20"
                           : done
-                          ? "bg-primary/80 text-primary-foreground"
-                          : "bg-card border border-border text-muted-foreground"
+                            ? "bg-primary/80 text-primary-foreground"
+                            : "bg-card border border-border text-muted-foreground"
                       }`}
                     >
                       <Icon className="w-4 h-4" />
@@ -284,12 +345,68 @@ const OrderTrackingPage = () => {
             </div>
           </div>
 
+          {/* Always-open Itemized Receipt */}
+          <section className="mt-5 rounded-2xl border border-white/12 bg-background/55 p-4" aria-labelledby="receipt-heading">
+            <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <ReceiptText className="h-4 w-4 text-primary" aria-hidden="true" />
+                <h2 id="receipt-heading" className="text-sm font-bold text-foreground">Order receipt</h2>
+              </div>
+              <span className="font-mono text-xs font-semibold text-primary">#{orderNumber}</span>
+            </div>
+
+            {placedTime && (
+              <p className="mt-2.5 text-[11px] text-muted-foreground">
+                Placed {placedTime} · {fulfillmentSummary}
+              </p>
+            )}
+
+            <div className="mt-3 space-y-2.5">
+              {Array.isArray(order.items) &&
+                (order.items as TrackedOrderItem[]).map((item, i) => {
+                  const qty = Number(item.qty ?? 1);
+                  const lineTotal = Number(item.price ?? 0) * qty;
+                  const mods = [
+                    item.weight,
+                    item.doneness,
+                    item.side ? `Side: ${item.side}` : null,
+                    Array.isArray(item.sauces) && item.sauces.length > 0 ? `Sauce: ${item.sauces.join(", ")}` : null,
+                  ].filter(Boolean);
+                  return (
+                    <div key={i} className="flex items-start justify-between gap-3 text-sm">
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground">
+                          {qty}× {item.name}
+                        </p>
+                        {mods.length > 0 && (
+                          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                            {mods.join(" · ")}
+                          </p>
+                        )}
+                      </div>
+                      <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                        {formatPrice(lineTotal)}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+
+            <div className="mt-3.5 flex items-center justify-between border-t border-white/10 pt-3">
+              <span className="text-sm font-semibold text-foreground">Total</span>
+              <span className="text-lg font-extrabold tabular-nums text-primary">{formatPrice(Number(order.total))}</span>
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Show order #{orderNumber}{order.arrival_code ? ` or code ${order.arrival_code}` : ""} to staff on collection or at your table.
+            </p>
+          </section>
+
           {isActive && (
             <div className="mt-5 pt-4 border-t border-white/10">
               <p className="text-sm font-semibold text-foreground">Add something while you wait</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link
-                  to="/menu?category=Drinks"
+                  to="/drinks"
                   className="flex-1 min-w-[100px] rounded-xl border border-primary/45 bg-primary/12 py-2.5 text-center text-xs font-bold text-primary btn-press"
                 >
                   Drinks
@@ -315,10 +432,7 @@ const OrderTrackingPage = () => {
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Quick adds
               </p>
-              <p className="text-xs text-muted-foreground mt-1 mb-3">
-                We&apos;ll bundle these with your order when we can.
-              </p>
-              <div className="space-y-2">
+              <div className="mt-2.5 space-y-2">
                 {whileYouWaitItems.map((item) => (
                   <div
                     key={item.id}
@@ -326,7 +440,7 @@ const OrderTrackingPage = () => {
                   >
                     <img
                       src={item.image}
-                      alt=""
+                      alt={item.name}
                       className="h-11 w-11 rounded-lg object-cover shrink-0"
                       decoding="async"
                     />
@@ -342,37 +456,11 @@ const OrderTrackingPage = () => {
                     >
                       <Plus className="h-4 w-4" />
                     </button>
-                    <Link
-                      to={`/menu/${item.id}`}
-                      className="text-[10px] text-muted-foreground hover:text-foreground shrink-0 w-10 text-center"
-                    >
-                      Menu
-                    </Link>
                   </div>
                 ))}
               </div>
             </div>
           )}
-
-          {/* Order Items — collapsible summary */}
-          <details className="mt-4 group">
-            <summary className="text-muted-foreground text-xs cursor-pointer hover:text-foreground transition-colors select-none">
-              {Array.isArray(order.items) ? `${order.items.length} item${order.items.length > 1 ? "s" : ""}` : "Items"} — tap to view
-            </summary>
-            <div className="mt-3 space-y-1.5 animate-fade-in">
-              {Array.isArray(order.items) &&
-                order.items.map((item: any, i: number) => (
-                  <div key={i} className="flex justify-between text-sm">
-                    <span className="text-foreground">{item.name} x {item.qty}</span>
-                    <span className="text-muted-foreground">{formatPrice(item.price * item.qty)}</span>
-                  </div>
-                ))}
-              <div className="border-t border-white/10 pt-2 flex justify-between font-semibold text-sm">
-                <span className="text-foreground">Total</span>
-                <span className="text-primary">{formatPrice(Number(order.total))}</span>
-              </div>
-            </div>
-          </details>
         </div>
       </div>
     </div>

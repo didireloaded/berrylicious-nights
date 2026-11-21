@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect } from "react";
-import { CalendarDays, Clock, Users } from "lucide-react";
+import { CalendarDays, Clock, Sparkles, Users } from "lucide-react";
 import { ArrivalCodeCard } from "@/components/ArrivalCodeCard";
 import { useApp } from "@/context/AppContext";
 
@@ -8,12 +8,20 @@ const BookingSuccessPage = () => {
   const location = useLocation();
   const { setCurrentBooking } = useApp();
   const booking = location.state as {
+    id?: string;
     date: string;
     time: string;
     guests: number;
+    eventTitle?: string;
     arrival_code?: string;
+    reservation_number?: string;
     assigned_table_code?: string;
   } | null;
+
+  const reservationNumber =
+    booking?.arrival_code ||
+    booking?.reservation_number ||
+    (booking?.id ? `BB-${booking.id.slice(0, 6).toUpperCase()}` : null);
 
   useEffect(() => {
     if (!booking?.date || !booking?.time) return;
@@ -21,9 +29,9 @@ const BookingSuccessPage = () => {
       date: booking.date,
       time: booking.time,
       guests: booking.guests,
-      arrival_code: booking.arrival_code,
+      arrival_code: reservationNumber ?? undefined,
     });
-  }, [booking?.date, booking?.time, booking?.guests, booking?.arrival_code, setCurrentBooking]);
+  }, [booking?.date, booking?.time, booking?.guests, reservationNumber, setCurrentBooking]);
 
   const formattedDate = booking?.date
     ? new Date(booking.date + "T00:00").toLocaleDateString("en-ZA", {
@@ -35,7 +43,6 @@ const BookingSuccessPage = () => {
 
   return (
     <div className="min-h-screen pb-safe-nav flex flex-col items-center justify-center px-6 max-w-lg mx-auto text-center animate-fade-in">
-
       {/* Animated checkmark */}
       <div className="w-24 h-24 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center mb-6">
         <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none">
@@ -56,16 +63,38 @@ const BookingSuccessPage = () => {
 
       {booking ? (
         <>
-          {booking.arrival_code ? (
+          {reservationNumber ? (
             <ArrivalCodeCard
-              code={booking.arrival_code}
+              code={reservationNumber}
               bookingDate={booking.date}
               bookingTime={booking.time}
               className="mb-5"
             />
           ) : null}
+
           {/* Booking summary card */}
           <div className="bg-card border border-border rounded-xl p-5 w-full mb-4 text-left space-y-3">
+            {reservationNumber && (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Reservation Number</p>
+                  <p className="font-mono text-sm font-bold text-primary">{reservationNumber}</p>
+                </div>
+                <div className="border-t border-border" />
+              </>
+            )}
+            {booking.eventTitle && (
+              <>
+                <div className="flex items-center gap-3">
+                  <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase tracking-wider">Event</p>
+                    <p className="text-foreground font-semibold">{booking.eventTitle}</p>
+                  </div>
+                </div>
+                <div className="border-t border-border" />
+              </>
+            )}
             <div className="flex items-center gap-3">
               <CalendarDays className="w-5 h-5 text-primary flex-shrink-0" />
               <div>
@@ -103,8 +132,8 @@ const BookingSuccessPage = () => {
             ) : null}
           </div>
           <p className="text-muted-foreground text-sm mb-8">
-            {booking.arrival_code
-              ? "Keep the code handy — we’ll match you in seconds at the door."
+            {reservationNumber
+              ? "Present your reservation number at Butcher Block upon arrival — you can also pull it up anytime in your Profile."
               : "Save these details and bring them with you when you arrive."}
           </p>
         </>
@@ -122,7 +151,7 @@ const BookingSuccessPage = () => {
           {booking ? "Explore the menu" : "Browse menu"}
         </Link>
         <Link
-          to="/"
+          to="/home"
           className="flex-1 border border-border text-foreground font-semibold py-4 rounded-lg text-center hover:bg-card transition-colors btn-press"
         >
           Back to Home

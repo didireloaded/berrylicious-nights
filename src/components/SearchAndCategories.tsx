@@ -10,11 +10,22 @@ type SearchAndCategoriesProps = {
   onCategoryChange: (value: string) => void;
   featuredOnly: boolean;
   onFeaturedToggle: () => void;
+  categoryList?: string[];
+  placeholder?: string;
+  artworkResolver?: (category: string) => string | null;
 };
 
 export const SearchAndCategories = forwardRef<HTMLInputElement, SearchAndCategoriesProps>(
   function SearchAndCategories({
-    search, onSearchChange, category, onCategoryChange, featuredOnly, onFeaturedToggle,
+    search,
+    onSearchChange,
+    category,
+    onCategoryChange,
+    featuredOnly,
+    onFeaturedToggle,
+    categoryList = categories,
+    placeholder = "Search dishes",
+    artworkResolver = categoryArtwork,
   }, inputRef) {
     return (
       <div className="mt-7 space-y-6">
@@ -26,7 +37,7 @@ export const SearchAndCategories = forwardRef<HTMLInputElement, SearchAndCategor
               type="search"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search dishes and drinks"
+              placeholder={placeholder}
               aria-label="Search menu"
               className="min-h-[52px] w-full rounded-full border border-white/15 bg-[#242424] pl-12 pr-12 text-[15px] text-white outline-none placeholder:text-white/45 focus:border-[#ff5a1f] focus:ring-1 focus:ring-[#ff5a1f]"
             />
@@ -49,12 +60,12 @@ export const SearchAndCategories = forwardRef<HTMLInputElement, SearchAndCategor
         </div>
 
         <div role="group" aria-label="Menu categories" className="-mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide sm:-mx-8 sm:px-8">
-          {categories.map((name) => {
+          {categoryList.map((name) => {
             const active = name === category;
-            const photo = categoryArtwork(name);
+            const photo = artworkResolver(name);
             return (
               <button type="button" key={name} aria-pressed={active} onClick={() => onCategoryChange(name)}
-                className="group flex min-w-[64px] shrink-0 snap-start flex-col items-center gap-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+                className="group flex min-w-[68px] max-w-[84px] shrink-0 snap-start flex-col items-center gap-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
               >
                 <span className={"flex h-[66px] w-[66px] items-center justify-center overflow-hidden rounded-full border-[3px] p-[3px] transition-colors " +
                   (active ? "border-[#ff5a1f]" : "border-transparent group-hover:border-white/30")}
@@ -63,7 +74,7 @@ export const SearchAndCategories = forwardRef<HTMLInputElement, SearchAndCategor
                     {photo ? <img src={photo} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <UtensilsCrossed aria-hidden="true" className="h-5 w-5 text-white/55" />}
                   </span>
                 </span>
-                <span className={"text-[13px] font-medium " + (active ? "text-[#ff7b50]" : "text-white/60")}>{name}</span>
+                <span className={"line-clamp-2 text-[12px] font-medium leading-tight " + (active ? "text-[#ff7b50]" : "text-white/60")}>{name}</span>
               </button>
             );
           })}

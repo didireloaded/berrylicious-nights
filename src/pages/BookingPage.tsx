@@ -10,6 +10,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { parseRpcBookedTimes } from "@/lib/bookingRpc";
 import { getWindhoekDateISO } from "@/lib/windhoekDate";
 
+type RpcSupabaseClient = {
+  rpc: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+};
+
+const rpcClient = supabase as unknown as RpcSupabaseClient;
+
 const BookingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -19,6 +28,7 @@ const BookingPage = () => {
   const suggestedTime = planState?.suggestedTime?.trim() || querySuggestedTime || "";
   const suggestedGuests = planState?.suggestedGuests;
   const suggestedDate = planState?.suggestedDate?.trim() ?? "";
+  const eventTitle = planState?.eventTitle?.trim() ?? "";
   const eventTimeSlots = planState?.eventTimeSlots;
   const tablesAlmostFull = Boolean(planState?.tablesAlmostFull);
 
@@ -28,9 +38,21 @@ const BookingPage = () => {
   const [guests, setGuests] = useState(
     typeof suggestedGuests === "number" && suggestedGuests > 0 ? suggestedGuests : 2,
   );
-  const [specialRequests, setSpecialRequests] = useState("");
-  const [guestName, setGuestName] = useState("");
-  const [guestPhone, setGuestPhone] = useState("");
+  const [specialRequests, setSpecialRequests] = useState(() => (eventTitle ? `Event: ${eventTitle}` : ""));
+  const [guestName, setGuestName] = useState(() => {
+    try {
+      return localStorage.getItem("butcher-block-guest-name") || "";
+    } catch {
+      return "";
+    }
+  });
+  const [guestPhone, setGuestPhone] = useState(() => {
+    try {
+      return localStorage.getItem("butcher-block-guest-phone") || "";
+    } catch {
+      return "";
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
   const [checkingTimes, setCheckingTimes] = useState(true);
@@ -45,8 +67,8 @@ const BookingPage = () => {
     setCheckingTimes(true);
     setTimesError(false);
     setBookedTimes([]);
-    void Promise.resolve((supabase as any).rpc("booked_table_times", { p_date: date }))
-      .then(({ data, error }: any) => {
+    void Promise.resolve(rpcClient.rpc("booked_table_times", { p_date: date }))
+      .then(({ data, error }) => {
         if (cancelled) return;
         if (error) throw error;
         setBookedTimes(parseRpcBookedTimes(data));
@@ -94,7 +116,7 @@ const BookingPage = () => {
     setLoading(true);
     // Recheck at submission so a previously available slot is not offered after another booking.
     try {
-      const { data, error } = await (supabase as any).rpc("booked_table_times", { p_date: date });
+      const { data, error } = await rpcClient.rpc("booked_table_times", { p_date: date });
       if (error) throw error;
       const latestBooked = parseRpcBookedTimes(data);
       if (latestBooked.includes(selectedTime)) {
@@ -118,10 +140,12 @@ const BookingPage = () => {
       special_requests: specialRequests || null,
     };
 
+    let booking_id: string | null = null;
     let arrival_code: string | null = null;
     let assigned_table_code: string | null = null;
     try {
       const res = await insertBookingWithArrivalCode(bookingData);
+      booking_id = res.booking_id;
       arrival_code = res.arrival_code;
       assigned_table_code = res.assigned_table_code;
     } catch {
@@ -130,13 +154,26 @@ const BookingPage = () => {
       return;
     }
 
+    try {
+      if (!user && guestName.trim()) localStorage.setItem("butcher-block-guest-name", guestName.trim());
+      if (!user && guestPhone.trim()) localStorage.setItem("butcher-block-guest-phone", guestPhone.trim());
+    } catch {
+      /* ignore storage errors */
+    }
+
+    const reservation_number =
+      arrival_code || (booking_id ? `BB-${booking_id.slice(0, 6).toUpperCase()}` : null);
+
     const localData = {
+      ...(booking_id ? { id: booking_id } : {}),
       date,
       time: selectedTime,
       guests,
       specialRequests,
+      ...(eventTitle ? { eventTitle } : {}),
       createdAt: new Date().toISOString(),
       ...(arrival_code ? { arrival_code } : {}),
+      ...(reservation_number ? { reservation_number } : {}),
       ...(assigned_table_code ? { assigned_table_code } : {}),
     };
     // Local history is optional. A storage failure must never hide a confirmed server booking.
@@ -183,7 +220,7 @@ const BookingPage = () => {
     }
     setWaitlistBusy(true);
     try {
-      const { data, error } = await (supabase as any).rpc("join_waitlist", {
+      const { data, error } = await rpcClient.rpc("join_waitlist", {
         p_party_size: guests,
         p_preferred_date: date,
         p_guest_name: name,
@@ -208,6 +245,11 @@ const BookingPage = () => {
       <h1 className="font-display text-3xl font-bold mb-4">Book a table</h1>
 
       <div className="mb-6 rounded-2xl glass-card px-4 py-4">
+        {eventTitle && (
+          <p className="mb-2 inline-flex rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+            Reserving for: {eventTitle}
+          </p>
+        )}
         <p className="text-sm leading-relaxed text-muted-foreground">
           Selected date:{" "}
           <span className="font-semibold text-foreground">{date}</span>

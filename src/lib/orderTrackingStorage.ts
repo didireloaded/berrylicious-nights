@@ -6,6 +6,9 @@ export type TrackableOrderSnapshot = {
   total: number;
   status: string;
   order_type?: string;
+  table_number?: string | null;
+  scheduled_time?: string | null;
+  guest_name?: string | null;
   eta_minutes?: number | null;
   eta_set_at?: string | null;
   created_at?: string;

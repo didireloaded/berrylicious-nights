@@ -44,7 +44,7 @@ export const promoSpotlight: PromoSpotlightConfig = {
     "Join us at Am Weinberg Estate on Tuesdays for Ladies’ Night or Wednesdays for Men’s Night.",
   ],
   menuItemId: "6",
-  promoPrice: 625,
+  promoPrice: 565,
 };
 
 function todayYmd(): string {

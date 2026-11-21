@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
-import { CalendarDays, Sparkles, UtensilsCrossed } from "lucide-react";
+import { CalendarDays, UtensilsCrossed } from "lucide-react";
 import { slotLabel } from "@/lib/bookingSlots";
 import {
   computeOpenSlotsForDate,
@@ -95,6 +95,7 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
   const goBooking = (time: string) => {
     const state: BookingNavState = {
       eventId: event.id,
+      eventTitle: event.title,
       suggestedDate: eventDate,
       suggestedTime: time,
       eventTimeSlots: openSlots.length > 0 ? openSlots : undefined,
@@ -179,16 +180,8 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-center text-sm font-bold text-primary-foreground btn-press"
           >
             <CalendarDays className="h-5 w-5 shrink-0" />
-            {slotsLoading || slotsError || openSlots.length === 0 ? "Check table availability" : "Book for this event"}
+            {slotsLoading || slotsError || openSlots.length === 0 ? "Check table availability" : "Reserve for this event"}
           </button>
-          <Link
-            to="/plan"
-            onClick={onClose}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/5 py-3 text-center text-sm font-semibold text-primary btn-press"
-          >
-            <Sparkles className="h-5 w-5 shrink-0" />
-            Join — plan my night
-          </Link>
           <Link
             to="/menu"
             onClick={onClose}

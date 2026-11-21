@@ -3,18 +3,20 @@ import {
   Gift,
   Clock,
   CalendarDays,
+  CalendarHeart,
   LogOut,
   ChevronRight,
   Shield,
   Info,
-  Sparkles,
   Package,
   Instagram,
-  Compass,
   MapPin,
   PartyPopper,
+  Wine,
+  Check,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useAboutSheet } from "@/context/AboutSheetContext";
 import { formatPrice } from "@/lib/vibe";
 import { useAuth } from "@/context/AuthContext";
@@ -28,6 +30,8 @@ type OrderRow = {
   items?: { name?: string; qty?: number }[];
   total?: number;
   status?: string;
+  order_type?: string;
+  arrival_code?: string | null;
   created_at?: string;
   createdAt?: string;
 };
@@ -38,6 +42,10 @@ type BookingRow = {
   date?: string;
   time?: string;
   status?: string;
+  eventTitle?: string;
+  arrival_code?: string;
+  reservation_number?: string;
+  assigned_table_code?: string;
 };
 
 function initials(name: string): string {
@@ -47,6 +55,14 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function readLocal(key: string): string {
+  try {
+    return localStorage.getItem(key) || "";
+  } catch {
+    return "";
+  }
+}
+
 const ProfilePage = () => {
   const { user, profile, loading, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
@@ -54,10 +70,15 @@ const ProfilePage = () => {
   const { currentOrder, currentBooking } = useApp();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [guestNameInput, setGuestNameInput] = useState(() => readLocal("butcher-block-guest-name"));
+  const [guestPhoneInput, setGuestPhoneInput] = useState(() => readLocal("butcher-block-guest-phone"));
+  const [savedGuestName, setSavedGuestName] = useState(() => readLocal("butcher-block-guest-name"));
+  const [savedNotice, setSavedNotice] = useState(false);
 
-  const displayName = profile?.display_name || user?.user_metadata?.full_name || "Guest";
+  const displayName =
+    profile?.display_name || user?.user_metadata?.full_name || savedGuestName || "Guest";
   const totalVisits = profile?.total_visits || 0;
-  const totalOrders = profile?.total_orders || 0;
+  const totalOrders = profile?.total_orders || orders.length;
   const loyaltyPoints = profile?.loyalty_points ?? 0;
   const loyaltyTarget = 5;
   const loyaltyPercent = Math.min((totalVisits / loyaltyTarget) * 100, 100);
@@ -79,8 +100,13 @@ const ProfilePage = () => {
         .limit(10)
         .then(({ data }) => setBookings((data ?? []) as BookingRow[]));
     } else {
-      setOrders(JSON.parse(localStorage.getItem("berrylicious-orders") || "[]").reverse() as OrderRow[]);
-      setBookings(JSON.parse(localStorage.getItem("berrylicious-bookings") || "[]").reverse() as BookingRow[]);
+      try {
+        setOrders(JSON.parse(localStorage.getItem("berrylicious-orders") || "[]").reverse() as OrderRow[]);
+        setBookings(JSON.parse(localStorage.getItem("berrylicious-bookings") || "[]").reverse() as BookingRow[]);
+      } catch {
+        setOrders([]);
+        setBookings([]);
+      }
     }
   }, [user]);
 
@@ -90,11 +116,35 @@ const ProfilePage = () => {
     void requestOrderNotificationPermission();
   }, [user]);
 
+  const handleSaveGuestProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanedName = guestNameInput.trim();
+    const cleanedPhone = guestPhoneInput.trim();
+    try {
+      if (cleanedName) {
+        localStorage.setItem("butcher-block-guest-name", cleanedName);
+      } else {
+        localStorage.removeItem("butcher-block-guest-name");
+      }
+      if (cleanedPhone) {
+        localStorage.setItem("butcher-block-guest-phone", cleanedPhone);
+      } else {
+        localStorage.removeItem("butcher-block-guest-phone");
+      }
+    } catch {
+      /* ignore storage errors */
+    }
+    setSavedGuestName(cleanedName);
+    setSavedNotice(true);
+    toast.success("Profile details saved");
+    setTimeout(() => setSavedNotice(false), 2000);
+  };
+
   const lastOrder = orders[0];
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/");
+    navigate("/home");
   };
 
   const orderLine = useMemo(() => {
@@ -138,7 +188,7 @@ const ProfilePage = () => {
         <div className="relative flex flex-col items-center text-center">
           <div className="relative mb-4">
             <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/10 text-2xl font-bold text-primary ring-4 ring-background shadow-xl">
-              {user ? initials(displayName) : <User className="h-10 w-10 text-primary" strokeWidth={1.75} />}
+              {user || savedGuestName ? initials(displayName) : <User className="h-10 w-10 text-primary" strokeWidth={1.75} />}
             </div>
             {user && (
               <span
@@ -156,7 +206,11 @@ const ProfilePage = () => {
               {new Date(user.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}
             </p>
           )}
-          {!user && <p className="mt-1 text-sm text-muted-foreground">Sign in to save orders, bookings & rewards</p>}
+          {!user && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Save your details for faster checkout &amp; table bookings
+            </p>
+          )}
           {user && milestoneLabel && (
             <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1">
               <PartyPopper className="h-3.5 w-3.5 text-primary" />
@@ -185,12 +239,54 @@ const ProfilePage = () => {
 
       <div className="space-y-6 px-6 -mt-2">
         {!user && (
-          <Link
-            to="/auth"
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-bold text-primary-foreground shadow-lg shadow-primary/20 btn-press"
-          >
-            Sign in or create account
-          </Link>
+          <section className="rounded-2xl border border-border bg-card p-4 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-display text-sm font-semibold text-foreground">Your details</h2>
+              <Link to="/auth" className="text-xs font-semibold text-primary hover:underline">
+                Sign in to sync
+              </Link>
+            </div>
+            <form onSubmit={handleSaveGuestProfile} className="space-y-3">
+              <div>
+                <label htmlFor="profile-guest-name" className="mb-1 block text-xs text-muted-foreground">
+                  Display name
+                </label>
+                <input
+                  id="profile-guest-name"
+                  type="text"
+                  value={guestNameInput}
+                  onChange={(e) => setGuestNameInput(e.target.value)}
+                  placeholder="Enter your name"
+                  className="h-11 w-full rounded-xl border border-border bg-background px-3.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label htmlFor="profile-guest-phone" className="mb-1 block text-xs text-muted-foreground">
+                  Phone number
+                </label>
+                <input
+                  id="profile-guest-phone"
+                  type="tel"
+                  value={guestPhoneInput}
+                  onChange={(e) => setGuestPhoneInput(e.target.value)}
+                  placeholder="+264 81 000 0000"
+                  className="h-11 w-full rounded-xl border border-border bg-background px-3.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground btn-press"
+              >
+                {savedNotice ? (
+                  <>
+                    <Check className="h-4 w-4" /> Saved
+                  </>
+                ) : (
+                  "Save profile details"
+                )}
+              </button>
+            </form>
+          </section>
         )}
 
         {user && (
@@ -210,16 +306,16 @@ const ProfilePage = () => {
               <span className="text-xs font-semibold text-foreground">Order</span>
             </Link>
             <Link
-              to="/plan"
+              to="/events"
               className="flex flex-1 flex-col items-center gap-1.5 rounded-xl border border-border bg-card py-3 text-center btn-press hover:border-primary/40"
             >
-              <Sparkles className="h-5 w-5 text-primary" />
-              <span className="text-xs font-semibold text-foreground">Plan</span>
+              <CalendarHeart className="h-5 w-5 text-primary" />
+              <span className="text-xs font-semibold text-foreground">Events</span>
             </Link>
           </div>
         )}
 
-        {user && (orderLive || bookingTonight) && (
+        {(orderLive || bookingTonight) && (
           <section className="space-y-2">
             <h2 className="px-0.5 font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Right now
@@ -230,8 +326,10 @@ const ProfilePage = () => {
                 className="flex items-center justify-between gap-3 rounded-2xl border border-primary/35 bg-primary/10 px-4 py-3.5 transition-colors hover:bg-primary/15"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-primary">Order in progress</p>
-                  <p className="text-xs text-muted-foreground">Status: {String(currentOrder.status)} · tap to track</p>
+                  <p className="text-sm font-bold text-primary">
+                    Order #BB-{String(currentOrder.id).slice(0, 6).toUpperCase()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Status: {String(currentOrder.status)} · tap for receipt</p>
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-primary" />
               </Link>
@@ -245,7 +343,8 @@ const ProfilePage = () => {
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-emerald-200">Table tonight</p>
                   <p className="text-xs text-muted-foreground">
-                    {currentBooking.time} · {currentBooking.guests} guests · arrival &amp; details
+                    {currentBooking.time} · {currentBooking.guests} guests
+                    {currentBooking.arrival_code ? ` · #${currentBooking.arrival_code}` : ""}
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-emerald-300" />
@@ -260,30 +359,6 @@ const ProfilePage = () => {
           </h2>
           <div className="grid grid-cols-2 gap-2">
             <Link
-              to="/plan"
-              className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/35"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">Plan my night</p>
-                <p className="text-[10px] text-muted-foreground">Time, vibe, pre-order</p>
-              </div>
-            </Link>
-            <Link
-              to="/plan?tab=events"
-              className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/35"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Compass className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">Host an event</p>
-                <p className="text-[10px] text-muted-foreground">Package &amp; price estimate</p>
-              </div>
-            </Link>
-            <Link
               to="/menu"
               className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/35"
             >
@@ -291,8 +366,32 @@ const ProfilePage = () => {
                 <Package className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">Full menu</p>
-                <p className="text-[10px] text-muted-foreground">Drinks &amp; plates</p>
+                <p className="text-sm font-semibold text-foreground">Food menu</p>
+                <p className="text-[10px] text-muted-foreground">Cuts, burgers &amp; grill</p>
+              </div>
+            </Link>
+            <Link
+              to="/drinks"
+              className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/35"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Wine className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">Wine &amp; Drinks</p>
+                <p className="text-[10px] text-muted-foreground">Cocktails &amp; cellar</p>
+              </div>
+            </Link>
+            <Link
+              to="/events"
+              className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/35"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <CalendarHeart className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">Events</p>
+                <p className="text-[10px] text-muted-foreground">Weekly steak nights</p>
               </div>
             </Link>
             <Link
@@ -311,19 +410,15 @@ const ProfilePage = () => {
         </section>
 
         <section className="rounded-2xl border border-border/80 bg-gradient-to-br from-card to-background/60 p-4">
-          <h2 className="font-display text-sm font-semibold text-foreground">While you&apos;re here</h2>
+          <h2 className="font-display text-sm font-semibold text-foreground">At Am Weinberg Estate</h2>
           <ul className="mt-3 space-y-2.5 text-xs leading-relaxed text-muted-foreground">
             <li className="flex gap-2">
               <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-              Ask about terrace tables when the weather plays along — same menu, open-air energy.
-            </li>
-            <li className="flex gap-2">
-              <Gift className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-              Mention dietary needs when you book; the pass can usually flex with a heads-up.
+              13 Jan Jonker Road, Klein Windhoek · Open Mon–Sat 11:30–22:00, Sun 11:30–21:00.
             </li>
             <li className="flex gap-2">
               <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-              Fridays fill fast after 19:00 — a reservation beats the queue.
+              Fridays &amp; Ladies/Men&apos;s Nights fill fast after 19:00 — book ahead to lock your reservation number.
             </li>
           </ul>
         </section>
@@ -369,9 +464,16 @@ const ProfilePage = () => {
               Recent activity
             </h2>
             <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <div className="mb-3 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold text-foreground">Last order</span>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">Last order</span>
+                </div>
+                {lastOrder.id && (
+                  <span className="font-mono text-xs font-bold text-primary">
+                    #BB-{String(lastOrder.id).slice(0, 6).toUpperCase()}
+                  </span>
+                )}
               </div>
               <p className="text-sm leading-relaxed text-foreground line-clamp-2">{orderLine}</p>
               <p className="mt-2 text-xs text-muted-foreground">
@@ -382,12 +484,22 @@ const ProfilePage = () => {
                   month: "short",
                 })}
               </p>
-              <Link
-                to="/menu"
-                className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-primary hover:opacity-90"
-              >
-                Order again <ChevronRight className="h-4 w-4" />
-              </Link>
+              <div className="mt-4 flex items-center gap-5">
+                {lastOrder.id && (
+                  <Link
+                    to={`/order/${lastOrder.id}`}
+                    className="inline-flex items-center gap-1 text-sm font-bold text-primary hover:opacity-90"
+                  >
+                    View receipt <ChevronRight className="h-4 w-4" />
+                  </Link>
+                )}
+                <Link
+                  to="/menu"
+                  className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  Order again
+                </Link>
+              </div>
             </div>
           </section>
         )}
@@ -395,37 +507,58 @@ const ProfilePage = () => {
         {bookings.length > 0 && (
           <section>
             <h2 className="mb-3 px-0.5 font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Bookings
+              Reservations
             </h2>
             <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-              {bookings.slice(0, 4).map((b, i) => (
-                <div key={b.id || String(i)} className="flex items-center justify-between gap-3 px-4 py-3.5">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">
-                      {b.guests} guests · {b.time}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {b.date
-                        ? new Date(b.date + "T12:00:00").toLocaleDateString(undefined, {
-                            weekday: "short",
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : ""}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                      b.status === "confirmed" || b.status === "arrived"
-                        ? "bg-primary/15 text-primary"
-                        : "bg-muted text-muted-foreground"
-                    }`}
+              {bookings.slice(0, 6).map((b, i) => {
+                const resNo =
+                  b.arrival_code ||
+                  b.reservation_number ||
+                  (b.id ? `BB-${String(b.id).slice(0, 6).toUpperCase()}` : null);
+                return (
+                  <Link
+                    key={b.id || String(i)}
+                    to="/booking/success"
+                    state={{
+                      id: b.id,
+                      date: b.date,
+                      time: b.time,
+                      guests: b.guests,
+                      eventTitle: b.eventTitle,
+                      arrival_code: resNo ?? undefined,
+                      assigned_table_code: b.assigned_table_code,
+                    }}
+                    className="flex items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-muted/20"
                   >
-                    {b.status || "booked"}
-                  </span>
-                </div>
-              ))}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">
+                        {b.eventTitle ? `${b.eventTitle} · ` : ""}
+                        {b.guests} guests · {b.time}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {b.date
+                          ? new Date(b.date + "T12:00:00").toLocaleDateString(undefined, {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : ""}
+                        {resNo ? ` · #${resNo}` : ""}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                        b.status === "confirmed" || b.status === "arrived"
+                          ? "bg-primary/15 text-primary"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {b.status || "booked"}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           </section>
         )}
@@ -433,7 +566,7 @@ const ProfilePage = () => {
         {orders.length > 0 && (
           <section>
             <h2 className="mb-3 px-0.5 font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Order history
+              Order receipts
             </h2>
             <div className="space-y-2">
               {orders.map((o, i) => (
@@ -446,14 +579,15 @@ const ProfilePage = () => {
                       {Array.isArray(o.items) ? o.items.map((x) => x.name).filter(Boolean).join(", ") || "Order" : "Order"}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
+                      {o.id ? `#BB-${String(o.id).slice(0, 6).toUpperCase()} · ` : ""}
                       {new Date(o.created_at || o.createdAt || "").toLocaleDateString()}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <span className="text-sm font-bold text-primary">{formatPrice(Number(o.total))}</span>
-                    {o.id && o.status && o.status !== "completed" && (
+                    {o.id && (
                       <Link to={`/order/${o.id}`} className="text-[11px] font-semibold text-primary hover:underline">
-                        Track
+                        Receipt
                       </Link>
                     )}
                   </div>
@@ -475,7 +609,7 @@ const ProfilePage = () => {
               className="flex items-center gap-3 px-4 py-4 transition-colors hover:bg-muted/30 active:bg-muted/50"
             >
               <Instagram className="h-5 w-5 shrink-0 text-pink-400" />
-              <span className="flex-1 text-sm font-medium text-foreground">Instagram</span>
+              <span className="flex-1 text-sm font-medium text-foreground">@butcherblocknamibia</span>
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </a>
             <button

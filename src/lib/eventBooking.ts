@@ -91,6 +91,7 @@ export async function computeOpenSlotsForDate(
 
 export type BookingNavState = {
   eventId?: string;
+  eventTitle?: string;
   suggestedDate?: string;
   suggestedTime?: string;
   suggestedGuests?: number;

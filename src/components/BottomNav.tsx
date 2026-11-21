@@ -8,7 +8,7 @@ export default function BottomNav() {
   const { totalItems } = useCart();
   const { openAssistant } = useRestaurantAssistant();
 
-  const isHome = pathname === "/";
+  const isHome = pathname === "/home";
   const isFood = pathname === "/menu" || pathname === "/food";
   const isDrinks = pathname === "/drinks";
   const isCart = pathname === "/cart";
@@ -44,7 +44,7 @@ export default function BottomNav() {
         aria-label="Main app navigation"
         className="fixed bottom-[max(16px,env(safe-area-inset-bottom,0px))] left-1/2 z-50 flex w-[calc(100%-24px)] max-w-[388px] -translate-x-1/2 items-center justify-between rounded-full border border-white/10 bg-[#242424]/95 px-2 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.36)] backdrop-blur-xl"
       >
-        <Link to="/" aria-current={isHome ? "page" : undefined} aria-label="Home" className={itemStyle(isHome)}>
+        <Link to="/home" aria-current={isHome ? "page" : undefined} aria-label="Home" className={itemStyle(isHome)}>
           <Home className="h-[18px] w-[18px]" strokeWidth={1.9} aria-hidden="true" />
           <span className="text-[9px] font-bold uppercase tracking-wider">Home</span>
         </Link>

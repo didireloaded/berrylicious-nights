@@ -4,12 +4,12 @@ import { useCart } from "@/context/CartContext";
 import butcherBlockLogo from "@/assets/butcher-block-logo.png";
 
 const links = [
-  { to: "/", label: "Home" },
+  { to: "/home", label: "Home" },
   { to: "/menu", label: "Food" },
   { to: "/drinks", label: "Drinks" },
   { to: "/events", label: "Events" },
   { to: "/booking", label: "Reservations" },
-  { to: "/profile", label: "Account" },
+  { to: "/profile", label: "Profile" },
 ];
 
 export default function SiteHeader() {
