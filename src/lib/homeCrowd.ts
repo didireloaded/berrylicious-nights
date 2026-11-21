@@ -1,6 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { parseRpcBookedTimes, parseRpcBookingCount } from "@/lib/bookingRpc";
 
+type UntypedRpcClient = {
+  rpc: (
+    fn: string,
+    args?: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+};
+
 export type CrowdLevel = "quiet" | "moderate" | "busy" | "unknown";
 
 export type CrowdSnapshot = {
@@ -36,20 +43,19 @@ const HINTS: Record<CrowdLevel, string> = {
 };
 
 export async function fetchCrowdSnapshot(isoDate: string): Promise<CrowdSnapshot> {
-  let bookingCount = 0;
-  let bookedSlots = 0;
+  const client = supabase as unknown as UntypedRpcClient;
 
   const [countRes, slotsRes] = await Promise.all([
-    (supabase as any).rpc("active_bookings_count", { p_date: isoDate }),
-    (supabase as any).rpc("booked_table_times", { p_date: isoDate }),
+    client.rpc("active_bookings_count", { p_date: isoDate }),
+    client.rpc("booked_table_times", { p_date: isoDate }),
   ]);
 
   if (countRes.error || slotsRes.error) {
     console.warn("[homeCrowd] availability unavailable", countRes.error ?? slotsRes.error);
     return { level: "unknown", label: LABELS.unknown, hint: HINTS.unknown, bookingCount: 0, bookedSlotCount: 0 };
   }
-  bookingCount = parseRpcBookingCount(countRes.data);
-  bookedSlots = parseRpcBookedTimes(slotsRes.data).length;
+  const bookingCount = parseRpcBookingCount(countRes.data);
+  const bookedSlots = parseRpcBookedTimes(slotsRes.data).length;
 
   const level = levelFromSignals(bookingCount, bookedSlots);
 

@@ -29,7 +29,7 @@ const statusSubline: Record<string, string> = {
   pending: "Hang tight — we’re lining everything up.",
   preparing: "The kitchen is preparing your order. We will update you when it is ready.",
   ready: "Almost there — head to the counter or your table when you’re ready.",
-  completed: "Thanks for choosing Berrylicious tonight.",
+  completed: "Thanks for choosing Butcher Block Steakhouse tonight.",
 };
 
 const WHILE_WAIT_MENU_IDS = ["19", "14", "12"];

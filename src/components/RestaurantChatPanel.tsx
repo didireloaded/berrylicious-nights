@@ -225,7 +225,7 @@ export function RestaurantChatPanel({
                   >
                     {!mine && (
                       <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-primary">
-                        Berrylicious
+                        Butcher Block
                       </p>
                     )}
                     {mine ? (
@@ -255,7 +255,7 @@ export function RestaurantChatPanel({
               <div className="flex justify-start">
                 <div className="rounded-2xl rounded-bl-md border border-white/10 bg-[#1a1a1a] px-4 py-3">
                   <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-primary">
-                    Berrylicious
+                    Butcher Block
                   </p>
                   <div className="flex items-center gap-1.5">
                     {[0, 150, 300].map((d) => (

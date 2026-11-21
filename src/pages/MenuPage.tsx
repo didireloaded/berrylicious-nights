@@ -84,7 +84,7 @@ export default function MenuPage() {
         <ActiveOrderBanner />
 
         <div className="mt-12">
-          <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#ff7342]">THE BERRYLICIOUS MENU</p>
+          <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#ff7342]">THE BUTCHER BLOCK MENU</p>
           <div className="mt-3 flex items-end justify-between gap-3">
             <h1 className="max-w-[370px] text-[clamp(3.2rem,11vw,4.8rem)] font-extrabold leading-[0.98] tracking-[-0.065em]">What's your craving?</h1>
             <Link to="/booking" className="mb-1 shrink-0 border-b border-[#ff5a1f]/80 pb-1 text-[13px] font-semibold text-[#ff8157] transition-colors hover:text-white">
@@ -181,7 +181,7 @@ export default function MenuPage() {
         <section className="mt-12 rounded-[28px] border border-white/10 bg-[#202020] px-6 py-7">
           <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#ff7b50]">Not sure what to choose?</p>
           <h2 className="mt-3 max-w-[280px] text-[28px] font-semibold leading-tight tracking-[-0.045em]">Ask us what goes well together.</h2>
-          <button type="button" onClick={openAssistant} className="mt-5 inline-flex min-h-11 items-center gap-2 text-[14px] font-semibold text-[#ff845e]">Ask Berrylicious <ArrowRight className="h-4 w-4" /></button>
+          <button type="button" onClick={openAssistant} className="mt-5 inline-flex min-h-11 items-center gap-2 text-[14px] font-semibold text-[#ff845e]">Ask Butcher Block <ArrowRight className="h-4 w-4" /></button>
         </section>
         <p className="mt-7 text-center text-xs leading-relaxed text-white/35">Category photographs are illustrative until individual dish images are verified.</p>
       </div>

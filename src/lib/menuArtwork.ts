@@ -10,6 +10,12 @@ import type { MenuItem } from "@/data/menu";
  * Never describe a category image as a photograph of an unrelated menu item.
  */
 const categoryPhotos: Record<string, string | undefined> = {
+  "Choice Cuts": dishLamb,
+  "Kick Start": dishFries,
+  Poultry: dishLamb,
+  Combos: dishLamb,
+  "Land + Sea": dishLamb,
+  "Local Favourites": dishBurger,
   Burgers: dishBurger,
   Mains: dishLamb,
   Sides: dishFries,

@@ -3,8 +3,10 @@ import { menuItems, type MenuItem } from "@/data/menu";
 export type PlanPeople = "just_me" | "date" | "friends" | "group";
 export type PlanVibe = "chill" | "date_night" | "party" | "quick_bite";
 
+const MENU_BY_ID = new Map<string, MenuItem>(menuItems.map((m) => [m.id, m]));
+
 export function getMenuItem(id: string): MenuItem {
-  const item = menuItems.find((m) => m.id === id);
+  const item = MENU_BY_ID.get(id);
   if (!item) throw new Error(`Unknown menu id: ${id}`);
   return item;
 }

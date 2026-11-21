@@ -17,6 +17,8 @@ function retryImport<T>(fn: () => Promise<T>): Promise<T> {
 
 const HomePage = lazy(() => retryImport(() => import("@/pages/HomePageEditorial")));
 const MenuPage = lazy(() => retryImport(() => import("@/pages/MenuPage")));
+const DrinksPage = lazy(() => retryImport(() => import("@/pages/DrinksPage")));
+const EventsPage = lazy(() => retryImport(() => import("@/pages/EventsPage")));
 const MenuItemPage = lazy(() => retryImport(() => import("@/pages/MenuItemPage")));
 const PromoSpotlightPage = lazy(() => retryImport(() => import("@/pages/PromoSpotlightPage")));
 const AboutRouteRedirect = lazy(() => retryImport(() => import("@/pages/AboutRouteRedirect")));
@@ -67,6 +69,9 @@ export default function AppProviders() {
                   <Routes>
                     <Route path="/" element={<HomePage />} />
                     <Route path="/menu" element={<MenuPage />} />
+                    <Route path="/food" element={<Navigate to="/menu" replace />} />
+                    <Route path="/drinks" element={<DrinksPage />} />
+                    <Route path="/events" element={<EventsPage />} />
                     <Route path="/menu/:id" element={<MenuItemPage />} />
                     <Route path="/promo" element={<PromoSpotlightPage />} />
                     <Route path="/about" element={<AboutRouteRedirect />} />

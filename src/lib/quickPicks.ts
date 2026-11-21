@@ -11,6 +11,8 @@ export type QuickPickConfig = {
   menuItemIds: string[];
 };
 
+const MENU_BY_ID = new Map<string, MenuItem>(menuItems.map((m) => [m.id, m]));
+
 export const quickPicks: QuickPickConfig[] = [
   {
     id: "date_night",
@@ -47,7 +49,10 @@ export const quickPicks: QuickPickConfig[] = [
 ];
 
 export function menuItemsForQuickPick(ids: string[]): MenuItem[] {
-  return ids
-    .map((id) => menuItems.find((m) => m.id === id))
-    .filter((m): m is MenuItem => m != null);
+  const result: MenuItem[] = [];
+  for (const id of ids) {
+    const item = MENU_BY_ID.get(id);
+    if (item) result.push(item);
+  }
+  return result;
 }

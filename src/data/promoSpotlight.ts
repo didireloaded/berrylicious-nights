@@ -35,18 +35,16 @@ export type PromoSpotlightConfig = {
 export const promoSpotlight: PromoSpotlightConfig = {
   windowKind: "weekly",
   badge: "This week",
-  title: "Tomahawk for the table",
-  shortLine: "800g ribeye, chimichurri & garlic butter — run through Sunday.",
+  title: "800g Tomahawk on the bone",
+  shortLine: "100% Namibian wet-aged rib eye on the bone, grilled over charcoal.",
   heroImage: dishLamb,
   storyParagraphs: [
-    "We’re putting the tomahawk centre stage: bone-in ribeye meant for splitting, with chimichurri, roasted garlic butter, and whatever sides the pass is loving right now.",
-    "Book a table or order for pickup — this spotlight price is locked for the window on your badge. When it’s gone, it’s gone.",
-    "Perfect for birthdays, closing a deal, or just flexing on a Tuesday. Ask your server for the cut’s resting time — we’ll slice it at the table if the room allows.",
+    "We’re putting our 800g Tomahawk centre stage: bone-in Namibian rib eye meant for savouring, flame-grilled over charcoal and served on a hot sizzle plate with your choice of complimentary side.",
+    "Pair it with a bottle of Rust En Vrede Cabernet Sauvignon from our glass wine cellar or a Moscow Mule in an icy copper mug.",
+    "Join us at Am Weinberg Estate on Tuesdays for Ladies’ Night or Wednesdays for Men’s Night.",
   ],
   menuItemId: "6",
-  promoPrice: 385,
-  validFrom: "2026-04-01",
-  validUntil: "2026-04-13",
+  promoPrice: 625,
 };
 
 function todayYmd(): string {

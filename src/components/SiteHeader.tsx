@@ -1,12 +1,14 @@
 import { Link, useLocation } from "react-router-dom";
 import { ShoppingBag } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import butcherBlockLogo from "@/assets/butcher-block-logo.png";
 
 const links = [
   { to: "/", label: "Home" },
-  { to: "/menu", label: "Menu" },
+  { to: "/menu", label: "Food" },
+  { to: "/drinks", label: "Drinks" },
+  { to: "/events", label: "Events" },
   { to: "/booking", label: "Reservations" },
-  { to: "/plan", label: "Plan an evening" },
   { to: "/profile", label: "Account" },
 ];
 
@@ -18,8 +20,8 @@ export default function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 hidden border-b border-border bg-background/95 lg:block">
       <div className="mx-auto flex h-[78px] max-w-7xl items-center justify-between gap-8 px-8 xl:px-12">
-        <Link to="/" className="font-display text-2xl font-semibold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          Berrylicious<span className="text-primary">.</span>
+        <Link to="/" aria-label="Butcher Block Steakhouse home" className="font-display text-2xl font-semibold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <img src={butcherBlockLogo} alt="Butcher Block Steakhouse" className="h-9 w-auto object-contain" />
         </Link>
         <nav aria-label="Main navigation" className="flex items-center gap-7">
           {links.map((item) => {

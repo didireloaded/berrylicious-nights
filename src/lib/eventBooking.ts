@@ -3,6 +3,13 @@ import { STANDARD_SLOT_TIMES } from "@/lib/bookingSlots";
 import { parseRpcBookedTimes } from "@/lib/bookingRpc";
 import { getWindhoekDateISO } from "@/lib/windhoekDate";
 
+type UntypedRpcClient = {
+  rpc: (
+    fn: string,
+    args?: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+};
+
 export type HomeUpdateRow = {
   id: string;
   title: string;
@@ -46,10 +53,9 @@ export function normalizeUpdateRow(row: Record<string, unknown>): HomeUpdateRow 
 
 /** Event night: explicit event_date, else expires_at date, else today. */
 export function resolveEventDate(ev: HomeUpdateRow): string {
-  const today = getWindhoekDateISO();
   if (ev.event_date?.trim()) return ev.event_date.trim();
   if (ev.expires_at?.trim()) return ev.expires_at.split("T")[0];
-  return today;
+  return getWindhoekDateISO();
 }
 
 export function resolveHeadlineTime(ev: HomeUpdateRow): string {
@@ -64,7 +70,8 @@ export function resolveBaseSlots(ev: HomeUpdateRow): string[] {
 }
 
 export async function fetchBookedTimesForDate(date: string): Promise<string[]> {
-  const { data, error } = await (supabase as any).rpc("booked_table_times", { p_date: date });
+  const client = supabase as unknown as UntypedRpcClient;
+  const { data, error } = await client.rpc("booked_table_times", { p_date: date });
   if (error) {
     console.warn("[eventBooking] booked_table_times:", error.message);
     throw error;
@@ -78,7 +85,8 @@ export async function computeOpenSlotsForDate(
   candidates: string[],
 ): Promise<string[]> {
   const booked = await fetchBookedTimesForDate(date);
-  return candidates.filter((t) => !booked.includes(t));
+  const bookedSet = new Set(booked);
+  return candidates.filter((t) => !bookedSet.has(t));
 }
 
 export type BookingNavState = {

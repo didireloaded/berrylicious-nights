@@ -469,7 +469,7 @@ const ProfilePage = () => {
           </h2>
           <div className="overflow-hidden rounded-2xl border border-border bg-card divide-y divide-border">
             <a
-              href="https://instagram.com/berrylicious__restaurant"
+              href="https://www.instagram.com/butcherblocknamibia/"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 px-4 py-4 transition-colors hover:bg-muted/30 active:bg-muted/50"
@@ -511,7 +511,7 @@ const ProfilePage = () => {
           </button>
         )}
 
-        <p className="pb-4 text-center text-[11px] text-muted-foreground">Berrylicious · Profile</p>
+        <p className="pb-4 text-center text-[11px] text-muted-foreground">Butcher Block Steakhouse · Profile</p>
       </div>
     </div>
   );

@@ -46,7 +46,7 @@ const AuthPage = () => {
   return (
     <div className="min-h-screen pb-safe-nav flex flex-col items-center justify-center px-6 max-w-lg mx-auto">
       <h1 className="font-display text-3xl font-bold text-foreground mb-2">
-        {isLogin ? "Welcome back" : "Join Berrylicious"}
+        {isLogin ? "Welcome back" : "Join Butcher Block"}
       </h1>
       <p className="text-muted-foreground text-sm mb-8">
         {isLogin ? "Sign in to your account" : "Create your account to get started"}

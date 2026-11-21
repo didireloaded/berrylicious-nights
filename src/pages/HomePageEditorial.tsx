@@ -4,6 +4,7 @@ import { ArrowRight, CalendarDays, MapPin, ShoppingBag } from "lucide-react";
 import heroFood from "@/assets/dish-burger.jpg";
 import detailFood from "@/assets/dish-lamb.jpg";
 import cocktail from "@/assets/dish-cocktail.jpg";
+import butcherBlockLogo from "@/assets/butcher-block-logo.png";
 import { useApp } from "@/context/AppContext";
 import { useActiveUpdates } from "@/hooks/useActiveUpdates";
 import { useAboutSheet } from "@/context/AboutSheetContext";
@@ -38,8 +39,8 @@ export default function HomePageEditorial() {
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/45 via-transparent to-transparent" aria-hidden="true" />
 
         <header className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 px-5 pt-[max(30px,env(safe-area-inset-top,0px))] sm:px-7">
-          <Link to="/" aria-label="Berrylicious home" className="font-display text-[19px] font-extrabold tracking-[-0.055em] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
-            berrylicious<span className="text-[#ff5a1f]">.</span>
+          <Link to="/" aria-label="Butcher Block Steakhouse home" className="font-display text-[19px] font-extrabold tracking-[-0.055em] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+            <img src={butcherBlockLogo} alt="Butcher Block Steakhouse" className="h-9 w-auto object-contain" />
           </Link>
           <Link to="/booking" className="flex min-h-10 shrink-0 items-center rounded-full border border-white/50 bg-black/20 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
             Book a table
@@ -76,7 +77,7 @@ export default function HomePageEditorial() {
         <div className="absolute -bottom-3 -right-3 z-20 h-[156px] w-[156px] rounded-tl-[110px] bg-white p-[12px]">
           <Link
             to="/menu"
-            aria-label="Explore the Berrylicious menu"
+            aria-label="Explore the Butcher Block menu"
             className="flex h-full w-full items-center justify-center rounded-tl-[98px] bg-[#ff5a1f] text-white transition-colors duration-200 hover:bg-[#fa703f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-inset"
           >
             <ArrowRight className="ml-6 mt-7 h-9 w-9 transition-transform duration-200" strokeWidth={2} aria-hidden="true" />
@@ -112,7 +113,10 @@ export default function HomePageEditorial() {
 
       {updates.length > 0 && (
         <section className="border-t border-white/10 px-6 py-12 sm:px-8" aria-labelledby="events-heading">
-          <h2 id="events-heading" className="text-[29px] font-semibold tracking-tight">What's happening</h2>
+          <div className="flex items-end justify-between gap-4">
+            <h2 id="events-heading" className="text-[29px] font-semibold tracking-tight">What's happening</h2>
+            <Link to="/events" className="mb-1 text-[13px] font-medium text-[#ff8157] hover:text-white">See all</Link>
+          </div>
           <div className="mt-5 divide-y divide-white/10">
             {updates.slice(0, 5).map((event) => (
               <button
@@ -130,7 +134,7 @@ export default function HomePageEditorial() {
       )}
 
       <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-white/10 px-6 py-8 text-[13px] text-white/55 sm:px-8">
-        <span>Berrylicious · Windhoek</span>
+        <span>Butcher Block Steakhouse · Am Weinberg Estate, Windhoek</span>
         <button type="button" onClick={openAbout} className="text-white underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]">About & contact</button>
       </footer>
       <EventDetailSheet event={selectedEvent} onClose={() => setSelectedEvent(null)} />

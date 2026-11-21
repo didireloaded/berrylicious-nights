@@ -246,7 +246,7 @@ export function BerryliciousHostThread({ className }: { className?: string }) {
                 className="max-w-[92%] rounded-2xl rounded-bl-md bg-[#1a1a1a] px-4 py-3.5 text-[15px] leading-relaxed text-white/95 shadow-inner shadow-black/20"
                 style={{ animationDuration: "280ms" }}
               >
-                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Berrylicious</p>
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Butcher Block</p>
                 <p className="whitespace-pre-wrap">{line.text}</p>
               </div>
             </div>

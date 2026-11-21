@@ -29,7 +29,15 @@ export default function CartPage() {
   async function handleCheckout() {
     if (submitting || items.length === 0) return;
     setSubmitting(true);
-    const orderItems = items.map((item) => ({ name: item.name, qty: item.quantity, price: item.price }));
+    const orderItems = items.map((item) => ({
+      name: item.name,
+      qty: item.quantity,
+      price: item.price,
+      ...(item.weight ? { weight: item.weight } : {}),
+      ...(item.doneness ? { doneness: item.doneness } : {}),
+      ...(item.side ? { side: item.side } : {}),
+      ...(item.sauces?.length ? { sauces: item.sauces } : {}),
+    }));
     const total = totalPrice;
     let orderId: string;
     let arrivalCode: string | null = null;
@@ -134,7 +142,32 @@ export default function CartPage() {
                     )}
                     <div className="min-w-0 flex-1 pt-0.5">
                       <h3 className="text-[16px] font-semibold leading-tight tracking-[-0.025em]">{item.name}</h3>
-                      <p className="mt-1.5 line-clamp-2 text-[12px] leading-relaxed text-white/50">{item.description}</p>
+                      {(item.weight || item.doneness || item.side || (item.sauces && item.sauces.length > 0)) ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {item.weight && (
+                            <span className="rounded-full bg-[#171717] px-2.5 py-0.5 text-[11px] font-medium text-white/85">
+                              {item.weight}
+                            </span>
+                          )}
+                          {item.doneness && (
+                            <span className="rounded-full bg-[#ff5a1f]/20 px-2.5 py-0.5 text-[11px] font-semibold text-[#ff8055]">
+                              {item.doneness}
+                            </span>
+                          )}
+                          {item.side && (
+                            <span className="rounded-full bg-[#171717] px-2.5 py-0.5 text-[11px] text-white/70">
+                              Side: {item.side}
+                            </span>
+                          )}
+                          {item.sauces && item.sauces.length > 0 && (
+                            <span className="rounded-full bg-[#171717] px-2.5 py-0.5 text-[11px] text-white/70">
+                              Sauce: {item.sauces.join(", ")}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="mt-1.5 line-clamp-2 text-[12px] leading-relaxed text-white/50">{item.description}</p>
+                      )}
                     </div>
                     <button type="button" onClick={() => removeItem(item.id)} aria-label={`Remove ${item.name}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]">
                       <Trash2 className="h-4 w-4" aria-hidden="true" />

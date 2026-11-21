@@ -1,8 +1,26 @@
 import { supabase as _supabase } from "@/integrations/supabase/client";
 import { generateArrivalCode } from "@/lib/arrivalCode";
 
-// Cast to any to avoid type mismatches with auto-generated types that may lag behind migrations
-const supabase = _supabase as any;
+type DynamicTableResponse = {
+  data: Record<string, unknown> | null;
+  error: { code?: string; message?: string; details?: string; hint?: string } | null;
+};
+
+type DynamicSupabaseClient = {
+  from: (table: string) => {
+    insert: (row: Record<string, unknown>) => {
+      select: (columns: string) => {
+        single: () => Promise<DynamicTableResponse>;
+      };
+    } & Promise<DynamicTableResponse>;
+    delete: () => {
+      eq: (column: string, value: string) => Promise<DynamicTableResponse>;
+    };
+  };
+};
+
+// Typed dynamic wrapper to avoid mismatches when auto-generated types lag behind migrations
+const supabase = _supabase as unknown as DynamicSupabaseClient;
 
 const MAX_ATTEMPTS = 14;
 
@@ -44,10 +62,10 @@ export async function insertBookingWithArrivalCode(
       .select("*")
       .single();
     if (!error && data) {
-      const row = data as { arrival_code?: string | null; assigned_table_code?: string | null };
+      const inserted = data as { arrival_code?: string | null; assigned_table_code?: string | null };
       return {
-        arrival_code: row.arrival_code ?? null,
-        assigned_table_code: row.assigned_table_code ?? null,
+        arrival_code: inserted.arrival_code ?? null,
+        assigned_table_code: inserted.assigned_table_code ?? null,
       };
     }
     if (error && isSchemaCacheOrMissingColumnError(error)) {
@@ -71,11 +89,11 @@ export async function insertOrderWithArrivalCode(
       .select("id, arrival_code")
       .single();
     if (!error && data?.id) {
-      return { id: data.id as string, arrival_code: (data.arrival_code as string) ?? null };
+      return { id: String(data.id), arrival_code: (data.arrival_code as string) ?? null };
     }
     if (error && isSchemaCacheOrMissingColumnError(error)) {
       const { data: legacy, error: legErr } = await supabase.from("orders").insert(row).select("id").single();
-      if (!legErr && legacy?.id) return { id: legacy.id as string, arrival_code: null };
+      if (!legErr && legacy?.id) return { id: String(legacy.id), arrival_code: null };
       throw legErr ?? error;
     }
     if (!isUniqueViolation(error)) throw error;
@@ -93,7 +111,7 @@ async function insertOrderAndBookingLegacy(opts: {
     .select("id")
     .single();
   if (orderErr || !insertedOrder?.id) throw orderErr ?? new Error("Order insert failed");
-  const orderId = insertedOrder.id as string;
+  const orderId = String(insertedOrder.id);
   const { error: bookErr } = await supabase.from("bookings").insert({
     ...opts.bookingWithoutPreOrder,
     pre_order: { order_id: orderId },
@@ -124,7 +142,7 @@ export async function insertOrderAndBookingWithSharedArrivalCode(opts: {
       if (isUniqueViolation(orderErr)) continue;
       throw orderErr;
     }
-    const orderId = insertedOrder?.id as string;
+    const orderId = String(insertedOrder?.id ?? "");
     const { error: bookErr } = await supabase.from("bookings").insert({
       ...opts.bookingWithoutPreOrder,
       arrival_code,

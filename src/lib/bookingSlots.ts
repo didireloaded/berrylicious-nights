@@ -9,5 +9,9 @@ export const bookingTimeSlots = [
 
 export const STANDARD_SLOT_TIMES = bookingTimeSlots.map((s) => s.time);
 
-export const slotLabel = (time: string) =>
-  bookingTimeSlots.find((s) => s.time === time)?.label ?? "";
+const SLOT_LABEL_MAP = new Map<string, string>(
+  bookingTimeSlots.map((s) => [s.time, s.label]),
+);
+
+export const slotLabel = (time: string): string =>
+  SLOT_LABEL_MAP.get(time) ?? "";

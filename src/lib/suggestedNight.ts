@@ -11,8 +11,8 @@ export type SuggestedNightSummary = {
 /** Shown on Home before the user builds a plan in-session. */
 export const DEFAULT_HOME_SUGGESTED_NIGHT = {
   time: "19:30",
-  food: "The Licious Burger",
-  drink: "Classic Mojito",
+  food: "Rump Steak",
+  drink: "Moscow Mule",
 } as const;
 
 export function persistSuggestedNight(p: Omit<SuggestedNightSummary, "updatedAt">) {

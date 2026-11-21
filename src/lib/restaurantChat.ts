@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
+type UntypedRpcClient = {
+  rpc: (
+    fn: string,
+  ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
+};
+
 function friendlyRestaurantChatError(raw: string): string {
   const m = raw.toLowerCase();
   if (
@@ -37,9 +43,10 @@ export async function ensureRestaurantChat(
   supabase: SupabaseClient<Database>,
   userId: string,
 ): Promise<{ chatId: string | null; error: string | null }> {
-  const { data: rpcId, error: rpcErr } = await (supabase as any).rpc("ensure_restaurant_chat_for_me");
+  const rpcClient = supabase as unknown as UntypedRpcClient;
+  const { data: rpcId, error: rpcErr } = await rpcClient.rpc("ensure_restaurant_chat_for_me");
 
-  if (!rpcErr && typeof rpcId === "string" && (rpcId as string).length > 0) {
+  if (!rpcErr && typeof rpcId === "string" && rpcId.length > 0) {
     return { chatId: rpcId, error: null };
   }
 

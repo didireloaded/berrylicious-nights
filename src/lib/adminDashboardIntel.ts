@@ -15,18 +15,39 @@ export type AdminOrderLike = {
 };
 
 export function groupOrdersByKitchenStatus(orders: AdminOrderLike[]) {
-  const active = orders.filter((o) => o.status !== "completed");
-  return {
-    pending: active.filter((o) => o.status === "pending"),
-    preparing: active.filter((o) => o.status === "preparing"),
-    ready: active.filter((o) => o.status === "ready"),
-    completed: orders.filter((o) => o.status === "completed"),
-  };
+  const pending: AdminOrderLike[] = [];
+  const preparing: AdminOrderLike[] = [];
+  const ready: AdminOrderLike[] = [];
+  const completed: AdminOrderLike[] = [];
+
+  for (const order of orders) {
+    switch (order.status) {
+      case "pending":
+        pending.push(order);
+        break;
+      case "preparing":
+        preparing.push(order);
+        break;
+      case "ready":
+        ready.push(order);
+        break;
+      case "completed":
+        completed.push(order);
+        break;
+    }
+  }
+
+  return { pending, preparing, ready, completed };
 }
 
 function lineCount(order: AdminOrderLike): number {
   if (!Array.isArray(order.items)) return 0;
-  return order.items.reduce((n, it: { qty?: number }) => n + (Number(it?.qty) > 0 ? Number(it.qty) : 1), 0);
+  let total = 0;
+  for (const it of order.items as { qty?: number }[]) {
+    const q = Number(it?.qty);
+    total += q > 0 ? q : 1;
+  }
+  return total;
 }
 
 /** Suggested prep minutes for a ticket given current kitchen queue (not persisted). */
@@ -51,9 +72,13 @@ export function kitchenLoadLevel(pending: number, preparing: number, ready: numb
 }
 
 export function ordersPerMinuteLastWindow(orders: AdminOrderLike[], windowMinutes: number): number {
+  if (windowMinutes <= 0) return 0;
   const cutoff = Date.now() - windowMinutes * 60 * 1000;
-  const recent = orders.filter((o) => new Date(o.created_at).getTime() >= cutoff);
-  return windowMinutes > 0 ? recent.length / windowMinutes : 0;
+  let recentCount = 0;
+  for (const o of orders) {
+    if (Date.parse(o.created_at) >= cutoff) recentCount++;
+  }
+  return recentCount / windowMinutes;
 }
 
 export function buildDashboardHints(input: {
@@ -88,25 +113,33 @@ export function bookingsInNextMinutes(
   windowMinutes: number,
 ): number {
   const today = now.toISOString().split("T")[0];
-  const windowEnd = now.getTime() + windowMinutes * 60 * 1000;
-  return bookings.filter((b) => {
-    if (b.date !== today) return false;
-    if (b.status === "cancelled") return false;
+  const nowMs = now.getTime();
+  const windowEnd = nowMs + windowMinutes * 60 * 1000;
+  let count = 0;
+
+  for (const b of bookings) {
+    if (b.date !== today || b.status === "cancelled") continue;
     const parts = String(b.time).split(":");
     const hh = parseInt(parts[0] ?? "", 10);
+    if (Number.isNaN(hh)) continue;
     const mm = parseInt(parts[1] ?? "0", 10);
-    if (Number.isNaN(hh)) return false;
     const at = new Date(now);
     at.setHours(hh, Number.isNaN(mm) ? 0 : mm, 0, 0);
     const t = at.getTime();
-    return t >= now.getTime() && t <= windowEnd;
-  }).length;
+    if (t >= nowMs && t <= windowEnd) count++;
+  }
+
+  return count;
 }
 
 export function revenueTodayCompleted(orders: AdminOrderLike[], todayIso: string): number {
-  return orders
-    .filter((o) => o.status === "completed" && String(o.created_at).split("T")[0] === todayIso)
-    .reduce((s, o) => s + (Number(o.total) || 0), 0);
+  let sum = 0;
+  for (const o of orders) {
+    if (o.status === "completed" && String(o.created_at).startsWith(todayIso)) {
+      sum += Number(o.total) || 0;
+    }
+  }
+  return sum;
 }
 
 export function getNextOrderStatus(status: string): string | null {

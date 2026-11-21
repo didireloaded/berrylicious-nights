@@ -83,7 +83,7 @@ export function HostYourEventTab() {
   return (
     <div className="animate-fade-in space-y-8 pb-4">
       <header>
-        <h1 className="font-display text-2xl font-bold leading-tight text-foreground">Host at Berrylicious</h1>
+        <h1 className="font-display text-2xl font-bold leading-tight text-foreground">Host at Butcher Block</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Private birthdays, corporate nights, launches, and receptions — build a package and get an instant ballpark.
           Final quotes always come from our events team after a quick brief.

@@ -10,13 +10,13 @@ export function getVibeLine() {
   const time = getTimeOfDay();
   switch (time) {
     case "morning":
-      return "Good morning ☕ — fresh Mediterranean flavours await";
+      return "Good morning ☕ — prime cuts & fresh flavours await";
     case "afternoon":
-      return "Lunch at Berrylicious 🍽️ — seasonal specials today";
+      return "Lunch at Butcher Block 🥩 — 100% Namibian wet-aged steaks";
     case "evening":
-      return "🔥 The lounge is alive tonight — DJ, cocktails, fine dining";
+      return "🔥 The charcoal grill is alive tonight — fine wine & prime cuts";
     case "latenight":
-      return "🍸 Drinks, vibes, and the city below — come in";
+      return "🍸 Craft cocktails, South African wines & Am Weinberg views";
   }
 }
 

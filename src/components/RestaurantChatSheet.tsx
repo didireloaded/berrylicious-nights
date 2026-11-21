@@ -22,7 +22,7 @@ export function RestaurantChatSheet({ open, onOpenChange }: RestaurantChatSheetP
           "[&>button.absolute]:hidden",
         )}
       >
-        <SheetTitle className="sr-only">Chat with Berrylicious</SheetTitle>
+        <SheetTitle className="sr-only">Chat with Butcher Block</SheetTitle>
         <SheetDescription className="sr-only">
           Plan your night with quick picks, or type a message for the team.
         </SheetDescription>
@@ -46,7 +46,7 @@ export function RestaurantChatSheet({ open, onOpenChange }: RestaurantChatSheetP
               <MessageCircle className="h-6 w-6 text-primary" strokeWidth={2} />
             </div>
             <div>
-              <p className="font-display text-lg font-bold tracking-tight text-white">Berrylicious</p>
+              <p className="font-display text-lg font-bold tracking-tight text-white">Butcher Block</p>
               <p className="mt-0.5 text-xs leading-snug text-white/55">
                 We're here to help — ask about the menu, events, or book a table.
               </p>

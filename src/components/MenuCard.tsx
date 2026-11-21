@@ -41,10 +41,14 @@ const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: Menu
           {item.name}
         </Link>
         <p className="mt-2 line-clamp-2 min-h-[38px] text-[12px] leading-[1.45] text-[#a4a4a4]">{item.description}</p>
-        <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#ff7b50]">{item.category}</div>
+        <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#ff7b50]">
+          {item.tag ? `${item.category} · ${item.tag}` : item.category}
+        </div>
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
           <div>
-            <span className="block text-[17px] font-semibold tracking-tight text-white">{formatPrice(item.price)}</span>
+            <span className="block text-[17px] font-semibold tracking-tight text-white">
+              {item.variations && item.variations.length > 1 ? `From ${formatPrice(item.price)}` : formatPrice(item.price)}
+            </span>
             {disabled && <span className="mt-1 block text-xs text-white/50">Unavailable</span>}
           </div>
           {!disabled && (

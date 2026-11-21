@@ -3,6 +3,7 @@ import gallery1 from "@/assets/gallery-1.jpg";
 import gallery2 from "@/assets/gallery-2.jpg";
 import gallery3 from "@/assets/gallery-3.jpg";
 import heroImage from "@/assets/hero-restaurant.jpg";
+import butcherBlockLogo from "@/assets/butcher-block-logo.png";
 import { Link } from "react-router-dom";
 
 const AboutPage = () => {
@@ -10,13 +11,14 @@ const AboutPage = () => {
     <div className="min-h-screen pb-24">
       {/* Hero */}
       <section className="relative h-64">
-        <img src={heroImage} alt="Berrylicious restaurant" className="absolute inset-0 w-full h-full object-cover" />
+        <img src={heroImage} alt="Butcher Block Steakhouse Windhoek" className="absolute inset-0 w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-background/20 to-background" />
         <div className="relative h-full flex items-end px-6 pb-6 max-w-lg mx-auto">
           <div>
-            <h1 className="font-display text-3xl font-bold text-foreground">About Berrylicious</h1>
+            <img src={butcherBlockLogo} alt="Butcher Block Steakhouse" className="mb-2 h-9 w-auto object-contain" />
+            <h1 className="font-display text-3xl font-bold text-foreground">About Butcher Block</h1>
             <p className="text-muted-foreground text-sm flex items-center gap-1 mt-1">
-              <Star className="w-4 h-4 text-primary fill-primary" /> 4.5 • Restaurant & Lounge
+              <Star className="w-4 h-4 text-primary fill-primary" /> Est. 2003 • Steakhouse &amp; Wine Cellar
             </p>
           </div>
         </div>
@@ -28,13 +30,13 @@ const AboutPage = () => {
           <h2 className="font-display text-xl font-semibold mb-3">Our Story</h2>
           <div className="text-muted-foreground text-sm leading-relaxed space-y-3">
             <p>
-              Nestled in the heart of Freedom Plaza, Windhoek, Berrylicious is where contemporary Mediterranean cuisine meets the warmth of Namibian hospitality.
+              Established in 2003 and situated at the prestigious Am Weinberg Estate in Klein Windhoek, Butcher Block Steakhouse is where 100% Namibian, grass-fed, wet-aged A-grade beef meets warm, upmarket hospitality.
             </p>
             <p>
-              From hand-crafted cocktails to dishes made with locally sourced ingredients and global inspiration, every visit is an experience — whether you're here for a quiet lunch, a lively dinner, or a late-night lounge session with friends.
+              Our cuts are wet-aged for a minimum of 21 days, flame-grilled over charcoal embers, and served on wooden boards with hot plates — paired with curated South African wines from our transparent glass cellar and classic craft cocktails.
             </p>
             <p>
-              Our space blends indoor elegance with an open-air terrace overlooking the city — perfect for any occasion.
+              Blending rich leather, natural wood, and a lively yet refined atmosphere, we are the home of signature Tomahawk steaks, Tuesday Ladies&apos; Night, and Wednesday Men&apos;s Night.
             </p>
           </div>
         </section>
@@ -45,7 +47,7 @@ const AboutPage = () => {
           <div className="grid grid-cols-2 gap-2">
             {[heroImage, gallery1, gallery2, gallery3].map((img, i) => (
               <div key={i} className="aspect-square overflow-hidden rounded-lg">
-                <img src={img} alt={`Gallery ${i + 1}`} loading="lazy" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                <img src={img} alt={`Butcher Block Steakhouse gallery ${i + 1}`} loading="lazy" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
               </div>
             ))}
           </div>
@@ -58,9 +60,8 @@ const AboutPage = () => {
           </h2>
           <div className="bg-card border border-border rounded-lg p-4 space-y-2">
             {[
-              { day: "Monday – Thursday", hours: "11:00 – 22:00" },
-              { day: "Friday – Saturday", hours: "11:00 – 00:00" },
-              { day: "Sunday", hours: "10:00 – 21:00" },
+              { day: "Monday – Saturday", hours: "11:30 AM – 10:00 PM" },
+              { day: "Sunday", hours: "11:30 AM – 9:00 PM" },
             ].map((item) => (
               <div key={item.day} className="flex justify-between text-sm">
                 <span className="text-foreground">{item.day}</span>
@@ -76,19 +77,23 @@ const AboutPage = () => {
           <div className="bg-card border border-border rounded-lg p-4 space-y-3">
             <div className="flex items-center gap-3 text-sm">
               <MapPin className="w-5 h-5 text-primary flex-shrink-0" />
-              <span className="text-foreground">Freedom Plaza, City Centre, Windhoek, Namibia</span>
+              <span className="text-foreground">Am Weinberg Estate, 13 Jan Jonker Road, Klein Windhoek, Windhoek, Namibia</span>
             </div>
             <div className="flex items-center gap-3 text-sm">
               <Phone className="w-5 h-5 text-primary flex-shrink-0" />
-              <a href="tel:+264612345678" className="text-foreground hover:text-primary transition-colors">+264 61 234 5678</a>
+              <span className="text-foreground">
+                <a href="tel:+264832888000" className="hover:text-primary transition-colors">+264 83 288 8000</a>
+                {" / "}
+                <a href="tel:+264832888001" className="hover:text-primary transition-colors">+264 83 288 8001</a>
+              </span>
             </div>
             <div className="flex items-center gap-3 text-sm">
               <Mail className="w-5 h-5 text-primary flex-shrink-0" />
-              <a href="mailto:hello@berrylicious.na" className="text-foreground hover:text-primary transition-colors">hello@berrylicious.na</a>
+              <a href="mailto:windhoek@butcherblock.com.na" className="text-foreground hover:text-primary transition-colors">windhoek@butcherblock.com.na</a>
             </div>
             <div className="flex items-center gap-3 text-sm">
               <Instagram className="w-5 h-5 text-primary flex-shrink-0" />
-              <a href="https://instagram.com/berrylicious__restaurant" target="_blank" rel="noopener noreferrer" className="text-foreground hover:text-primary transition-colors">@berrylicious__restaurant</a>
+              <a href="https://www.instagram.com/butcherblocknamibia/" target="_blank" rel="noopener noreferrer" className="text-foreground hover:text-primary transition-colors">@butcherblocknamibia</a>
             </div>
           </div>
         </section>
@@ -98,14 +103,14 @@ const AboutPage = () => {
           <h2 className="font-display text-xl font-semibold mb-3">Find Us</h2>
           <div className="rounded-lg overflow-hidden border border-border aspect-video">
             <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3685.7!2d17.0836!3d-22.5609!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjLCsDMzJzM5LjIiUyAxN8KwMDUnMDEuMCJF!5e0!3m2!1sen!2sna!4v1"
+              src="https://maps.google.com/maps?q=Butcher+Block+Steakhouse+Am+Weinberg+Estate+13+Jan+Jonker+Street+Windhoek+Namibia&z=17&hl=en&ie=UTF8&iwloc=&output=embed"
               width="100%"
               height="100%"
               style={{ border: 0 }}
               allowFullScreen
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              title="Berrylicious location"
+              title="Butcher Block Steakhouse location"
             />
           </div>
         </section>

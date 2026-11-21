@@ -244,7 +244,7 @@ const AdminPage = () => {
                 <LayoutDashboard className="w-4 h-4 text-primary" />
               </div>
               <div>
-                <h1 className="font-display text-base font-bold text-foreground leading-none">Berrylicious Ops</h1>
+                <h1 className="font-display text-base font-bold text-foreground leading-none">Butcher Block Ops</h1>
                 <p className="text-[10px] text-muted-foreground/70 mt-0.5">
                   {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
                 </p>

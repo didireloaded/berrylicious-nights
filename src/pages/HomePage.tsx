@@ -219,7 +219,7 @@ const HomePage = () => {
         ) : (
           <img
             src={heroImage}
-            alt="Berrylicious restaurant interior"
+            alt="Butcher Block Steakhouse Windhoek"
             className="absolute inset-0 w-full h-full object-cover"
             width={1920}
             height={1080}
@@ -367,7 +367,7 @@ const HomePage = () => {
               </div>
             </Link>
             <a
-              href="https://instagram.com/berrylicious__restaurant"
+              href="https://www.instagram.com/butcherblocknamibia/"
               target="_blank"
               rel="noopener noreferrer"
               className="snap-start shrink-0 w-[148px] rounded-2xl glass-card p-4 text-left shadow-md shadow-black/10 transition-colors hover:border-primary/30 btn-press"
@@ -375,7 +375,7 @@ const HomePage = () => {
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-500/15 text-pink-400 mb-3">
                 <Instagram className="h-5 w-5" />
               </div>
-              <p className="text-sm font-bold text-foreground leading-tight">@berrylicious__restaurant</p>
+              <p className="text-sm font-bold text-foreground leading-tight">@butcherblocknamibia</p>
               <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">Stories from the floor, specials, drops.</p>
             </a>
             <button
@@ -544,9 +544,9 @@ const HomePage = () => {
 
         {/* Footer */}
         <footer className="text-center py-8 border-t border-border">
-          <p className="font-display text-lg text-foreground">Berrylicious</p>
-          <p className="text-muted-foreground text-sm mt-1">Restaurant & Lounge</p>
-          <p className="text-muted-foreground text-xs mt-1">Freedom Plaza, City Centre, Windhoek</p>
+          <p className="font-display text-lg text-foreground">Butcher Block Steakhouse</p>
+          <p className="text-muted-foreground text-sm mt-1">Steakhouse • Est. 2003</p>
+          <p className="text-muted-foreground text-xs mt-1">Am Weinberg Estate, 13 Jan Jonker Road, Klein Windhoek, Windhoek, Namibia</p>
           <button
             type="button"
             onClick={() => openAbout()}
@@ -554,7 +554,7 @@ const HomePage = () => {
           >
             About us &amp; hours
           </button>
-          <p className="text-muted-foreground text-xs mt-4">&copy; {new Date().getFullYear()} Berrylicious. All rights reserved.</p>
+          <p className="text-muted-foreground text-xs mt-4">&copy; {new Date().getFullYear()} Butcher Block Steakhouse. All rights reserved.</p>
         </footer>
       </div>
 
