@@ -19,6 +19,7 @@ export function groupOrdersByKitchenStatus(orders: AdminOrderLike[]) {
   const preparing: AdminOrderLike[] = [];
   const ready: AdminOrderLike[] = [];
   const completed: AdminOrderLike[] = [];
+  const cancelled: AdminOrderLike[] = [];
 
   for (const order of orders) {
     switch (order.status) {
@@ -34,10 +35,13 @@ export function groupOrdersByKitchenStatus(orders: AdminOrderLike[]) {
       case "completed":
         completed.push(order);
         break;
+      case "cancelled":
+        cancelled.push(order);
+        break;
     }
   }
 
-  return { pending, preparing, ready, completed };
+  return { pending, preparing, ready, completed, cancelled };
 }
 
 function lineCount(order: AdminOrderLike): number {

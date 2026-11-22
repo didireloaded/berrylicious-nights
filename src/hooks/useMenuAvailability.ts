@@ -56,9 +56,10 @@ async function fetchDisabledMenuIds(): Promise<Set<string>> {
 export function useMenuAvailability() {
   const [disabledIds, setDisabledIds] = useState<Set<string>>(() => cachedDisabledIds);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<Set<string>> => {
     const next = await fetchDisabledMenuIds();
     setDisabledIds((prev) => (setsEqual(prev, next) ? prev : next));
+    return next;
   }, []);
 
   useEffect(() => {

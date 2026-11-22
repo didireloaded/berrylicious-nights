@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { CalendarDays, UtensilsCrossed } from "lucide-react";
@@ -31,6 +31,20 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
   const [openSlots, setOpenSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState(false);
+  const dragStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0]?.clientY ?? null;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (dragStartY.current === null) return;
+    const endY = e.changedTouches[0]?.clientY ?? dragStartY.current;
+    if (endY - dragStartY.current > 72) {
+      onClose();
+    }
+    dragStartY.current = null;
+  };
 
   useEffect(() => {
     if (!event) return;
@@ -117,10 +131,15 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="event-sheet-title"
-        className="pointer-events-auto flex max-h-[min(85dvh,720px)] w-full max-w-lg flex-col rounded-t-3xl border border-border border-b-0 bg-card shadow-[0_-8px_40px_rgba(0,0,0,0.45)] animate-panel-up mx-auto"
+        className="pointer-events-auto mx-auto flex max-h-[min(85dvh,720px)] w-full max-w-lg flex-col rounded-t-[28px] border border-white/10 border-b-0 bg-[#181818] text-white shadow-[0_-8px_40px_rgba(0,0,0,0.55)] animate-panel-up"
       >
-        <div className="flex shrink-0 justify-center pt-3 pb-1" aria-hidden>
-          <div className="h-1 w-10 rounded-full bg-muted-foreground/35" />
+        <div
+          className="flex shrink-0 justify-center pt-3 pb-2"
+          aria-hidden="true"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="h-1 w-10 rounded-full bg-white/25" />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-2">
@@ -173,27 +192,27 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
           )}
         </div>
 
-        <div className="shrink-0 space-y-2 border-t border-border bg-card px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="shrink-0 space-y-2 border-t border-white/10 bg-[#181818] px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
           <button
             type="button"
             onClick={() => goBooking(primaryTime)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-center text-sm font-bold text-primary-foreground btn-press"
+            className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-[#FF5A1F] text-center text-sm font-bold text-white transition-colors hover:bg-[#E84D15] active:scale-[0.98]"
           >
-            <CalendarDays className="h-5 w-5 shrink-0" />
+            <CalendarDays className="h-5 w-5 shrink-0" aria-hidden="true" />
             {slotsLoading || slotsError || openSlots.length === 0 ? "Check table availability" : "Reserve for this event"}
           </button>
           <Link
             to="/menu"
             onClick={onClose}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-center text-sm font-semibold text-foreground btn-press"
+            className="flex min-h-[46px] w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-[#242424] text-center text-sm font-semibold text-white transition-colors hover:bg-[#303030]"
           >
-            <UtensilsCrossed className="h-5 w-5 shrink-0" />
+            <UtensilsCrossed className="h-5 w-5 shrink-0" aria-hidden="true" />
             View menu
           </Link>
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="min-h-[44px] w-full text-sm font-medium text-[#A3A3A3] transition-colors hover:text-white"
           >
             Close
           </button>

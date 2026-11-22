@@ -1,12 +1,28 @@
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { loadOrderSnapshotFromStorage } from "@/lib/orderTrackingStorage";
+import { loadOrderSnapshotFromStorage, saveOrderSnapshotForTracking } from "@/lib/orderTrackingStorage";
+import { extractOrderMetaFromItems } from "@/lib/orderPricing";
 import { formatPrice } from "@/lib/vibe";
 import { menuItems } from "@/data/menu";
 import { useCart } from "@/context/CartContext";
 import { useApp } from "@/context/AppContext";
-import { ArrowLeft, Clock, CheckCircle2, ChefHat, PackageCheck, Plus, ReceiptText } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Clock,
+  CheckCircle2,
+  ChefHat,
+  MessageSquare,
+  PackageCheck,
+  Phone,
+  Plus,
+  ReceiptText,
+  XCircle,
+} from "lucide-react";
+import { toast } from "sonner";
 import { notifyOrderStatusTransition, requestOrderNotificationPermission } from "@/lib/orderStatusNotify";
 import { ArrivalCodeCard } from "@/components/ArrivalCodeCard";
 
@@ -22,6 +38,7 @@ const statusHeadline: Record<string, string> = {
   preparing: "Preparing your order",
   ready: "Ready for collection",
   completed: "Order completed",
+  cancelled: "Order cancelled",
 };
 
 const statusSubline: Record<string, string> = {
@@ -29,6 +46,7 @@ const statusSubline: Record<string, string> = {
   preparing: "The grill and kitchen team are preparing your dishes.",
   ready: "Your order is ready — collect at the counter or watch for your server.",
   completed: "Thank you for dining with Butcher Block Steakhouse.",
+  cancelled: "This order was cancelled and is no longer being prepared by the kitchen.",
 };
 
 const WHILE_WAIT_MENU_IDS = ["14", "12", "19"];
@@ -62,19 +80,30 @@ type TrackedOrder = {
   table_number?: string | null;
   scheduled_time?: string | null;
   guest_name?: string | null;
+  dietary_notes?: string | null;
   eta_minutes?: number | null;
   eta_set_at?: string | null;
   created_at?: string;
   arrival_code?: string | null;
 };
 
+type CancelRpcClient = {
+  rpc: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+};
+
 const OrderTrackingPage = () => {
   const { id } = useParams();
   const { addItem } = useCart();
+  const { user } = useAuth();
   const { setCurrentOrder, clearCurrentOrder, currentOrder } = useApp();
+  const { openAssistant } = useRestaurantAssistant();
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [etaRemaining, setEtaRemaining] = useState<number | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const whileYouWaitItems = useMemo(
     () =>
@@ -87,11 +116,24 @@ const OrderTrackingPage = () => {
   useEffect(() => {
     if (!id) return;
 
+    const hydrateOrder = (raw: TrackedOrder | null, snap: ReturnType<typeof loadOrderSnapshotFromStorage>): TrackedOrder | null => {
+      if (!raw) return snap;
+      const embeddedMeta = extractOrderMetaFromItems(raw.items);
+      return {
+        ...raw,
+        arrival_code: raw.arrival_code ?? snap?.arrival_code ?? null,
+        table_number: snap?.table_number ?? embeddedMeta.tableNumber ?? null,
+        scheduled_time: snap?.scheduled_time ?? embeddedMeta.scheduledTime ?? null,
+        guest_name: snap?.guest_name ?? embeddedMeta.guestName ?? null,
+        dietary_notes: snap?.dietary_notes ?? embeddedMeta.dietaryNotes ?? null,
+      };
+    };
+
     const fetchOrder = async () => {
       const snap = loadOrderSnapshotFromStorage(id);
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData?.session && snap) {
-        setOrder(snap);
+        setOrder(hydrateOrder(snap, snap));
         setLoading(false);
         return;
       }
@@ -100,16 +142,7 @@ const OrderTrackingPage = () => {
         .select("*")
         .eq("id", id)
         .maybeSingle();
-      const row = data
-        ? {
-            ...data,
-            arrival_code: (data as { arrival_code?: string }).arrival_code ?? snap?.arrival_code,
-            table_number: snap?.table_number ?? null,
-            scheduled_time: snap?.scheduled_time ?? null,
-            guest_name: snap?.guest_name ?? null,
-          }
-        : snap;
-      setOrder(row);
+      setOrder(hydrateOrder(data as TrackedOrder | null, snap));
       setLoading(false);
     };
     void fetchOrder();
@@ -126,12 +159,7 @@ const OrderTrackingPage = () => {
             notifyOrderStatusTransition(neu.id, oldRow?.status, neu.status);
           }
           const snap = loadOrderSnapshotFromStorage(id);
-          setOrder({
-            ...neu,
-            table_number: snap?.table_number ?? null,
-            scheduled_time: snap?.scheduled_time ?? null,
-            guest_name: snap?.guest_name ?? null,
-          });
+          setOrder(hydrateOrder(neu, snap));
         },
       )
       .subscribe();
@@ -143,7 +171,7 @@ const OrderTrackingPage = () => {
 
   useEffect(() => {
     if (!order?.id) return;
-    setCurrentOrder({
+    const snap = {
       id: String(order.id),
       items: order.items,
       total: Number(order.total) || 0,
@@ -152,15 +180,18 @@ const OrderTrackingPage = () => {
       table_number: order.table_number ?? null,
       scheduled_time: order.scheduled_time ?? null,
       guest_name: order.guest_name ?? null,
+      dietary_notes: order.dietary_notes ?? null,
       eta_minutes: order.eta_minutes ?? null,
       eta_set_at: order.eta_set_at ?? null,
       created_at: order.created_at,
       arrival_code: order.arrival_code ?? null,
-    });
+    };
+    saveOrderSnapshotForTracking(snap);
+    setCurrentOrder(snap);
   }, [order, setCurrentOrder]);
 
   useEffect(() => {
-    if (order?.status === "completed" && currentOrder?.id === id) {
+    if ((order?.status === "completed" || order?.status === "cancelled") && currentOrder?.id === id) {
       clearCurrentOrder();
     }
   }, [order?.status, currentOrder?.id, id, clearCurrentOrder]);
@@ -186,6 +217,25 @@ const OrderTrackingPage = () => {
     return () => clearInterval(iv);
   }, [order?.eta_minutes, order?.eta_set_at]);
 
+  const handleCustomerCancel = async () => {
+    if (!order?.id || !user || order.status !== "pending" || cancelling) return;
+    setCancelling(true);
+    try {
+      const rpc = supabase as unknown as CancelRpcClient;
+      const { data, error } = await rpc.rpc("cancel_own_pending_order", { p_order_id: order.id });
+      if (error || !data) {
+        toast.error("Please call +264 83 288 8000 so the kitchen can update or cancel your ticket.");
+        return;
+      }
+      setOrder((prev) => (prev ? { ...prev, status: "cancelled" } : prev));
+      toast.success("Order cancelled");
+    } catch {
+      toast.error("Please call +264 83 288 8000 so staff can assist with your order.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-[#121212] px-6 text-center text-[14px] text-[#A3A3A3]">
@@ -208,12 +258,13 @@ const OrderTrackingPage = () => {
     );
   }
 
+  const isCancelled = order.status === "cancelled";
+  const isActive = !isCancelled && order.status !== "completed";
   const currentIndex = Math.max(0, statusSteps.findIndex((s) => s.key === order.status));
-  const progressPercent = Math.round(((currentIndex + 1) / statusSteps.length) * 100);
+  const progressPercent = isCancelled ? 0 : Math.round(((currentIndex + 1) / statusSteps.length) * 100);
   const typeLabel = orderTypeLabels[order.order_type ?? ""] ?? "Order";
   const headline = statusHeadline[order.status ?? "pending"] ?? statusHeadline.pending;
   const subline = statusSubline[order.status ?? "pending"] ?? statusSubline.pending;
-  const isActive = order.status !== "completed";
   const orderNumber = formatOrderNumber(String(order.id));
   const placedTime = order.created_at
     ? new Date(order.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
@@ -243,14 +294,21 @@ const OrderTrackingPage = () => {
           </span>
         </header>
 
-        {/* Compact Status & Progress Card (real statuses only — zero fake drivers/delivery) */}
-        <section className="mt-6 rounded-[24px] border border-white/10 bg-[#242424] p-5" aria-label="Order status">
+        {/* Status & Progress Card (real DB statuses including cancelled) */}
+        <section
+          className={
+            "mt-6 rounded-[24px] border p-5 " +
+            (isCancelled ? "border-red-500/35 bg-red-950/20" : "border-white/10 bg-[#242424]")
+          }
+          aria-label="Order status"
+        >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#FF5A1F]">
+              <p className={"text-[12px] font-semibold uppercase tracking-[0.12em] " + (isCancelled ? "text-red-400" : "text-[#FF5A1F]")}>
                 Order #{orderNumber}
               </p>
-              <h1 className="mt-1 font-display text-[24px] font-extrabold tracking-[-0.03em] text-white">
+              <h1 className="mt-1 flex items-center gap-2 font-display text-[24px] font-extrabold tracking-[-0.03em] text-white">
+                {isCancelled && <XCircle className="h-6 w-6 text-red-400" aria-hidden="true" />}
                 {headline}
               </h1>
               <p className="mt-1 text-[14px] text-[#A3A3A3]">{subline}</p>
@@ -267,49 +325,67 @@ const OrderTrackingPage = () => {
             )}
           </div>
 
-          {/* Genuine kitchen ETA only when explicitly provided by staff */}
-          {isActive && etaRemaining !== null && order.status !== "ready" && (
-            <p className="mt-3 rounded-xl bg-[#303030] px-3.5 py-2 text-[14px] font-semibold text-white">
-              Estimated prep time remaining: <span className="text-[#FF5A1F]">~{etaRemaining} min</span>
-            </p>
+          {isCancelled ? (
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <Link
+                to="/menu"
+                className="inline-flex min-h-[46px] flex-1 items-center justify-center whitespace-nowrap rounded-full bg-[#FF5A1F] px-5 text-[14px] font-bold text-white hover:bg-[#E84D15]"
+              >
+                Order Again
+              </Link>
+              <a
+                href="tel:+264832888000"
+                className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-white/15 bg-[#242424] px-5 text-[14px] font-semibold text-white hover:bg-[#303030]"
+              >
+                <Phone className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+                Call Restaurant
+              </a>
+            </div>
+          ) : (
+            <>
+              {isActive && etaRemaining !== null && order.status !== "ready" && (
+                <p className="mt-3 rounded-xl bg-[#303030] px-3.5 py-2 text-[14px] font-semibold text-white">
+                  Estimated prep time remaining: <span className="text-[#FF5A1F]">~{etaRemaining} min</span>
+                </p>
+              )}
+
+              <div className="mt-5">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-[#303030]">
+                  <div
+                    className="h-full rounded-full bg-[#FF5A1F] transition-all duration-500"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+
+                <div className="mt-4 grid grid-cols-4 gap-1">
+                  {statusSteps.map((step, i) => {
+                    const done = i <= currentIndex;
+                    const active = i === currentIndex;
+                    const Icon = step.icon;
+                    return (
+                      <div key={step.key} className="flex flex-col items-center gap-1.5 text-center">
+                        <span
+                          className={
+                            "flex h-9 w-9 items-center justify-center rounded-full transition-colors " +
+                            (active
+                              ? "bg-[#FF5A1F] text-white"
+                              : done
+                                ? "bg-[#FF5A1F]/25 text-[#FF5A1F]"
+                                : "bg-[#303030] text-[#737373]")
+                          }
+                        >
+                          <Icon className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <span className={"text-[11px] font-semibold leading-tight " + (done ? "text-white" : "text-[#737373]")}>
+                          {step.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
-
-          {/* Horizontal progress track */}
-          <div className="mt-5">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-[#303030]">
-              <div
-                className="h-full rounded-full bg-[#FF5A1F] transition-all duration-500"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-
-            <div className="mt-4 grid grid-cols-4 gap-1">
-              {statusSteps.map((step, i) => {
-                const done = i <= currentIndex;
-                const active = i === currentIndex;
-                const Icon = step.icon;
-                return (
-                  <div key={step.key} className="flex flex-col items-center gap-1.5 text-center">
-                    <span
-                      className={
-                        "flex h-9 w-9 items-center justify-center rounded-full transition-colors " +
-                        (active
-                          ? "bg-[#FF5A1F] text-white"
-                          : done
-                            ? "bg-[#FF5A1F]/25 text-[#FF5A1F]"
-                            : "bg-[#303030] text-[#737373]")
-                      }
-                    >
-                      <Icon className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                    <span className={"text-[11px] font-semibold leading-tight " + (done ? "text-white" : "text-[#737373]")}>
-                      {step.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </section>
 
         {/* Arrival/Collection QR Code */}
@@ -342,6 +418,16 @@ const OrderTrackingPage = () => {
             <p className="mt-3 text-[13px] text-[#A3A3A3]">
               Placed {placedTime} · {fulfillmentSummary}
             </p>
+          )}
+
+          {order.dietary_notes && (
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[13px] text-amber-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" aria-hidden="true" />
+              <div>
+                <p className="font-bold text-amber-300">Allergy / Dietary Note Sent to Kitchen</p>
+                <p className="mt-0.5">{order.dietary_notes}</p>
+              </div>
+            </div>
           )}
 
           <div className="mt-4 space-y-3">
@@ -380,11 +466,50 @@ const OrderTrackingPage = () => {
             </span>
           </div>
 
-          <p className="mt-2.5 text-[13px] text-[#A3A3A3]">
-            Show order #{orderNumber}
-            {order.arrival_code ? ` or code ${order.arrival_code}` : ""} to staff on collection or at your table.
-          </p>
+          {!isCancelled && (
+            <p className="mt-2.5 text-[13px] text-[#A3A3A3]">
+              Show order #{orderNumber}
+              {order.arrival_code ? ` or code ${order.arrival_code}` : ""} to staff on collection or at your table.
+            </p>
+          )}
         </section>
+
+        {/* Corrections & Cancellation Support for Active Orders */}
+        {isActive && (
+          <section className="mt-4 rounded-[22px] border border-white/10 bg-[#242424] p-4" aria-label="Order changes or cancellation">
+            <p className="text-[14px] font-bold text-white">Need to change or cancel your order?</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-[#A3A3A3]">
+              Call the floor team immediately with reference <span className="font-mono font-semibold text-white">#{orderNumber}</span> before the grill fires your cuts.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a
+                href="tel:+264832888000"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/15 bg-[#303030] px-4 text-[13px] font-semibold text-white hover:bg-[#3A3A3A]"
+              >
+                <Phone className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+                +264 83 288 8000
+              </a>
+              <button
+                type="button"
+                onClick={openAssistant}
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/15 bg-[#303030] px-4 text-[13px] font-semibold text-white hover:bg-[#3A3A3A]"
+              >
+                <MessageSquare className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+                Message staff
+              </button>
+              {user && order.status === "pending" && (
+                <button
+                  type="button"
+                  disabled={cancelling}
+                  onClick={() => void handleCustomerCancel()}
+                  className="inline-flex min-h-[44px] items-center rounded-full border border-red-500/35 bg-red-500/10 px-4 text-[13px] font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-50"
+                >
+                  {cancelling ? "Cancelling…" : "Cancel pending order"}
+                </button>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Quick add while waiting */}
         {isActive && whileYouWaitItems.length > 0 && (

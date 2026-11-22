@@ -1,9 +1,10 @@
 import { type CSSProperties, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import heroGrill from "@/assets/dish-lamb.jpg";
 import butcherBlockLogo from "@/assets/butcher-block-logo.png";
 
+const WELCOME_STORAGE_KEY = "bb-welcome-seen";
 const SMOOTH_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 const MOTION_SAFE = "motion-reduce:transition-none";
 
@@ -15,21 +16,41 @@ function transitionStyle(delayMs: number, durationMs = 560): CSSProperties {
   };
 }
 
+function hasSeenWelcome(): boolean {
+  try {
+    return (
+      localStorage.getItem(WELCOME_STORAGE_KEY) === "1" ||
+      sessionStorage.getItem(WELCOME_STORAGE_KEY) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default function HomePageEditorial() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const forceIntro = searchParams.get("intro") === "1";
+  const [returningVisitor] = useState<boolean>(() => !forceIntro && hasSeenWelcome());
   const [mounted, setMounted] = useState(false);
   const [entering, setEntering] = useState(false);
 
   useEffect(() => {
+    if (returningVisitor) return;
     const id = window.requestAnimationFrame(() => setMounted(true));
     return () => window.cancelAnimationFrame(id);
-  }, []);
+  }, [returningVisitor]);
+
+  if (returningVisitor) {
+    return <Navigate to="/home" replace />;
+  }
 
   const handleEnter = () => {
     if (entering) return;
     setEntering(true);
     try {
-      sessionStorage.setItem("bb-welcome-seen", "1");
+      localStorage.setItem(WELCOME_STORAGE_KEY, "1");
+      sessionStorage.setItem(WELCOME_STORAGE_KEY, "1");
     } catch {
       /* ignore storage errors */
     }
@@ -64,7 +85,7 @@ export default function HomePageEditorial() {
         />
       </div>
 
-      {/* Controlled contrast vignettes: pure dark charcoal top for crisp logo + grounded bottom for CTA */}
+      {/* Controlled contrast vignettes */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-[#0A0A0A] via-[#0A0A0A]/80 via-[36%] to-[#0A0A0A]/90"
@@ -74,7 +95,7 @@ export default function HomePageEditorial() {
         className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t from-[#0A0A0A] via-transparent via-[38%] to-transparent"
       />
 
-      {/* Centered upper-middle official brand identity */}
+      {/* Centered official brand identity */}
       <div className="mx-auto flex w-full max-w-[520px] flex-1 flex-col items-center justify-center px-8 pb-20 pt-[max(56px,env(safe-area-inset-top,0px))] text-center">
         <button
           type="button"
@@ -97,7 +118,7 @@ export default function HomePageEditorial() {
         </button>
       </div>
 
-      {/* Bottom iOS cinematic entry pill matching approved reference */}
+      {/* Bottom iOS entry pill */}
       <div
         style={transitionStyle(180, 680)}
         className={

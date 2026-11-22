@@ -24,7 +24,7 @@ const supabase = _supabase as unknown as DynamicSupabaseClient;
 
 const MAX_ATTEMPTS = 14;
 
-function generateUuid(): string {
+export function generateClientUuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
@@ -35,10 +35,24 @@ function generateUuid(): string {
   });
 }
 
-function isUniqueViolation(err: unknown): boolean {
+export function isUniqueViolation(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const e = err as { code?: string; message?: string };
   return e.code === "23505" || Boolean(e.message?.toLowerCase().includes("duplicate key"));
+}
+
+function isPrimaryKeyIdDuplicate(err: unknown): boolean {
+  if (!isUniqueViolation(err)) return false;
+  const e = err as { message?: string; details?: string };
+  const blob = `${e.message ?? ""} ${e.details ?? ""}`.toLowerCase();
+  return blob.includes("_pkey") || blob.includes("key (id)=");
+}
+
+export function isBookingSlotConflictError(err: unknown): boolean {
+  if (!isUniqueViolation(err)) return false;
+  const e = err as { message?: string; details?: string };
+  const blob = `${e.message ?? ""} ${e.details ?? ""}`.toLowerCase();
+  return blob.includes("bookings_date_time") || blob.includes("key (date, time)=");
 }
 
 /**
@@ -77,13 +91,14 @@ export async function insertBookingWithArrivalCode(
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     const arrival_code = generateArrivalCode();
     if (isGuest) {
-      const id = generateUuid();
+      const id = generateClientUuid();
       const { error } = await supabase.from("bookings").insert({ ...row, id, arrival_code });
       if (!error) {
         return { booking_id: id, arrival_code, assigned_table_code: null };
       }
+      if (isBookingSlotConflictError(error)) throw error;
       if (isSchemaCacheOrMissingColumnError(error)) {
-        const legacyId = generateUuid();
+        const legacyId = generateClientUuid();
         const { error: legErr } = await supabase.from("bookings").insert({ ...row, id: legacyId });
         if (!legErr) return { booking_id: legacyId, arrival_code: null, assigned_table_code: null };
         throw legErr ?? error;
@@ -105,6 +120,7 @@ export async function insertBookingWithArrivalCode(
         assigned_table_code: inserted.assigned_table_code ?? null,
       };
     }
+    if (error && isBookingSlotConflictError(error)) throw error;
     if (error && isSchemaCacheOrMissingColumnError(error)) {
       const { data: legacy, error: legErr } = await supabase.from("bookings").insert(row).select("id").single();
       if (!legErr) {
@@ -121,23 +137,31 @@ export async function insertBookingWithArrivalCode(
   throw new Error("Could not assign a unique arrival code");
 }
 
+/**
+ * Inserts an order with optional client-generated `idempotencyId` so retries after
+ * dropped connections or double taps cannot create duplicate kitchen tickets.
+ */
 export async function insertOrderWithArrivalCode(
   row: Record<string, unknown>,
-): Promise<{ id: string; arrival_code: string | null }> {
+  options?: { idempotencyId?: string; preferredArrivalCode?: string },
+): Promise<{ id: string; arrival_code: string | null; deduplicated?: boolean }> {
   const isGuest = !row.user_id;
+  const stableId = options?.idempotencyId || generateClientUuid();
 
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    const arrival_code = generateArrivalCode();
+    const arrival_code = i === 0 && options?.preferredArrivalCode ? options.preferredArrivalCode : generateArrivalCode();
     if (isGuest) {
-      const id = generateUuid();
-      const { error } = await supabase.from("orders").insert({ ...row, id, arrival_code });
+      const { error } = await supabase.from("orders").insert({ ...row, id: stableId, arrival_code });
       if (!error) {
-        return { id, arrival_code };
+        return { id: stableId, arrival_code };
+      }
+      if (isPrimaryKeyIdDuplicate(error)) {
+        return { id: stableId, arrival_code, deduplicated: true };
       }
       if (isSchemaCacheOrMissingColumnError(error)) {
-        const legacyId = generateUuid();
-        const { error: legErr } = await supabase.from("orders").insert({ ...row, id: legacyId });
-        if (!legErr) return { id: legacyId, arrival_code: null };
+        const { error: legErr } = await supabase.from("orders").insert({ ...row, id: stableId });
+        if (!legErr) return { id: stableId, arrival_code: null };
+        if (isPrimaryKeyIdDuplicate(legErr)) return { id: stableId, arrival_code: null, deduplicated: true };
         throw legErr ?? error;
       }
       if (!isUniqueViolation(error)) throw error;
@@ -146,15 +170,23 @@ export async function insertOrderWithArrivalCode(
 
     const { data, error } = await supabase
       .from("orders")
-      .insert({ ...row, arrival_code })
+      .insert({ ...row, id: stableId, arrival_code })
       .select("id, arrival_code")
       .single();
     if (!error && data?.id) {
       return { id: String(data.id), arrival_code: (data.arrival_code as string) ?? null };
     }
+    if (error && isPrimaryKeyIdDuplicate(error)) {
+      return { id: stableId, arrival_code, deduplicated: true };
+    }
     if (error && isSchemaCacheOrMissingColumnError(error)) {
-      const { data: legacy, error: legErr } = await supabase.from("orders").insert(row).select("id").single();
+      const { data: legacy, error: legErr } = await supabase
+        .from("orders")
+        .insert({ ...row, id: stableId })
+        .select("id")
+        .single();
       if (!legErr && legacy?.id) return { id: String(legacy.id), arrival_code: null };
+      if (legErr && isPrimaryKeyIdDuplicate(legErr)) return { id: stableId, arrival_code: null, deduplicated: true };
       throw legErr ?? error;
     }
     if (!isUniqueViolation(error)) throw error;
@@ -168,7 +200,7 @@ async function insertOrderAndBookingLegacy(opts: {
 }): Promise<{ orderId: string; arrival_code: null }> {
   const isGuest = !opts.orderRow.user_id;
   if (isGuest) {
-    const orderId = generateUuid();
+    const orderId = generateClientUuid();
     const { error: orderErr } = await supabase.from("orders").insert({ ...opts.orderRow, id: orderId });
     if (orderErr) throw orderErr;
     const { error: bookErr } = await supabase.from("bookings").insert({
@@ -207,7 +239,7 @@ export async function insertOrderAndBookingWithSharedArrivalCode(opts: {
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     const arrival_code = generateArrivalCode();
     if (isGuest) {
-      const orderId = generateUuid();
+      const orderId = generateClientUuid();
       const { error: orderErr } = await supabase
         .from("orders")
         .insert({ ...opts.orderRow, id: orderId, arrival_code });

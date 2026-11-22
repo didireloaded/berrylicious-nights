@@ -287,7 +287,7 @@ export function RestaurantChatPanel({
             }}
             placeholder="Ask us anything…"
             rows={1}
-            className="min-h-[48px] max-h-32 flex-1 resize-none rounded-2xl border border-white/10 bg-[#141414] px-4 py-3 text-sm text-white placeholder:text-white/35 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="min-h-[48px] max-h-32 flex-1 resize-none rounded-2xl border border-white/10 bg-[#141414] px-4 py-3 text-[16px] text-white placeholder:text-white/35 shadow-inner focus:outline-none focus:ring-2 focus:ring-[#FF5A1F]/50 sm:text-sm"
             disabled={!ready || !chatId || thinking}
           />
           <button

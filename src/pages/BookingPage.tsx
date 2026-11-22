@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CalendarDays, ListOrdered, Minus, Plus } from "lucide-react";
+import { ArrowLeft, CalendarDays, Info, ListOrdered, Minus, Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { bookingTimeSlots } from "@/lib/bookingSlots";
 import type { BookingNavState } from "@/lib/eventBooking";
-import { insertBookingWithArrivalCode } from "@/lib/supabaseArrivalInsert";
+import { insertBookingWithArrivalCode, isBookingSlotConflictError } from "@/lib/supabaseArrivalInsert";
 import { supabase } from "@/integrations/supabase/client";
 import { parseRpcBookedTimes } from "@/lib/bookingRpc";
 import { getWindhoekDateISO } from "@/lib/windhoekDate";
@@ -89,6 +89,7 @@ const BookingPage = () => {
     setCheckingTimes(true);
     setTimesError(false);
     setBookedTimes([]);
+    setWaitlistSnap(null);
     void Promise.resolve(rpcClient.rpc("booked_table_times", { p_date: date }))
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -185,8 +186,18 @@ const BookingPage = () => {
       booking_id = res.booking_id;
       arrival_code = res.arrival_code;
       assigned_table_code = res.assigned_table_code;
-    } catch {
-      toast.error("Could not complete your reservation. Please try again.");
+    } catch (err) {
+      if (isBookingSlotConflictError(err)) {
+        try {
+          const { data } = await rpcClient.rpc("booked_table_times", { p_date: date });
+          setBookedTimes(parseRpcBookedTimes(data));
+        } catch {
+          /* ignore secondary refresh error */
+        }
+        toast.error("That table slot was just booked by another guest. Available times have been updated.");
+      } else {
+        toast.error("Could not complete your reservation. Please try again.");
+      }
       setLoading(false);
       return;
     }
@@ -364,9 +375,25 @@ const BookingPage = () => {
           )}
 
           {fullyBooked && !checkingTimes && !timesError && (
-            <p className="mt-3 rounded-2xl border border-white/10 bg-[#242424] p-3.5 text-[14px] text-white/85">
-              All listed times are currently taken for {date}. Join the waitlist below or select another day.
-            </p>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-[#242424] p-3.5 text-[14px] text-white/85">
+              <span>All listed times are currently taken for {date}. Join the waitlist below or check the next day.</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const idx = dateStrip.findIndex((c) => c.iso === date);
+                  if (idx >= 0 && idx + 1 < dateStrip.length) {
+                    setDate(dateStrip[idx + 1].iso);
+                  } else {
+                    const [y, m, d] = date.split("-").map(Number);
+                    const next = new Date(Date.UTC(y, (m || 1) - 1, (d || 1) + 1, 12, 0, 0));
+                    setDate(next.toISOString().slice(0, 10));
+                  }
+                }}
+                className="min-h-[38px] rounded-full bg-[#FF5A1F] px-3.5 text-[13px] font-bold text-white"
+              >
+                Try next day
+              </button>
+            </div>
           )}
 
           <div className="mt-3 grid grid-cols-3 gap-2.5 sm:grid-cols-4">
@@ -505,6 +532,18 @@ const BookingPage = () => {
                   ? "No Open Times — Join Waitlist Below"
                   : "Confirm Reservation"}
         </button>
+
+        {/* Reservation & Cancellation Policy */}
+        <section className="mt-6 flex items-start gap-3 rounded-[20px] border border-white/10 bg-[#1B1B1B] p-4 text-[13px] leading-relaxed text-[#A3A3A3]">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+          <p>
+            Tables are held for 15 minutes past your booking time. Running late, modifying party size, or cancelling? Call Butcher Block on{" "}
+            <a href="tel:+264832888000" className="font-semibold text-white underline underline-offset-2">
+              +264 83 288 8000
+            </a>
+            .
+          </p>
+        </section>
 
         {/* Smart Waitlist preserved */}
         <section className="mt-6 rounded-[22px] border border-white/10 bg-[#242424] p-4">

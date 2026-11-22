@@ -10,12 +10,14 @@ const headlines: Record<string, string> = {
   pending: "Order received",
   preparing: "Preparing your order",
   ready: "Ready for collection",
+  cancelled: "Order cancelled",
 };
 
 const progressByStatus: Record<string, number> = {
   pending: 28,
   preparing: 64,
   ready: 94,
+  cancelled: 0,
 };
 
 const orderTypes: Record<string, string> = {
@@ -118,7 +120,7 @@ export function ActiveOrderBanner() {
 
   if (!currentOrder || !id) return null;
   const order = latest ?? currentOrder;
-  if (!["pending", "preparing", "ready"].includes(order.status)) return null;
+  if (!["pending", "preparing", "ready", "cancelled"].includes(order.status)) return null;
 
   const Icon = order.status === "ready" ? PackageCheck : order.status === "preparing" ? ChefHat : Clock3;
   const progress = progressByStatus[order.status] ?? 28;

@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { useAboutSheet } from "@/context/AboutSheetContext";
 import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
 import { formatPrice } from "@/lib/vibe";
+import { getWindhoekDateISO } from "@/lib/windhoekDate";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useFavorites } from "@/hooks/useFavorites";
@@ -153,7 +154,7 @@ const ProfilePage = () => {
     navigate("/home");
   };
 
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayStr = useMemo(() => getWindhoekDateISO(), []);
   const orderLive =
     !!currentOrder &&
     currentOrder.status !== "completed" &&

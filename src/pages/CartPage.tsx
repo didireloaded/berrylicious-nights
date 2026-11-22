@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   CalendarDays,
@@ -15,11 +16,18 @@ import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
+import { useMenuAvailability } from "@/hooks/useMenuAvailability";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/vibe";
 import { menuArtwork } from "@/lib/menuArtwork";
+import {
+  buildOrderSubmissionFingerprint,
+  resolveBaseMenuItemId,
+  resolveCanonicalUnitPrice,
+  revalidateCartForOrder,
+} from "@/lib/orderPricing";
 import { saveOrderSnapshotForTracking, type TrackableOrderSnapshot } from "@/lib/orderTrackingStorage";
-import { insertOrderWithArrivalCode } from "@/lib/supabaseArrivalInsert";
+import { generateClientUuid, insertOrderWithArrivalCode } from "@/lib/supabaseArrivalInsert";
 import { getWindhoekDateISO } from "@/lib/windhoekDate";
 
 type OrderType = "pickup" | "preorder" | "dinein";
@@ -32,6 +40,7 @@ const ORDER_MODES: { value: OrderType; label: string; detail: string }[] = [
 
 const PICKUP_TIMES = ["ASAP (~25 min)", "In 45 min", "In 1 hour"];
 const PREORDER_SLOTS = ["12:30", "18:00", "19:30", "20:00", "21:00"];
+const DIETARY_QUICK_FLAGS = ["Nut allergy", "Dairy-free", "Gluten-sensitive", "Shellfish allergy", "No pork"];
 
 function readStoredGuest(key: string): string {
   try {
@@ -42,9 +51,10 @@ function readStoredGuest(key: string): string {
 }
 
 export default function CartPage() {
-  const { items, updateQuantity, removeItem, totalPrice, clearCart, totalItems } = useCart();
+  const { items, updateQuantity, removeItem, clearCart, totalItems } = useCart();
   const { user, profile, refreshProfile } = useAuth();
   const { setCurrentOrder } = useApp();
+  const { isUnavailable, refresh: refreshAvailability } = useMenuAvailability();
   const navigate = useNavigate();
 
   const today = getWindhoekDateISO();
@@ -59,11 +69,53 @@ export default function CartPage() {
   const [guestPhone, setGuestPhone] = useState<string>(
     () => profile?.phone || readStoredGuest("butcher-block-guest-phone"),
   );
+  const [dietaryFlags, setDietaryFlags] = useState<string[]>([]);
+  const [dietaryCustomNote, setDietaryCustomNote] = useState<string>("");
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Synchronous double-tap lock + idempotent order UUID per unique payload fingerprint
+  const submittingRef = useRef(false);
+  const idempotencyRef = useRef<{ fingerprint: string; orderId: string } | null>(null);
+
+  const unavailableItems = useMemo(
+    () => items.filter((item) => isUnavailable(resolveBaseMenuItemId(item))),
+    [items, isUnavailable],
+  );
+
+  // Re-sync live kitchen availability whenever the guest visits checkout with items in cart
+  useEffect(() => {
+    if (items.length > 0) {
+      void refreshAvailability();
+    }
+  }, [items.length, refreshAvailability]);
+
+  // Always display canonical menu prices rather than trusting stale localStorage prices
+  const canonicalTotalPrice = useMemo(() => {
+    let sum = 0;
+    for (const item of items) {
+      const unit = resolveCanonicalUnitPrice(item) ?? item.price;
+      sum += unit * item.quantity;
+    }
+    return sum;
+  }, [items]);
+
+  const toggleDietaryFlag = (flag: string) => {
+    setDietaryFlags((prev) =>
+      prev.includes(flag) ? prev.filter((f) => f !== flag) : [...prev, flag],
+    );
+  };
+
+  const removeUnavailableItems = () => {
+    for (const item of unavailableItems) {
+      removeItem(item.id);
+    }
+    setFormError(null);
+    toast.success("Removed unavailable items from your cart");
+  };
+
   async function handleCheckout() {
-    if (submitting || items.length === 0) return;
+    if (submittingRef.current || submitting || items.length === 0) return;
     setFormError(null);
 
     const resolvedName = (profile?.display_name || user?.user_metadata?.full_name || guestName).trim();
@@ -98,11 +150,15 @@ export default function CartPage() {
       }
     }
 
+    submittingRef.current = true;
+    setSubmitting(true);
+
+    // 1. Refresh live kitchen 86 board right before submitting so stale carts cannot order unavailable dishes
+    let freshDisabled: Set<string>;
     try {
-      if (guestName.trim()) localStorage.setItem("butcher-block-guest-name", guestName.trim());
-      if (guestPhone.trim()) localStorage.setItem("butcher-block-guest-phone", guestPhone.trim());
+      freshDisabled = await refreshAvailability();
     } catch {
-      /* ignore storage errors */
+      freshDisabled = new Set();
     }
 
     const scheduledTime =
@@ -112,35 +168,83 @@ export default function CartPage() {
           ? `${preorderDate} at ${preorderSlot}`
           : null;
 
-    setSubmitting(true);
-    const orderItems = items.map((item) => ({
-      name: item.name,
-      qty: item.quantity,
-      price: item.price,
-      ...(item.weight ? { weight: item.weight } : {}),
-      ...(item.doneness ? { doneness: item.doneness } : {}),
-      ...(item.side ? { side: item.side } : {}),
-      ...(item.sauces?.length ? { sauces: item.sauces } : {}),
-    }));
-    const total = totalPrice;
+    const combinedDietaryNotes = [
+      ...dietaryFlags,
+      dietaryCustomNote.trim(),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    const orderMeta = {
+      tableNumber: orderType === "dinein" ? resolvedTable : null,
+      scheduledTime,
+      guestName: resolvedName || null,
+      dietaryNotes: combinedDietaryNotes || null,
+    };
+
+    // 2. Revalidate every item's availability & canonical price from the official catalog
+    const validated = revalidateCartForOrder(items, freshDisabled, orderMeta);
+    if ("reason" in validated) {
+      if (validated.reason === "unavailable") {
+        const names = validated.unavailableNames?.join(", ") || "One or more items";
+        const msg = `${names} just became unavailable in the kitchen. Please remove to continue.`;
+        setFormError(msg);
+        toast.error(msg);
+      } else {
+        const msg = "One or more items in your cart could not be priced. Please refresh and try again.";
+        setFormError(msg);
+        toast.error(msg);
+      }
+      submittingRef.current = false;
+      setSubmitting(false);
+      return;
+    }
+
+    if (validated.priceAdjusted) {
+      toast.info("Menu prices were refreshed to the latest Butcher Block rates.");
+    }
+
+    try {
+      if (guestName.trim()) localStorage.setItem("butcher-block-guest-name", guestName.trim());
+      if (guestPhone.trim()) localStorage.setItem("butcher-block-guest-phone", guestPhone.trim());
+    } catch {
+      /* ignore storage errors */
+    }
+
+    // 3. Idempotent submission key so retries/double-taps cannot insert duplicate kitchen tickets
+    const fingerprint = buildOrderSubmissionFingerprint(validated.items, orderType, orderMeta);
+    let stableOrderId: string;
+    if (idempotencyRef.current && idempotencyRef.current.fingerprint === fingerprint) {
+      stableOrderId = idempotencyRef.current.orderId;
+    } else {
+      stableOrderId = generateClientUuid();
+      idempotencyRef.current = { fingerprint, orderId: stableOrderId };
+    }
 
     let orderId: string;
     let arrivalCode: string | null = null;
     try {
-      const row = await insertOrderWithArrivalCode({
-        user_id: user?.id || null,
-        items: orderItems,
-        total,
-        order_type: orderType,
-      });
+      const row = await insertOrderWithArrivalCode(
+        {
+          user_id: user?.id || null,
+          items: validated.items,
+          total: validated.total,
+          order_type: orderType,
+        },
+        { idempotencyId: stableOrderId },
+      );
       orderId = row.id;
       arrivalCode = row.arrival_code ?? null;
     } catch (error) {
       console.error("[CartPage] Unable to place order", error);
       toast.error("Your order could not be placed. Nothing was submitted. Please try again.");
+      submittingRef.current = false;
       setSubmitting(false);
       return;
     }
+
+    // Clear idempotency key after confirmed server acceptance
+    idempotencyRef.current = null;
 
     // Only query back when authenticated; guest SELECT is restricted by RLS
     let full: Record<string, unknown> | null = null;
@@ -155,13 +259,14 @@ export default function CartPage() {
 
     const snapshot: TrackableOrderSnapshot = {
       id: orderId,
-      items: full?.items ?? orderItems,
-      total: Number(full?.total ?? total),
+      items: full?.items ?? validated.items,
+      total: Number(full?.total ?? validated.total),
       status: String(full?.status ?? "pending"),
       order_type: typeof full?.order_type === "string" ? full.order_type : orderType,
-      table_number: orderType === "dinein" ? resolvedTable : null,
-      scheduled_time: scheduledTime,
-      guest_name: resolvedName || null,
+      table_number: orderMeta.tableNumber,
+      scheduled_time: orderMeta.scheduledTime,
+      guest_name: orderMeta.guestName,
+      dietary_notes: orderMeta.dietaryNotes,
       eta_minutes: typeof full?.eta_minutes === "number" ? full.eta_minutes : null,
       eta_set_at: typeof full?.eta_set_at === "string" ? full.eta_set_at : null,
       created_at: typeof full?.created_at === "string" ? full.created_at : new Date().toISOString(),
@@ -176,13 +281,14 @@ export default function CartPage() {
       if (Array.isArray(saved)) {
         saved.push({
           id: orderId,
-          items: orderItems,
-          total,
+          items: validated.items,
+          total: validated.total,
           status: snapshot.status,
           order_type: orderType,
           table_number: snapshot.table_number,
           scheduled_time: snapshot.scheduled_time,
           guest_name: snapshot.guest_name,
+          dietary_notes: snapshot.dietary_notes,
           createdAt: snapshot.created_at,
           arrival_code: snapshot.arrival_code,
         });
@@ -195,6 +301,7 @@ export default function CartPage() {
     clearCart();
     toast.success("Order placed — viewing your receipt");
     navigate(`/order/${orderId}`);
+    submittingRef.current = false;
     setSubmitting(false);
     if (refreshProfile) void Promise.resolve(refreshProfile()).catch(() => undefined);
   }
@@ -260,11 +367,36 @@ export default function CartPage() {
           </section>
         ) : (
           <div className="mt-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-8">
-            {/* Cart Item Rows (Screen 05 clean compact vertical list) */}
-            <section className="lg:col-span-7" aria-label="Items in your cart">
+            {/* Cart Item Rows */}
+            <section className="space-y-4 lg:col-span-7" aria-label="Items in your cart">
+              {unavailableItems.length > 0 && (
+                <div
+                  role="alert"
+                  className="flex flex-col gap-3 rounded-[20px] border border-red-500/40 bg-red-500/10 p-4 text-[14px]"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" aria-hidden="true" />
+                    <p className="text-red-200">
+                      {unavailableItems.map((i) => i.name).join(", ")}{" "}
+                      {unavailableItems.length === 1 ? "is" : "are"} currently unavailable in the kitchen. Remove to place your order.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeUnavailableItems}
+                    className="min-h-[40px] self-start rounded-full bg-red-500/20 px-4 text-[13px] font-bold text-red-200 hover:bg-red-500/30"
+                  >
+                    Remove unavailable {unavailableItems.length === 1 ? "item" : "items"}
+                  </button>
+                </div>
+              )}
+
               <ul className="space-y-3">
                 {items.map((item) => {
                   const art = menuArtwork(item);
+                  const baseId = resolveBaseMenuItemId(item);
+                  const itemUnavailable = isUnavailable(baseId);
+                  const unitPrice = resolveCanonicalUnitPrice(item) ?? item.price;
                   const modParts = [
                     item.weight,
                     item.doneness,
@@ -275,7 +407,12 @@ export default function CartPage() {
                   return (
                     <li
                       key={item.id}
-                      className="rounded-[22px] border border-white/10 bg-[#242424] p-3.5"
+                      className={
+                        "rounded-[22px] border p-3.5 " +
+                        (itemUnavailable
+                          ? "border-red-500/45 bg-red-950/20"
+                          : "border-white/10 bg-[#242424]")
+                      }
                     >
                       <div className="flex items-start gap-3.5">
                         {art.src ? (
@@ -294,9 +431,16 @@ export default function CartPage() {
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
-                            <h2 className="text-[16px] font-bold leading-snug text-white">
-                              {item.name}
-                            </h2>
+                            <div className="min-w-0">
+                              <h2 className="text-[16px] font-bold leading-snug text-white">
+                                {item.name}
+                              </h2>
+                              {itemUnavailable && (
+                                <span className="mt-1 inline-block rounded-full bg-red-500/20 px-2.5 py-0.5 text-[11px] font-bold text-red-300">
+                                  Unavailable in kitchen
+                                </span>
+                              )}
+                            </div>
                             <button
                               type="button"
                               onClick={() => removeItem(item.id)}
@@ -316,11 +460,11 @@ export default function CartPage() {
                           <div className="mt-3 flex items-center justify-between gap-3">
                             <div>
                               <span className="text-[16px] font-extrabold tabular-nums text-[#FF5A1F]">
-                                {formatPrice(item.price * item.quantity)}
+                                {formatPrice(unitPrice * item.quantity)}
                               </span>
                               {item.quantity > 1 && (
                                 <span className="ml-2 text-[12px] text-[#A3A3A3]">
-                                  {formatPrice(item.price)} ea
+                                  {formatPrice(unitPrice)} ea
                                 </span>
                               )}
                             </div>
@@ -342,9 +486,10 @@ export default function CartPage() {
                               </output>
                               <button
                                 type="button"
+                                disabled={itemUnavailable}
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
                                 aria-label={`Increase ${item.name} quantity`}
-                                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#303030] text-white transition-colors hover:bg-[#FF5A1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+                                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#303030] text-white transition-colors hover:bg-[#FF5A1F] disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
                               >
                                 <Plus className="h-4 w-4" aria-hidden="true" />
                               </button>
@@ -356,6 +501,50 @@ export default function CartPage() {
                   );
                 })}
               </ul>
+
+              {/* Allergies & Dietary Flagging (honest shared-kitchen disclosure) */}
+              <section className="rounded-[22px] border border-white/10 bg-[#242424] p-4" aria-labelledby="dietary-heading">
+                <h2 id="dietary-heading" className="text-[15px] font-bold text-white">
+                  Allergies &amp; Dietary Notes <span className="font-normal text-[#A3A3A3]">(optional)</span>
+                </h2>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {DIETARY_QUICK_FLAGS.map((flag) => {
+                    const active = dietaryFlags.includes(flag);
+                    return (
+                      <button
+                        key={flag}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => toggleDietaryFlag(flag)}
+                        className={
+                          "min-h-[38px] rounded-full border px-3 text-[13px] font-semibold transition-colors " +
+                          (active
+                            ? "border-[#FF5A1F] bg-[#FF5A1F]/20 text-[#FF5A1F]"
+                            : "border-white/10 bg-[#1B1B1B] text-[#A3A3A3] hover:text-white")
+                        }
+                      >
+                        {flag}
+                      </button>
+                    );
+                  })}
+                </div>
+                <textarea
+                  id="cart-dietary-notes"
+                  aria-label="Additional allergy or dietary requirements"
+                  value={dietaryCustomNote}
+                  onChange={(e) => setDietaryCustomNote(e.target.value)}
+                  maxLength={240}
+                  placeholder="Flag specific allergies or preparation notes for the kitchen..."
+                  className="mt-3 h-20 w-full resize-none rounded-xl border border-white/10 bg-[#181818] p-3 text-[16px] text-white placeholder:text-[#737373] focus:border-[#FF5A1F] focus:outline-none sm:text-[14px]"
+                />
+                <p className="mt-2 text-[12px] leading-relaxed text-[#A3A3A3]">
+                  Dishes are prepared in a shared kitchen. We cannot guarantee allergen-free preparation — please confirm severe allergies directly with staff or call{" "}
+                  <a href="tel:+264832888000" className="text-white underline underline-offset-2">
+                    +264 83 288 8000
+                  </a>
+                  .
+                </p>
+              </section>
             </section>
 
             {/* Fulfilment + Honest Summary + Place Order CTA */}
@@ -541,7 +730,7 @@ export default function CartPage() {
                 </div>
               </section>
 
-              {/* Honest N$ Order Summary (zero fake delivery or service charges) */}
+              {/* Honest N$ Order Summary */}
               <section className="rounded-[22px] border border-white/10 bg-[#242424] p-5" aria-labelledby="summary-heading">
                 <h2 id="summary-heading" className="text-[16px] font-bold text-white">
                   Order Summary
@@ -553,13 +742,13 @@ export default function CartPage() {
                   </div>
                   <div className="flex justify-between gap-4">
                     <span className="text-[#A3A3A3]">Subtotal</span>
-                    <span className="font-semibold tabular-nums text-white">{formatPrice(totalPrice)}</span>
+                    <span className="font-semibold tabular-nums text-white">{formatPrice(canonicalTotalPrice)}</span>
                   </div>
                 </div>
                 <div className="mt-4 flex items-baseline justify-between border-t border-white/10 pt-4">
                   <span className="text-[16px] font-bold text-white">Total</span>
                   <span className="text-[22px] font-extrabold tabular-nums text-[#FF5A1F]">
-                    {formatPrice(totalPrice)}
+                    {formatPrice(canonicalTotalPrice)}
                   </span>
                 </div>
                 <p className="mt-3 text-[13px] leading-relaxed text-[#A3A3A3]">
@@ -569,11 +758,19 @@ export default function CartPage() {
                 <button
                   type="button"
                   onClick={() => void handleCheckout()}
-                  disabled={submitting}
-                  className="mt-5 flex min-h-[54px] w-full items-center justify-center gap-2 rounded-full bg-[#FF5A1F] px-6 text-[16px] font-bold text-white transition-colors hover:bg-[#E84D15] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  disabled={submitting || unavailableItems.length > 0}
+                  className="mt-5 flex min-h-[54px] w-full items-center justify-center gap-2 rounded-full bg-[#FF5A1F] px-6 text-[16px] font-bold text-white transition-colors hover:bg-[#E84D15] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                 >
-                  <span>{submitting ? "Placing Order…" : "Place Order"}</span>
-                  {!submitting && <ArrowRight className="h-5 w-5" aria-hidden="true" />}
+                  <span>
+                    {submitting
+                      ? "Placing Order…"
+                      : unavailableItems.length > 0
+                        ? "Remove Unavailable Items"
+                        : "Place Order"}
+                  </span>
+                  {!submitting && unavailableItems.length === 0 && (
+                    <ArrowRight className="h-5 w-5" aria-hidden="true" />
+                  )}
                 </button>
               </section>
             </div>

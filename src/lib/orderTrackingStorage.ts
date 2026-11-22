@@ -9,6 +9,7 @@ export type TrackableOrderSnapshot = {
   table_number?: string | null;
   scheduled_time?: string | null;
   guest_name?: string | null;
+  dietary_notes?: string | null;
   eta_minutes?: number | null;
   eta_set_at?: string | null;
   created_at?: string;

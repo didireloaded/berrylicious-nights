@@ -21,6 +21,8 @@ import {
   bookingsInNextMinutes, revenueTodayCompleted, getNextOrderStatus,
   aggregateShiftAnalytics, type AdminOrderLike,
 } from "@/lib/adminDashboardIntel";
+import { extractOrderMetaFromItems } from "@/lib/orderPricing";
+import { getWindhoekDateISO } from "@/lib/windhoekDate";
 import { getPopularItems } from "@/services/analytics";
 
 /* ── Status badge colors ── */
@@ -100,13 +102,13 @@ const AdminPage = () => {
   const [bookingFilter, setBookingFilter] = useState<string>("all");
   const [newEvent, setNewEvent] = useState({
     title: "", subtitle: "", type: "event",
-    event_date: new Date().toISOString().split("T")[0],
+    event_date: getWindhoekDateISO(),
     event_time: "21:00",
     available_slots_csv: "18:00,19:30,20:00,21:00",
   });
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
   const bootstrappedRef = useRef(false);
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayStr = useMemo(() => getWindhoekDateISO(), []);
 
   /* ── Fetchers ── */
   const fetchBookings = useCallback(async () => {
@@ -206,6 +208,7 @@ const AdminPage = () => {
   const eventsTonight = useMemo(() => updates.filter((u) => u.active && (u.event_date === todayStr || !u.event_date)), [updates, todayStr]);
   const selected = orders.find((o) => o.id === selectedId) ?? null;
   const completedToday = useMemo(() => orders.filter(o => o.status === "completed" && String(o.created_at).startsWith(todayStr)), [orders, todayStr]);
+  const cancelledToday = useMemo(() => orders.filter(o => o.status === "cancelled" && String(o.created_at).startsWith(todayStr)), [orders, todayStr]);
   const ordersToday = useMemo(() => orders.filter(o => String(o.created_at).startsWith(todayStr)), [orders, todayStr]);
 
   const filteredBookingsToday = useMemo(() => {
@@ -225,7 +228,7 @@ const AdminPage = () => {
       <h1 className="font-display text-2xl font-bold text-foreground mb-2">Admin access required</h1>
       <p className="text-muted-foreground text-sm mb-4">This account doesn't have admin privileges.</p>
       <button onClick={() => navigate("/auth", { state: { from: "/admin" } })} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold btn-press">Sign in as admin</button>
-      <Link to="/" className="text-sm text-primary font-medium mt-3">Back to home</Link>
+      <Link to="/home" className="text-sm text-primary font-medium mt-3">Back to home</Link>
     </div>
   );
 
@@ -255,7 +258,7 @@ const AdminPage = () => {
               <button onClick={refreshAll} className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-center transition-colors" title="Refresh">
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
-              <Link to="/" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-lg hover:bg-muted/40">
+              <Link to="/home" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-lg hover:bg-muted/40">
                 <Home className="w-3.5 h-3.5" /> Exit
               </Link>
             </div>
@@ -359,6 +362,23 @@ const AdminPage = () => {
                     </div>
                   </details>
                 )}
+                {/* Cancelled today */}
+                {cancelledToday.length > 0 && (
+                  <details className="rounded-xl border border-destructive/30 bg-destructive/5 overflow-hidden group">
+                    <summary className="px-4 py-3 text-xs font-medium text-destructive cursor-pointer flex items-center gap-2 transition-colors">
+                      <X className="w-3.5 h-3.5" /> Cancelled today ({cancelledToday.length})
+                    </summary>
+                    <div className="px-4 pb-3 space-y-0.5 max-h-48 overflow-y-auto">
+                      {cancelledToday.map((o) => (
+                        <div key={o.id} className="flex items-center justify-between text-[11px] py-1.5 border-b border-border/20 last:border-0">
+                          <span className="font-mono text-muted-foreground">#BB-{o.id.slice(0, 6).toUpperCase()}</span>
+                          <span className="text-muted-foreground/60">{timeAgo(o.created_at)}</span>
+                          <span className="text-destructive font-semibold">{formatPrice(o.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </div>
 
               {/* Right: detail panel */}
@@ -371,7 +391,7 @@ const AdminPage = () => {
                       <p className="text-[10px] mt-1 opacity-50">Click a ticket for details</p>
                     </div>
                   ) : (
-                    <OrderDetailInline order={selected} activeCount={activeCount}
+                    <OrderDetailInline key={selected.id} order={selected} activeCount={activeCount}
                       onStatusChange={updateOrderStatus} onSetETA={setOrderETA} />
                   )}
                 </div>
@@ -670,7 +690,7 @@ const AdminPage = () => {
             <button onClick={() => setSelectedId(null)} className="text-xs text-primary font-medium mb-4 btn-press flex items-center gap-1">
               <ChevronRight className="w-3.5 h-3.5 rotate-180" /> Back
             </button>
-            <OrderDetailInline order={selected} activeCount={activeCount}
+            <OrderDetailInline key={selected.id} order={selected} activeCount={activeCount}
               onStatusChange={updateOrderStatus} onSetETA={setOrderETA} />
           </div>
         </div>
@@ -723,36 +743,52 @@ function AnalyticCard({ label, value, accent, icon }: { label: string; value: st
   );
 }
 
+const COLUMN_HEADER_STYLES: Record<string, { headerBg: string; badge: string }> = {
+  primary: { headerBg: "bg-primary/10", badge: "text-primary bg-primary/15" },
+  "yellow-500": { headerBg: "bg-yellow-500/10", badge: "text-yellow-400 bg-yellow-500/15" },
+  "green-500": { headerBg: "bg-green-500/10", badge: "text-green-400 bg-green-500/15" },
+};
+
 function KanbanColumn({ title, count, orders, activeCount, selectedId, onSelect, accentColor, onQuickAdvance }: {
   title: string; count: number; orders: AdminOrderLike[]; activeCount: number;
   selectedId: string | null; onSelect: (id: string) => void; accentColor: string;
   onQuickAdvance: (id: string) => void;
 }) {
+  const styles = COLUMN_HEADER_STYLES[accentColor] ?? COLUMN_HEADER_STYLES.primary;
   return (
     <div className="rounded-xl border border-border/60 bg-card/30 flex flex-col overflow-hidden">
-      <div className={`px-3 py-2.5 border-b border-border/40 flex items-center justify-between bg-${accentColor}/5`}>
+      <div className={`px-3 py-2.5 border-b border-border/40 flex items-center justify-between ${styles.headerBg}`}>
         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           {title}
         </span>
-        <span className={`text-[10px] font-bold text-${accentColor} bg-${accentColor}/10 px-2 py-0.5 rounded-full tabular-nums`}>{count}</span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums ${styles.badge}`}>{count}</span>
       </div>
       <div className="p-2 space-y-1.5 flex-1 overflow-y-auto max-h-[min(52vh,420px)]">
         {orders.length === 0 && <p className="text-muted-foreground/30 text-[10px] text-center py-10">Empty</p>}
         {[...orders].sort(sortFifo).map((o) => {
           const isSelected = o.id === selectedId;
           const urgent = isFreshPendingOrder(o);
+          const meta = extractOrderMetaFromItems(o.items);
           return (
             <button key={o.id} type="button" onClick={() => onSelect(o.id)}
               className={`w-full text-left rounded-lg border px-3 py-2 transition-all btn-press ${
                 isSelected ? "border-primary/40 bg-primary/5" : "border-border/30 bg-background/30 hover:border-primary/20"
               } ${urgent ? "ring-1 ring-inset ring-primary/50" : ""}`}>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-foreground font-mono">#{o.id.slice(0, 6)}</span>
+                <span className="text-[11px] font-bold text-foreground font-mono">
+                  #BB-{o.id.slice(0, 6).toUpperCase()}
+                  {meta.tableNumber ? ` · ${meta.tableNumber}` : ""}
+                </span>
                 <span className="text-[9px] text-muted-foreground/60 tabular-nums">{estimatePrepMinutes(o, activeCount)}m · {timeAgo(o.created_at)}</span>
               </div>
               <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">
-                {Array.isArray(o.items) ? (o.items as any[]).map((i: any) => i.name).join(", ") : "—"}
+                {Array.isArray(o.items) ? (o.items as any[]).map((i: any) => `${i.qty ?? 1}× ${i.name}${i.doneness ? ` (${i.doneness})` : ""}`).join(", ") : "—"}
               </p>
+              {meta.dietaryNotes && (
+                <p className="mt-1 truncate rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-amber-300">
+                  Allergy/Note: {meta.dietaryNotes}
+                </p>
+              )}
               <div className="flex items-center justify-between gap-2 mt-1.5">
                 <div className="flex items-center gap-1.5">
                   {(o as any).order_type && (
@@ -778,21 +814,36 @@ function OrderDetailInline({ order: o, activeCount, onStatusChange, onSetETA }: 
   onStatusChange: (id: string, status: string) => void;
   onSetETA: (id: string, mins: number) => void;
 }) {
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const nextStatus = getNextOrderStatus(o.status);
+  const meta = extractOrderMetaFromItems(o.items);
+  const canCancel = o.status === "pending" || o.status === "preparing" || o.status === "ready";
+
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center gap-2 flex-wrap">
-        <h2 className="font-display text-lg font-bold text-foreground">#{o.id.slice(0, 8)}</h2>
+        <h2 className="font-display text-lg font-bold text-foreground">#BB-{String(o.id).slice(0, 6).toUpperCase()}</h2>
         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColors[o.status] ?? "bg-muted text-muted-foreground"}`}>{o.status}</span>
         {inferredPriority(o) === "high" && <span className="text-[9px] font-bold uppercase tracking-wide text-orange-400">Priority</span>}
         {o.order_type && <span className="text-[10px] text-muted-foreground">{typeBadge[o.order_type]}</span>}
       </div>
 
       <div className="text-[11px] text-muted-foreground space-y-0.5">
-        <p>Prep ~{estimatePrepMinutes(o, activeCount)} min</p>
-        <p>{new Date(o.created_at).toLocaleString()}</p>
-        <p className="text-muted-foreground/50">{timeAgo(o.created_at)}</p>
+        {meta.tableNumber && <p className="font-semibold text-foreground">Table: {meta.tableNumber}</p>}
+        {meta.scheduledTime && <p className="font-semibold text-foreground">Scheduled: {meta.scheduledTime}</p>}
+        {meta.guestName && <p>Guest: {meta.guestName}</p>}
+        <p>Prep ~{estimatePrepMinutes(o, activeCount)} min · {timeAgo(o.created_at)}</p>
+        <p className="text-muted-foreground/60">{new Date(o.created_at).toLocaleString()}</p>
       </div>
+
+      {meta.dietaryNotes && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+          <p className="font-bold uppercase tracking-wider text-[10px] text-amber-300 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> Allergy / Dietary Alert
+          </p>
+          <p className="mt-1">{meta.dietaryNotes}</p>
+        </div>
+      )}
 
       <p className="text-foreground font-bold text-xl">{formatPrice(o.total)}</p>
       {o.arrival_code && (
@@ -803,14 +854,27 @@ function OrderDetailInline({ order: o, activeCount, onStatusChange, onSetETA }: 
       )}
       {o.arrival_verified_at && <p className="text-[9px] text-emerald-400">✓ Verified {new Date(o.arrival_verified_at).toLocaleString()}</p>}
 
-      <div className="rounded-lg border border-border/40 bg-background/30 p-3 space-y-1.5">
-        <p className="text-[9px] uppercase tracking-wider text-muted-foreground/50 font-semibold mb-1">Items</p>
-        {Array.isArray(o.items) && o.items.map((item: any, i: number) => (
-          <div key={i} className="flex justify-between text-xs">
-            <span className="text-foreground">{item.name} × {item.qty}</span>
-            <span className="text-muted-foreground tabular-nums">{formatPrice(item.price * item.qty)}</span>
-          </div>
-        ))}
+      <div className="rounded-lg border border-border/40 bg-background/30 p-3 space-y-2.5">
+        <p className="text-[9px] uppercase tracking-wider text-muted-foreground/50 font-semibold">Kitchen Ticket</p>
+        {Array.isArray(o.items) && o.items.map((item: any, i: number) => {
+          const mods = [
+            item.weight,
+            item.doneness,
+            item.side ? `Side: ${item.side}` : null,
+            Array.isArray(item.sauces) && item.sauces.length > 0 ? `Sauce: ${item.sauces.join(", ")}` : null,
+          ].filter(Boolean);
+          return (
+            <div key={i} className="border-b border-border/20 pb-2 last:border-0 last:pb-0">
+              <div className="flex justify-between gap-2 text-xs font-semibold">
+                <span className="text-foreground">{item.qty ?? 1}× {item.name}</span>
+                <span className="text-muted-foreground tabular-nums">{formatPrice(Number(item.price) * Number(item.qty ?? 1))}</span>
+              </div>
+              {mods.length > 0 && (
+                <p className="mt-1 text-[11px] font-medium text-primary/90">{mods.join(" · ")}</p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {o.status === "preparing" && (
@@ -839,6 +903,41 @@ function OrderDetailInline({ order: o, activeCount, onStatusChange, onSetETA }: 
           className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground btn-press shadow-md shadow-primary/20 flex items-center justify-center gap-2">
           Move to {nextStatus} <ChevronRight className="w-3.5 h-3.5" />
         </button>
+      )}
+
+      {canCancel && (
+        confirmCancel ? (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+            <p className="text-xs text-destructive font-semibold">Cancel order #BB-{String(o.id).slice(0, 6).toUpperCase()}?</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmCancel(false);
+                  onStatusChange(o.id, "cancelled");
+                }}
+                className="flex-1 rounded-lg bg-destructive py-2 text-xs font-bold text-destructive-foreground"
+              >
+                Confirm cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmCancel(false)}
+                className="flex-1 rounded-lg border border-border py-2 text-xs font-semibold text-foreground"
+              >
+                Keep order
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmCancel(true)}
+            className="w-full rounded-xl border border-destructive/30 py-2.5 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            Cancel order (unfulfillable / guest change)
+          </button>
+        )
       )}
     </div>
   );

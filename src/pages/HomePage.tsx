@@ -505,8 +505,11 @@ const HomePage = () => {
               {profile?.last_order && (
                 <p className="text-muted-foreground text-sm mt-1">
                   Your usual:{" "}
-                  {typeof profile.last_order === "object" && profile.last_order?.name
-                    ? profile.last_order.name
+                  {typeof profile.last_order === "object" &&
+                  profile.last_order !== null &&
+                  "name" in profile.last_order &&
+                  typeof (profile.last_order as { name?: unknown }).name === "string"
+                    ? (profile.last_order as { name: string }).name
                     : "Check your profile"}
                 </p>
               )}

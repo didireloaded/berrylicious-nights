@@ -44,7 +44,9 @@ function BottomSpacing() {
   const { totalItems } = useCart();
   useEffect(() => {
     document.documentElement.style.setProperty("--pb-bottom-chrome", totalItems > 0 ? "11rem" : "6.25rem");
-    return () => document.documentElement.style.removeProperty("--pb-bottom-chrome");
+    return () => {
+      document.documentElement.style.removeProperty("--pb-bottom-chrome");
+    };
   }, [totalItems]);
   return null;
 }
