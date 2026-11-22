@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { loadOrderSnapshotFromStorage, saveOrderSnapshotForTracking } from "@/lib/orderTrackingStorage";
@@ -35,6 +35,7 @@ import {
 import { toast } from "sonner";
 import { notifyOrderStatusTransition } from "@/lib/orderStatusNotify";
 import { ArrivalCodeCard } from "@/components/ArrivalCodeCard";
+import { OrderReviewSheet } from "@/components/OrderReviewSheet";
 
 const WHILE_WAIT_MENU_IDS = ["14", "12", "19"];
 
@@ -115,6 +116,7 @@ type DynamicRpcClient = {
 
 const OrderTrackingPage = () => {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { addItem } = useCart();
   const { user } = useAuth();
   const { setCurrentOrder, clearCurrentOrder, currentOrder } = useApp();
@@ -125,7 +127,15 @@ const OrderTrackingPage = () => {
   const [loading, setLoading] = useState(true);
   const [etaRemaining, setEtaRemaining] = useState<number | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [isOffline, setIsOffline] = useState(() => (typeof navigator !== "undefined" ? !navigator.onLine : false));
+
+  useEffect(() => {
+    if (searchParams.get("rate") === "1" && order?.status === "completed") {
+      setReviewOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, order?.status]);
 
   const whileYouWaitItems = useMemo(
     () =>
@@ -548,13 +558,14 @@ const OrderTrackingPage = () => {
                     <p className="text-[14px] font-bold text-white">How was your meal?</p>
                     <p className="text-[12px] text-[#C4C4C4]">Share verified feedback on the dishes you ordered.</p>
                   </div>
-                  <Link
-                    to={`/order/${order.id}?rate=1`}
+                  <button
+                    type="button"
+                    onClick={() => setReviewOpen(true)}
                     className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-full bg-[#FF5A1F] px-4 text-[12px] font-bold text-white hover:bg-[#E84D15]"
                   >
                     <Star className="h-3.5 w-3.5" aria-hidden="true" />
                     Rate dishes
-                  </Link>
+                  </button>
                 </div>
               )}
             </>
@@ -723,6 +734,15 @@ const OrderTrackingPage = () => {
           </section>
         )}
       </div>
+
+      <OrderReviewSheet
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        orderId={String(order.id)}
+        orderStatus={String(order.status ?? "pending")}
+        orderItems={order.items}
+        guestAccessToken={order.guest_access_token}
+      />
     </div>
   );
 };

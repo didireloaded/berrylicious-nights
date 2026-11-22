@@ -7,12 +7,13 @@ import {
   CalendarDays, ShoppingBag, Megaphone, Plus, Trash2, Check, X, Clock,
   LayoutDashboard, Flame, BarChart3, MessageSquare, UtensilsCrossed,
   ChevronRight, Home, RefreshCw, Users, DollarSign, TrendingUp,
-  AlertTriangle, Filter, Brain, Zap,
+  AlertTriangle, Filter, Brain, Zap, Star,
 } from "lucide-react";
 import { AdminMessagesPanel } from "@/components/admin/AdminMessagesPanel";
 import { AdminArrivalVerify } from "@/components/admin/AdminArrivalVerify";
 import { AdminWaitlistPanel } from "@/components/admin/AdminWaitlistPanel";
 import { AdminMenuDisabledPanel } from "@/components/admin/AdminMenuDisabledPanel";
+import { AdminReviewsPanel } from "@/components/admin/AdminReviewsPanel";
 import AdminAIInsights from "@/components/admin/AdminAIInsights";
 import { toast } from "sonner";
 import {
@@ -77,11 +78,12 @@ function timeAgo(dateStr: string) {
 }
 
 /* ── Tab definitions ── */
-type AdminTab = "kitchen" | "bookings" | "events" | "analytics" | "insights" | "messages" | "tools";
+type AdminTab = "kitchen" | "bookings" | "events" | "reviews" | "analytics" | "insights" | "messages" | "tools";
 
 const TABS: { id: AdminTab; label: string; icon: typeof ShoppingBag }[] = [
   { id: "kitchen", label: "Kitchen", icon: Flame },
   { id: "bookings", label: "Bookings", icon: CalendarDays },
+  { id: "reviews", label: "Reviews", icon: Star },
   { id: "events", label: "Events", icon: Megaphone },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "insights", label: "Overview", icon: Brain },
@@ -698,6 +700,9 @@ const AdminPage = () => {
               <AdminAIInsights orders={orders} bookings={bookings} />
             </div>
           )}
+
+          {/* REVIEWS TAB */}
+          {tab === "reviews" && <AdminReviewsPanel />}
 
           {/* MESSAGES TAB */}
           {tab === "messages" && <AdminMessagesPanel />}
