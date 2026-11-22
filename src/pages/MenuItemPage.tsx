@@ -31,6 +31,7 @@ import { menuArtwork } from "@/lib/menuArtwork";
 import { getUpsellItems } from "@/services/upsell";
 import { formatPrice } from "@/lib/vibe";
 import MenuCard from "@/components/MenuCard";
+import { DishReviewsSection } from "@/components/DishReviewsSection";
 import restaurantPhoto from "@/assets/hero-restaurant.jpg";
 
 function SideIcon({ side }: { side: string }) {
@@ -500,6 +501,9 @@ export default function MenuItemPage() {
             </div>
           </div>
         </div>
+
+        {/* Verified Diner Reviews (real completed orders only; neutral empty state when none) */}
+        <DishReviewsSection menuItemId={item.id} />
 
         {/* Related recommendations */}
         {related.length > 0 && (

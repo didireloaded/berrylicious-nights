@@ -25,6 +25,7 @@ import { getWindhoekDateISO } from "@/lib/windhoekDate";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useFavorites } from "@/hooks/useFavorites";
+import { MyReviewsSection } from "@/components/MyReviewsSection";
 import { menuItems } from "@/data/menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useMemo, useState } from "react";
@@ -500,6 +501,9 @@ const ProfilePage = () => {
               </div>
             </section>
           )}
+
+          {/* User's verified dish reviews */}
+          <MyReviewsSection />
 
           {/* Restaurant Details & Account Links */}
           <section aria-labelledby="restaurant-info-heading">

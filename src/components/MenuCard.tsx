@@ -1,9 +1,10 @@
 import { memo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Heart, Plus, UtensilsCrossed } from "lucide-react";
+import { ArrowRight, Heart, Plus, Star, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useDishRatings } from "@/hooks/useDishRatings";
 import { menuArtwork } from "@/lib/menuArtwork";
 import type { MenuItem } from "@/data/menu";
 import { formatPrice } from "@/lib/vibe";
@@ -11,6 +12,8 @@ import { formatPrice } from "@/lib/vibe";
 const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: MenuItem; disabled?: boolean }) {
   const { addItem } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const dishRatings = useDishRatings();
+  const ratingSummary = dishRatings.get(item.id);
   const artwork = menuArtwork(item);
   const favorited = isFavorite(item.id);
 
@@ -100,6 +103,16 @@ const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: Menu
         {disabled && (
           <span className="absolute left-3 top-3 rounded-full bg-[#121212]/85 px-3 py-1 text-[12px] font-semibold text-white/80">
             Unavailable
+          </span>
+        )}
+        {!disabled && ratingSummary && ratingSummary.review_count > 0 && (
+          <span
+            aria-label={`Verified rating ${ratingSummary.avg_rating.toFixed(1)} from ${ratingSummary.review_count} orders`}
+            className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#121212]/80 px-2.5 py-1 text-[12px] font-bold text-white backdrop-blur-md tabular-nums"
+          >
+            <Star className="h-3.5 w-3.5 fill-[#FF5A1F] text-[#FF5A1F]" aria-hidden="true" />
+            {ratingSummary.avg_rating.toFixed(1)}
+            <span className="font-normal text-[#A3A3A3]">({ratingSummary.review_count})</span>
           </span>
         )}
       </div>
