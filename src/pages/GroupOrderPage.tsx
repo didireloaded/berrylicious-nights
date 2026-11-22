@@ -22,6 +22,8 @@ import { useTableSession } from "@/context/TableSessionContext";
 import { useMenuAvailability } from "@/hooks/useMenuAvailability";
 import { menuItems } from "@/data/menu";
 import { generateClientUuid } from "@/lib/supabaseArrivalInsert";
+import { isBackendMissingError } from "@/lib/featureAvailability";
+import { FeatureAvailabilityState } from "@/components/FeatureAvailabilityState";
 import {
   calculateByItemSplit,
   calculateEqualSplit,
@@ -95,6 +97,7 @@ export default function GroupOrderPage() {
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
   const [loading, setLoading] = useState(!isCreateMode);
+  const [backendUnavailable, setBackendUnavailable] = useState(false);
   const [state, setState] = useState<GroupStatePayload | null>(null);
   const [activeTab, setActiveTab] = useState<"order" | "split">("order");
   const [showQr, setShowQr] = useState(false);
@@ -116,6 +119,11 @@ export default function GroupOrderPage() {
       p_invite_code: inviteCode,
       p_guest_key: guestKey,
     });
+    if (error && isBackendMissingError(error)) {
+      setBackendUnavailable(true);
+      setLoading(false);
+      return;
+    }
     if (!error && data && typeof data === "object") {
       const payload = data as GroupStatePayload;
       setState(payload);
@@ -156,7 +164,11 @@ export default function GroupOrderPage() {
         p_guest_key: guestKey,
       });
       if (error || !data || typeof data !== "object") {
-        toast.error(error?.message || "Could not create group order (ensure Phase 6 SQL migration is applied).");
+        if (error && isBackendMissingError(error)) {
+          setBackendUnavailable(true);
+          return;
+        }
+        toast.error("Shared group ordering isn't available right now.");
         return;
       }
       const code = (data as { invite_code?: string }).invite_code;
@@ -375,6 +387,22 @@ export default function GroupOrderPage() {
       /* cancelled */
     }
   };
+
+  if (backendUnavailable) {
+    return (
+      <div className="min-h-dvh bg-[#121212] px-5 pb-32 pt-[max(32px,env(safe-area-inset-top,0px))] text-white lg:pb-16">
+        <div className="mx-auto max-w-[520px]">
+          <FeatureAvailabilityState
+            status="coming_soon"
+            title="Shared group ordering is coming soon"
+            description="Multi-phone shared table orders aren't connected yet. You can still build an order in your Cart and preview split bills right away."
+            primaryAction={{ label: "Open Cart & Split Preview", to: "/cart" }}
+            secondaryAction={{ label: "Browse Menu", to: "/menu" }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // --- CREATE MODE ---
   if (isCreateMode) {

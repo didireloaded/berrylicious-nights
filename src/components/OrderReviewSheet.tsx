@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Camera, Check, ShieldCheck, Star, X } from "lucide-react";
+import { Check, ShieldCheck, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,8 @@ import {
   validateReviewDraft,
   type ManagedFoodReview,
 } from "@/lib/reviews";
+import { isBackendMissingError } from "@/lib/featureAvailability";
+import { FeatureAvailabilityState } from "@/components/FeatureAvailabilityState";
 import { invalidateDishRatingsCache } from "@/hooks/useDishRatings";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +31,7 @@ type DynamicReviewDb = {
       eq: (col: string, val: string) => {
         eq: (col2: string, val2: string) => Promise<{
           data: ManagedFoodReview[] | null;
-          error: { message?: string } | null;
+          error: { code?: string; message?: string; status?: number } | null;
         }>;
       };
     };
@@ -37,7 +39,7 @@ type DynamicReviewDb = {
   rpc: (
     fn: string,
     args: Record<string, unknown>,
-  ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+  ) => Promise<{ data: unknown; error: { code?: string; message?: string; status?: number } | null }>;
 };
 
 export function OrderReviewSheet({
@@ -52,24 +54,31 @@ export function OrderReviewSheet({
   const dishes = extractReviewableDishesFromOrder(orderStatus, orderItems);
   const [selectedDishId, setSelectedDishId] = useState<string>("");
   const [existingReviews, setExistingReviews] = useState<Map<string, ManagedFoodReview>>(new Map());
+  const [backendAvailable, setBackendAvailable] = useState<boolean>(false);
+  const [checkingBackend, setCheckingBackend] = useState<boolean>(true);
   const [rating, setRating] = useState<number>(0);
   const [comment, setComment] = useState<string>("");
-  const [privateIssue, setPrivateIssue] = useState<string>("");
-  const [showPrivateBox, setShowPrivateBox] = useState(false);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const activeDishId = selectedDishId || dishes[0]?.menuItemId || "";
   const existing = activeDishId ? existingReviews.get(activeDishId) ?? null : null;
-  const editable = existing ? canEditReview(existing.editable_until) : true;
+  const editable = backendAvailable && (existing ? canEditReview(existing.editable_until) : true);
 
   useEffect(() => {
-    if (!open || !user?.id || !orderId) return;
+    if (!open || !orderId) return;
     let alive = true;
+    setCheckingBackend(true);
     const db = supabase as unknown as DynamicReviewDb;
 
     void (async () => {
-      // If this device placed the order as a guest and then signed in, claim it securely first
+      if (!user?.id) {
+        if (alive) {
+          setBackendAvailable(false);
+          setCheckingBackend(false);
+        }
+        return;
+      }
+
       if (guestAccessToken) {
         try {
           await db.rpc("claim_guest_order", {
@@ -77,20 +86,30 @@ export function OrderReviewSheet({
             p_access_token: guestAccessToken,
           });
         } catch {
-          /* already owned or migration pending */
+          /* ignore if unavailable */
         }
       }
 
-      const { data } = await db
+      const { data, error } = await db
         .from("food_reviews")
         .select("*")
         .eq("order_id", orderId)
         .eq("user_id", user.id);
 
-      if (!alive || !Array.isArray(data)) return;
+      if (!alive) return;
+      if (error) {
+        setBackendAvailable(!isBackendMissingError(error));
+        setCheckingBackend(false);
+        return;
+      }
+
+      setBackendAvailable(true);
       const map = new Map<string, ManagedFoodReview>();
-      for (const r of data) map.set(r.menu_item_id, r);
+      if (Array.isArray(data)) {
+        for (const r of data) map.set(r.menu_item_id, r);
+      }
       setExistingReviews(map);
+      setCheckingBackend(false);
     })();
 
     return () => {
@@ -102,40 +121,17 @@ export function OrderReviewSheet({
     if (existing) {
       setRating(existing.rating);
       setComment(existing.comment ?? "");
-      setPrivateIssue(existing.private_issue_note ?? "");
-      setShowPrivateBox(Boolean(existing.private_issue_note));
     } else {
       setRating(0);
       setComment("");
-      setPrivateIssue("");
-      setShowPrivateBox(false);
     }
-    setPhotoFile(null);
   }, [activeDishId, existing]);
-
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file (JPG, PNG, or WebP).");
-      return;
-    }
-    if (file.size > 4 * 1024 * 1024) {
-      toast.error("Photo must be 4 MB or smaller.");
-      return;
-    }
-    setPhotoFile(file);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.id || !activeDishId || submitting) return;
+    if (!user?.id || !activeDishId || !backendAvailable || submitting) return;
 
-    const check = validateReviewDraft({
-      rating,
-      comment,
-      privateIssueNote: privateIssue,
-    });
+    const check = validateReviewDraft({ rating, comment, privateIssueNote: "" });
     if ("error" in check) {
       toast.error(check.error);
       return;
@@ -143,21 +139,6 @@ export function OrderReviewSheet({
 
     setSubmitting(true);
     try {
-      let uploadedPhotoUrl: string | null = existing?.photo_url ?? null;
-      if (photoFile) {
-        const ext = photoFile.name.split(".").pop()?.toLowerCase() || "jpg";
-        const path = `${user.id}/${orderId}-${activeDishId}-${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from("review-photos")
-          .upload(path, photoFile, { upsert: false, contentType: photoFile.type });
-        if (!upErr) {
-          const { data: pub } = supabase.storage.from("review-photos").getPublicUrl(path);
-          uploadedPhotoUrl = pub?.publicUrl ?? null;
-        } else {
-          toast.info("Photo upload bucket is not enabled yet — saving your verified rating without the photo.");
-        }
-      }
-
       const db = supabase as unknown as DynamicReviewDb;
       const rpcName = existing ? "update_own_food_review" : "submit_verified_food_review";
       const args = existing
@@ -165,21 +146,25 @@ export function OrderReviewSheet({
             p_review_id: existing.id,
             p_rating: rating,
             p_comment: comment.trim() || null,
-            p_photo_url: uploadedPhotoUrl,
-            p_private_issue_note: privateIssue.trim() || null,
+            p_photo_url: existing.photo_url ?? null,
+            p_private_issue_note: null,
           }
         : {
             p_order_id: orderId,
             p_menu_item_id: activeDishId,
             p_rating: rating,
             p_comment: comment.trim() || null,
-            p_photo_url: uploadedPhotoUrl,
-            p_private_issue_note: privateIssue.trim() || null,
+            p_photo_url: null,
+            p_private_issue_note: null,
           };
 
       const { data, error } = await db.rpc(rpcName, args);
       if (error) {
-        toast.error(error.message || "Could not submit your verified review.");
+        if (isBackendMissingError(error)) {
+          setBackendAvailable(false);
+          return;
+        }
+        toast.error(error.message || "Could not submit your verified rating.");
         return;
       }
 
@@ -188,7 +173,7 @@ export function OrderReviewSheet({
         setExistingReviews((prev) => new Map(prev).set(activeDishId, saved));
       }
       invalidateDishRatingsCache();
-      toast.success(existing ? "Review updated" : "Thank you — your verified rating has been saved");
+      toast.success(existing ? "Rating updated" : "Thank you — your verified rating has been saved");
     } finally {
       setSubmitting(false);
     }
@@ -200,7 +185,7 @@ export function OrderReviewSheet({
         side="bottom"
         onEscapeKeyDown={() => onOpenChange(false)}
         className={cn(
-          "flex max-h-[min(90dvh,760px)] flex-col rounded-t-[28px] border-t border-white/10 bg-[#121212] p-0 text-white shadow-2xl",
+          "flex max-h-[min(90dvh,740px)] flex-col rounded-t-[28px] border-t border-white/10 bg-[#121212] p-0 text-white shadow-2xl",
           "[&>button.absolute]:hidden",
         )}
       >
@@ -215,10 +200,10 @@ export function OrderReviewSheet({
 
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-5 pb-3.5 pt-1">
           <div>
-            <h2 className="font-display text-[18px] font-bold text-white">How was your meal?</h2>
-            <p className="mt-0.5 flex items-center gap-1 text-[12px] text-[#A3A3A3]">
+            <h2 className="font-display text-[18px] font-bold text-white">Rate your dishes</h2>
+            <p className="mt-0.5 flex items-center gap-1 text-[13px] text-[#A3A3A3]">
               <ShieldCheck className="h-3.5 w-3.5 text-[#FF5A1F]" aria-hidden="true" />
-              Verified Order #BB-{orderId.slice(0, 6).toUpperCase()}
+              Order #BB-{orderId.slice(0, 6).toUpperCase()}
             </p>
           </div>
           <button
@@ -231,12 +216,12 @@ export function OrderReviewSheet({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))]">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-5">
           {!user ? (
             <div className="rounded-[22px] border border-white/10 bg-[#242424] p-5 text-center">
-              <p className="text-[15px] font-bold text-white">Sign in to verify your rating</p>
+              <p className="text-[16px] font-bold text-white">Sign in to verify your rating</p>
               <p className="mt-1.5 text-[14px] leading-relaxed text-[#A3A3A3]">
-                Butcher Block only publishes reviews verified against real completed orders. Sign in on this device to claim this receipt and rate your dishes.
+                Verified dish ratings are tied to signed-in completed orders so only real diners can rate dishes.
               </p>
               <Link
                 to="/auth"
@@ -244,16 +229,32 @@ export function OrderReviewSheet({
                 onClick={() => onOpenChange(false)}
                 className="mt-4 inline-flex min-h-[46px] items-center justify-center rounded-full bg-[#FF5A1F] px-6 text-[14px] font-bold text-white hover:bg-[#E84D15]"
               >
-                Sign in &amp; rate
+                Sign in
               </Link>
             </div>
+          ) : checkingBackend ? (
+            <FeatureAvailabilityState
+              status="loading"
+              title="Checking rating availability"
+              description="Verifying your completed order details."
+            />
           ) : dishes.length === 0 ? (
-            <p className="py-8 text-center text-[14px] text-[#A3A3A3]">
-              Dishes become eligible for verified rating once the kitchen marks your order completed.
-            </p>
+            <FeatureAvailabilityState
+              status="empty"
+              title="Available after order completion"
+              description="Dishes become eligible for verified ratings once the kitchen marks your order completed."
+            />
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Dish selector */}
+            <form id="order-review-form" onSubmit={handleSubmit} className="space-y-5">
+              {!backendAvailable && (
+                <FeatureAvailabilityState
+                  compact
+                  status="coming_soon"
+                  title="Verified reviews aren't available yet"
+                  description="Review submission is ready on the frontend and will unlock once verified order ratings are connected on the backend."
+                />
+              )}
+
               <div>
                 <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
                   Select dish ({dishes.length})
@@ -268,7 +269,7 @@ export function OrderReviewSheet({
                         type="button"
                         onClick={() => setSelectedDishId(d.menuItemId)}
                         className={cn(
-                          "inline-flex min-h-[42px] items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition-colors",
+                          "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-4 text-[13px] font-semibold transition-colors",
                           active
                             ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
                             : "border-white/10 bg-[#242424] text-white hover:bg-[#303030]",
@@ -282,7 +283,6 @@ export function OrderReviewSheet({
                 </div>
               </div>
 
-              {/* 1–5 Star Selector */}
               <div className="rounded-[22px] border border-white/10 bg-[#242424] p-4">
                 <p className="text-[14px] font-bold text-white">Your rating</p>
                 <div className="mt-3 flex items-center gap-2" role="radiogroup" aria-label="Dish star rating">
@@ -297,7 +297,7 @@ export function OrderReviewSheet({
                         aria-label={`${star} ${star === 1 ? "star" : "stars"}`}
                         disabled={!editable}
                         onClick={() => setRating(star)}
-                        className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-[#181818] transition-transform active:scale-95 disabled:opacity-50"
+                        className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-[#181818] transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         <Star
                           className={cn(
@@ -310,17 +310,11 @@ export function OrderReviewSheet({
                     );
                   })}
                 </div>
-                {existing && !editable && (
-                  <p className="mt-2 text-[12px] text-[#A3A3A3]">
-                    The 7-day edit window for this review has closed.
-                  </p>
-                )}
               </div>
 
-              {/* Optional written review */}
               <div>
-                <label htmlFor="review-comment" className="mb-1.5 block text-[13px] font-semibold text-white">
-                  Written review <span className="font-normal text-[#A3A3A3]">(optional)</span>
+                <label htmlFor="review-comment" className="mb-1.5 block text-[14px] font-semibold text-white">
+                  Written feedback <span className="font-normal text-[#A3A3A3]">(optional)</span>
                 </label>
                 <textarea
                   id="review-comment"
@@ -330,68 +324,31 @@ export function OrderReviewSheet({
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="How was the cook, seasoning, or presentation?"
-                  className="w-full rounded-2xl border border-white/10 bg-[#242424] px-4 py-3 text-[16px] text-white placeholder:text-[#737373] focus:border-[#FF5A1F] focus:outline-none sm:text-[14px]"
+                  className="w-full rounded-2xl border border-white/10 bg-[#242424] px-4 py-3 text-[16px] text-white placeholder:text-[#737373] focus:border-[#FF5A1F] focus:outline-none disabled:cursor-not-allowed disabled:opacity-45 sm:text-[14px]"
                 />
               </div>
-
-              {/* Optional dish photo */}
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#242424] px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-white">Food photo (optional)</p>
-                  <p className="truncate text-[12px] text-[#A3A3A3]">
-                    {photoFile ? photoFile.name : "Share a photo of your dish (max 4 MB)"}
-                  </p>
-                </div>
-                <label className="inline-flex min-h-[42px] cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-[#303030] px-3.5 text-[12px] font-semibold text-white hover:bg-[#3A3A3A]">
-                  <Camera className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
-                  <span>{photoFile ? "Change" : "Upload"}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    disabled={!editable}
-                    onChange={handlePhotoChange}
-                    className="sr-only"
-                  />
-                </label>
-              </div>
-
-              {/* Private issue reporting (never published) */}
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setShowPrivateBox((v) => !v)}
-                  className="inline-flex min-h-[40px] items-center gap-1.5 text-[13px] font-semibold text-[#A3A3A3] hover:text-white"
-                >
-                  <AlertTriangle className="h-4 w-4 text-amber-400" aria-hidden="true" />
-                  {showPrivateBox ? "Hide private issue note" : "Report an issue privately to management"}
-                </button>
-                {showPrivateBox && (
-                  <textarea
-                    rows={2}
-                    maxLength={1000}
-                    disabled={!editable}
-                    value={privateIssue}
-                    onChange={(e) => setPrivateIssue(e.target.value)}
-                    placeholder="Shared privately with Butcher Block management — never published publicly."
-                    className="mt-2 w-full rounded-2xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-[16px] text-white placeholder:text-[#A3A3A3] focus:border-amber-400 focus:outline-none sm:text-[14px]"
-                  />
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={!editable || rating < 1 || submitting}
-                className="flex min-h-[50px] w-full items-center justify-center rounded-full bg-[#FF5A1F] text-[15px] font-bold text-white transition-colors hover:bg-[#E84D15] disabled:opacity-45"
-              >
-                {submitting
-                  ? "Saving…"
-                  : existing
-                    ? "Update verified rating"
-                    : "Submit verified rating"}
-              </button>
             </form>
           )}
         </div>
+
+        {user && !checkingBackend && dishes.length > 0 && (
+          <div className="shrink-0 border-t border-white/10 bg-[#121212] px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+            <button
+              type="submit"
+              form="order-review-form"
+              disabled={!editable || rating < 1 || submitting}
+              className="flex min-h-[50px] w-full items-center justify-center rounded-full bg-[#FF5A1F] text-[15px] font-bold text-white transition-colors hover:bg-[#E84D15] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {!backendAvailable
+                ? "Verified Reviews Coming Soon"
+                : submitting
+                  ? "Saving…"
+                  : existing
+                    ? "Update Verified Rating"
+                    : "Submit Verified Rating"}
+            </button>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );

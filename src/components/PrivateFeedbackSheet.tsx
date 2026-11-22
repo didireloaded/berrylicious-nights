@@ -1,34 +1,44 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Lock, MessageSquareHeart, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useTableSession } from "@/context/TableSessionContext";
+import {
+  isBackendMissingError,
+  PRIVATE_FEEDBACK_CATEGORIES,
+  type PrivateFeedbackCategory,
+} from "@/lib/featureAvailability";
+import { FeatureAvailabilityState } from "@/components/FeatureAvailabilityState";
 import { cn } from "@/lib/utils";
 
-type FeedbackCategory = "compliment" | "service_issue" | "food_issue" | "manager_request" | "other";
+export type ContactPreference = "none" | "phone" | "message";
 
-const CATEGORIES: { id: FeedbackCategory; label: string }[] = [
-  { id: "compliment", label: "Compliment" },
-  { id: "service_issue", label: "Service issue" },
-  { id: "food_issue", label: "Food issue" },
-  { id: "manager_request", label: "Request manager" },
-  { id: "other", label: "Other note" },
-];
-
-type PrivateFeedbackSheetProps = {
+export type PrivateFeedbackSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orderId?: string | null;
+  orderReference?: string | null;
 };
 
-export function PrivateFeedbackSheet({ open, onOpenChange, orderId = null }: PrivateFeedbackSheetProps) {
+/**
+ * Confidential Private Dining Feedback bottom sheet.
+ * Never published publicly and never mixed with public dish ratings.
+ * Probes backend availability safely on open; when no secure backend endpoint
+ * exists yet, disables submission cleanly and never simulates delivery.
+ */
+export function PrivateFeedbackSheet({
+  open,
+  onOpenChange,
+  orderId = null,
+  orderReference = null,
+}: PrivateFeedbackSheetProps) {
   const { user, profile } = useAuth();
   const { session: tableSession } = useTableSession();
-  const [category, setCategory] = useState<FeedbackCategory>("compliment");
+  const [category, setCategory] = useState<PrivateFeedbackCategory>("food_quality");
   const [message, setMessage] = useState("");
-  const [wantsManagerVisit, setWantsManagerVisit] = useState(false);
+  const [contactPreference, setContactPreference] = useState<ContactPreference>("none");
   const [guestName, setGuestName] = useState(
     () =>
       profile?.display_name ||
@@ -40,11 +50,50 @@ export function PrivateFeedbackSheet({ open, onOpenChange, orderId = null }: Pri
       profile?.phone ||
       (typeof localStorage !== "undefined" ? localStorage.getItem("butcher-block-guest-phone") || "" : ""),
   );
+  const [checkingBackend, setCheckingBackend] = useState(false);
+  const [backendAvailable, setBackendAvailable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    setCheckingBackend(true);
+    type ProbeDb = {
+      from: (t: string) => {
+        select: (cols: string) => {
+          limit: (n: number) => Promise<{
+            error: { code?: string; message?: string; status?: number } | null;
+            status?: number;
+          }>;
+        };
+      };
+    };
+    void (supabase as unknown as ProbeDb)
+      .from("private_dining_feedback")
+      .select("id")
+      .limit(1)
+      .then(({ error, status }) => {
+        if (!alive) return;
+        const missing = status === 404 || (error ? isBackendMissingError(error) : false);
+        setBackendAvailable(!error && !missing);
+        setCheckingBackend(false);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setBackendAvailable(false);
+        setCheckingBackend(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [open]);
+
+  const canSubmit = backendAvailable && !checkingBackend;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting) return;
+    if (!canSubmit || submitting) return;
     const cleaned = message.trim();
     if (cleaned.length < 5) {
       toast.error("Please share a few words so management knows how to help.");
@@ -55,9 +104,18 @@ export function PrivateFeedbackSheet({ open, onOpenChange, orderId = null }: Pri
     try {
       type FeedbackDb = {
         from: (t: string) => {
-          insert: (row: Record<string, unknown>) => Promise<{ error: { message?: string } | null }>;
+          insert: (row: Record<string, unknown>) => Promise<{ error: { code?: string; message?: string; status?: number } | null }>;
         };
       };
+      const dbCategoryMap: Record<PrivateFeedbackCategory, string> = {
+        food_quality: "food_issue",
+        restaurant_service: "service_issue",
+        waiting_time: "service_issue",
+        cleanliness: "other",
+        general_experience: "compliment",
+        other_feedback: "other",
+      };
+      const categoryLabel = PRIVATE_FEEDBACK_CATEGORIES.find((c) => c.id === category)?.label ?? "Feedback";
       const { error } = await (supabase as unknown as FeedbackDb)
         .from("private_dining_feedback")
         .insert({
@@ -66,20 +124,24 @@ export function PrivateFeedbackSheet({ open, onOpenChange, orderId = null }: Pri
           table_session_id: tableSession?.sessionId ?? null,
           table_label: tableSession?.displayName ?? null,
           guest_name: guestName.trim() || null,
-          guest_phone: guestPhone.trim() || null,
-          category,
-          message: cleaned,
-          wants_manager_visit: category === "manager_request" || wantsManagerVisit,
+          guest_phone: contactPreference !== "none" ? guestPhone.trim() || null : null,
+          category: dbCategoryMap[category],
+          message: `[${categoryLabel}] ${cleaned}`,
+          wants_manager_visit: contactPreference !== "none",
         });
 
       if (error) {
-        toast.error("Could not send right now — please call +264 83 288 8000 or speak with the floor manager.");
+        if (isBackendMissingError(error)) {
+          setBackendAvailable(false);
+          return;
+        }
+        toast.error("Could not send right now — please call +264 83 288 8000 to speak with management.");
         return;
       }
 
       toast.success("Sent privately to Butcher Block management. Thank you.");
       setMessage("");
-      setWantsManagerVisit(false);
+      setContactPreference("none");
       onOpenChange(false);
     } finally {
       setSubmitting(false);
@@ -92,13 +154,13 @@ export function PrivateFeedbackSheet({ open, onOpenChange, orderId = null }: Pri
         side="bottom"
         onEscapeKeyDown={() => onOpenChange(false)}
         className={cn(
-          "flex max-h-[min(90dvh,740px)] flex-col rounded-t-[28px] border-t border-white/10 bg-[#121212] p-0 text-white shadow-2xl",
+          "flex max-h-[min(90dvh,760px)] flex-col rounded-t-[28px] border-t border-white/10 bg-[#121212] p-0 text-white shadow-2xl",
           "[&>button.absolute]:hidden",
         )}
       >
         <SheetTitle className="sr-only">Private Dining Feedback</SheetTitle>
         <SheetDescription className="sr-only">
-          Send a private compliment, report an issue, or request a manager at Butcher Block.
+          Send private dining feedback directly to Butcher Block management. Never published publicly.
         </SheetDescription>
 
         <div className="flex shrink-0 justify-center pt-3 pb-1">
@@ -112,9 +174,9 @@ export function PrivateFeedbackSheet({ open, onOpenChange, orderId = null }: Pri
             </span>
             <div>
               <h2 className="font-display text-[17px] font-bold text-white">Private Dining Feedback</h2>
-              <p className="flex items-center gap-1 text-[12px] text-[#A3A3A3]">
-                <Lock className="h-3 w-3 text-[#FF5A1F]" aria-hidden="true" />
-                Only Butcher Block management sees this — never public
+              <p className="flex items-center gap-1 text-[13px] text-[#A3A3A3]">
+                <Lock className="h-3.5 w-3.5 text-[#FF5A1F]" aria-hidden="true" />
+                Private to management — never published
               </p>
             </div>
           </div>
@@ -133,25 +195,48 @@ export function PrivateFeedbackSheet({ open, onOpenChange, orderId = null }: Pri
           onSubmit={handleSubmit}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4"
         >
-          {tableSession && (
-            <div className="rounded-2xl border border-white/10 bg-[#242424] px-4 py-2.5 text-[13px] text-[#C4C4C4]">
-              Linked table: <span className="font-bold text-white">{tableSession.displayName}</span>
+          {!checkingBackend && !backendAvailable && (
+            <FeatureAvailabilityState
+              compact
+              status="coming_soon"
+              title="Private feedback submission isn't connected yet"
+              description="This private channel will deliver notes securely to Butcher Block management once backend integration is live. For immediate assistance, call +264 83 288 8000."
+            />
+          )}
+
+          {(orderReference || tableSession) && (
+            <div className="rounded-2xl border border-white/10 bg-[#242424] px-4 py-3 text-[14px] text-[#C4C4C4]">
+              {orderReference && (
+                <span>
+                  Related order: <strong className="font-mono text-white">#{orderReference}</strong>
+                </span>
+              )}
+              {orderReference && tableSession && " · "}
+              {tableSession && (
+                <span>
+                  Table: <strong className="text-white">{tableSession.displayName}</strong>
+                </span>
+              )}
             </div>
           )}
 
+          {/* 6 Approved Feedback Categories */}
           <div>
-            <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">Topic</p>
+            <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
+              Feedback category
+            </p>
             <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((c) => {
+              {PRIVATE_FEEDBACK_CATEGORIES.map((c) => {
                 const active = category === c.id;
                 return (
                   <button
                     key={c.id}
                     type="button"
                     aria-pressed={active}
+                    disabled={!canSubmit}
                     onClick={() => setCategory(c.id)}
                     className={cn(
-                      "min-h-[40px] rounded-full border px-3.5 text-[13px] font-semibold transition-colors",
+                      "min-h-[44px] rounded-full border px-4 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                       active
                         ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
                         : "border-white/10 bg-[#242424] text-white hover:bg-[#303030]",
@@ -165,74 +250,106 @@ export function PrivateFeedbackSheet({ open, onOpenChange, orderId = null }: Pri
           </div>
 
           <div>
-            <label htmlFor="private-feedback-msg" className="mb-1.5 block text-[13px] font-semibold text-white">
-              Your message to management
+            <label htmlFor="private-feedback-msg" className="mb-1.5 block text-[14px] font-semibold text-white">
+              Your message
             </label>
             <textarea
               id="private-feedback-msg"
               rows={4}
               maxLength={1500}
               required
+              disabled={!canSubmit}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder={
-                category === "compliment"
-                  ? "Let us know who made your evening memorable…"
-                  : "Tell our duty manager how we can make things right…"
-              }
-              className="w-full rounded-2xl border border-white/10 bg-[#242424] px-4 py-3 text-[16px] text-white placeholder:text-[#737373] focus:border-[#FF5A1F] focus:outline-none sm:text-[14px]"
+              placeholder="Share private notes on your meal, service, or visit…"
+              className="w-full rounded-2xl border border-white/10 bg-[#242424] px-4 py-3 text-[16px] text-white placeholder:text-[#737373] focus:border-[#FF5A1F] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:text-[14px]"
             />
           </div>
 
-          <label className="flex items-start gap-2.5 rounded-2xl border border-white/10 bg-[#242424] p-3.5 text-[13px] text-[#E5E5E5]">
-            <input
-              type="checkbox"
-              checked={category === "manager_request" || wantsManagerVisit}
-              onChange={(e) => setWantsManagerVisit(e.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-[#FF5A1F]"
-            />
-            <span>I would like a duty manager to check in with me at my table or follow up by phone.</span>
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label htmlFor="fb-name" className="mb-1 block text-[12px] text-[#A3A3A3]">
-                Name (optional)
-              </label>
-              <input
-                id="fb-name"
-                type="text"
-                value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
-                placeholder="Your name"
-                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-[#242424] px-3.5 text-[16px] text-white sm:text-[14px]"
-              />
-            </div>
-            <div>
-              <label htmlFor="fb-phone" className="mb-1 block text-[12px] text-[#A3A3A3]">
-                Phone for follow-up (optional)
-              </label>
-              <input
-                id="fb-phone"
-                type="tel"
-                value={guestPhone}
-                onChange={(e) => setGuestPhone(e.target.value)}
-                placeholder="+264 81 000 0000"
-                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-[#242424] px-3.5 text-[16px] text-white sm:text-[14px]"
-              />
+          {/* Optional Contact Preference */}
+          <div>
+            <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
+              Contact preference (optional)
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: "none", label: "No follow-up" },
+                  { id: "phone", label: "Phone call" },
+                  { id: "message", label: "Message" },
+                ] as const
+              ).map((opt) => {
+                const active = contactPreference === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    aria-pressed={active}
+                    disabled={!canSubmit}
+                    onClick={() => setContactPreference(opt.id)}
+                    className={cn(
+                      "min-h-[44px] rounded-xl border px-2 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                      active
+                        ? "border-[#FF5A1F] bg-[#FF5A1F]/15 text-white"
+                        : "border-white/10 bg-[#242424] text-[#A3A3A3] hover:text-white",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
+
+          {contactPreference !== "none" && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="fb-name" className="mb-1 block text-[13px] text-[#A3A3A3]">
+                  Name (optional)
+                </label>
+                <input
+                  id="fb-name"
+                  type="text"
+                  disabled={!canSubmit}
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="Your name"
+                  className="min-h-[46px] w-full rounded-xl border border-white/10 bg-[#242424] px-3.5 text-[16px] text-white disabled:opacity-50 sm:text-[14px]"
+                />
+              </div>
+              <div>
+                <label htmlFor="fb-phone" className="mb-1 block text-[13px] text-[#A3A3A3]">
+                  Phone number
+                </label>
+                <input
+                  id="fb-phone"
+                  type="tel"
+                  disabled={!canSubmit}
+                  value={guestPhone}
+                  onChange={(e) => setGuestPhone(e.target.value)}
+                  placeholder="+264 81 000 0000"
+                  className="min-h-[46px] w-full rounded-xl border border-white/10 bg-[#242424] px-3.5 text-[16px] text-white disabled:opacity-50 sm:text-[14px]"
+                />
+              </div>
+            </div>
+          )}
         </form>
 
         <div className="shrink-0 border-t border-white/10 bg-[#121212] px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
           <button
             type="submit"
             form="private-feedback-form"
-            disabled={submitting}
-            className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full bg-[#FF5A1F] text-[15px] font-bold text-white hover:bg-[#E84D15] disabled:opacity-45"
+            disabled={!canSubmit || submitting}
+            className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full bg-[#FF5A1F] text-[15px] font-bold text-white transition-colors hover:bg-[#E84D15] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-            {submitting ? "Sending…" : "Send Privately to Management"}
+            {checkingBackend
+              ? "Checking availability…"
+              : !backendAvailable
+                ? "Private Feedback Coming Soon"
+                : submitting
+                  ? "Sending…"
+                  : "Send Privately to Management"}
           </button>
         </div>
       </SheetContent>

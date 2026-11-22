@@ -6,7 +6,6 @@ import { extractOrderMetaFromItems } from "@/lib/orderPricing";
 import {
   getOrderStageCopy,
   isActiveOrderStatus,
-  ORDER_STAGE_SEQUENCE,
 } from "@/lib/orderLifecycle";
 import { formatPrice } from "@/lib/vibe";
 import { menuItems } from "@/data/menu";
@@ -19,28 +18,21 @@ import {
   AlertTriangle,
   ArrowLeft,
   Bell,
-  CheckCircle2,
-  ChefHat,
-  Clock,
   MessageSquare,
   MessageSquareHeart,
-  PackageCheck,
   Phone,
   Plus,
   ReceiptText,
   Star,
-  Utensils,
   WifiOff,
-  Wine,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { notifyOrderStatusTransition } from "@/lib/orderStatusNotify";
-import { extractDrinkLinesFromOrder } from "@/lib/anotherRound";
 import { ArrivalCodeCard } from "@/components/ArrivalCodeCard";
+import { OrderProgressTimeline } from "@/components/OrderProgressTimeline";
 import { OrderReviewSheet } from "@/components/OrderReviewSheet";
 import { ReorderPreviewSheet } from "@/components/ReorderPreviewSheet";
-import { OrderAnotherRoundSheet } from "@/components/OrderAnotherRoundSheet";
 import { PrivateFeedbackSheet } from "@/components/PrivateFeedbackSheet";
 
 const WHILE_WAIT_MENU_IDS = ["14", "12", "19"];
@@ -127,7 +119,7 @@ const OrderTrackingPage = () => {
   const { user } = useAuth();
   const { setCurrentOrder, clearCurrentOrder, currentOrder } = useApp();
   const { openAssistant } = useRestaurantAssistant();
-  const { openNotificationCenter, preferences, togglePushSubscription } = useNotificationCenter();
+  const { openNotificationCenter } = useNotificationCenter();
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [history, setHistory] = useState<StatusHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,14 +127,8 @@ const OrderTrackingPage = () => {
   const [cancelling, setCancelling] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reorderOpen, setReorderOpen] = useState(false);
-  const [anotherRoundOpen, setAnotherRoundOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [isOffline, setIsOffline] = useState(() => (typeof navigator !== "undefined" ? !navigator.onLine : false));
-
-  const hasOrderDrinks = useMemo(
-    () => extractDrinkLinesFromOrder(order?.items).length > 0,
-    [order?.items],
-  );
 
   useEffect(() => {
     if (searchParams.get("rate") === "1" && order?.status === "completed") {
@@ -371,12 +357,7 @@ const OrderTrackingPage = () => {
   const isCancelled = order.status === "cancelled";
   const isCompleted = order.status === "completed";
   const isActive = isActiveOrderStatus(order.status);
-  const currentIndex = Math.max(
-    0,
-    ORDER_STAGE_SEQUENCE.findIndex((s) => s === order.status),
-  );
   const stageCopy = getOrderStageCopy(order.status ?? "pending", order.order_type);
-  const progressPercent = stageCopy.progressPercent;
   const typeLabel = orderTypeLabels[order.order_type ?? ""] ?? "Order";
   const headline = stageCopy.headline;
   const subline = stageCopy.notificationMessage;
@@ -398,15 +379,8 @@ const OrderTrackingPage = () => {
   if (order.created_at && !historyTimeByStatus.has("pending")) {
     historyTimeByStatus.set("pending", formatWindhoekTime(order.created_at));
   }
-
-  const stageItems = [
-    { key: "pending", label: "Received", icon: Clock },
-    { key: "confirmed", label: "Confirmed", icon: CheckCircle2 },
-    { key: "preparing", label: "Preparing", icon: ChefHat },
-    { key: "ready", label: "Ready", icon: PackageCheck },
-    { key: "handover", label: order.order_type === "dinein" ? "To Table" : "Collection", icon: Utensils },
-    { key: "completed", label: "Completed", icon: Star },
-  ];
+  const hasGenuineHandover =
+    order.status === "handover" || history.some((h) => h.to_status === "handover");
 
   const fulfillmentSummary =
     order.order_type === "dinein" && order.table_number
@@ -507,77 +481,27 @@ const OrderTrackingPage = () => {
                 </p>
               )}
 
-              <div className="mt-5">
-                <div className="h-2 w-full overflow-hidden rounded-full bg-[#303030]">
-                  <div
-                    className="h-full rounded-full bg-[#FF5A1F] transition-all duration-500"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
+              {/* Feature 01: Clean Vertical Order Progress Timeline */}
+              <OrderProgressTimeline
+                currentStatus={order.status ?? "pending"}
+                orderType={order.order_type}
+                timestampsByStatus={historyTimeByStatus}
+                hasGenuineHandover={hasGenuineHandover}
+              />
 
-                {/* 6-Stage Kitchen Progress Stepper */}
-                <ol className="mt-4 grid grid-cols-3 gap-y-4 gap-x-2 sm:grid-cols-6">
-                  {stageItems.map((step, i) => {
-                    const done = i <= currentIndex;
-                    const active = i === currentIndex;
-                    const Icon = step.icon;
-                    const ts = historyTimeByStatus.get(step.key);
-                    return (
-                      <li key={step.key} className="flex flex-col items-center gap-1 text-center">
-                        <span
-                          className={
-                            "flex h-9 w-9 items-center justify-center rounded-full transition-colors " +
-                            (active
-                              ? "bg-[#FF5A1F] text-white"
-                              : done
-                                ? "bg-[#FF5A1F]/25 text-[#FF5A1F]"
-                                : "bg-[#303030] text-[#737373]")
-                          }
-                        >
-                          <Icon className="h-4 w-4" aria-hidden="true" />
-                        </span>
-                        <span className={"text-[11px] font-semibold leading-tight " + (done ? "text-white" : "text-[#737373]")}>
-                          {step.label}
-                        </span>
-                        {ts && done && (
-                          <span className="text-[10px] tabular-nums text-[#A3A3A3]">{ts}</span>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
-              </div>
-
-              {/* Explicit opt-in device alerts (never auto-prompted) */}
-              {isActive && user && !preferences.push_enabled && (
-                <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#1B1B1B] px-3.5 py-2.5">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-white">Want instant kitchen alerts?</p>
-                    <p className="text-[12px] text-[#A3A3A3]">Get notified as soon as your meal moves stages.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void togglePushSubscription(true)}
-                    className="min-h-[40px] shrink-0 rounded-full bg-[#303030] px-3.5 text-[12px] font-bold text-white hover:bg-[#3A3A3A]"
-                  >
-                    Enable alerts
-                  </button>
-                </div>
-              )}
-
-              {/* Subtle completed meal prompt (connected to Phase 2 verified ratings) */}
+              {/* Completed meal rating entry (Feature 02) */}
               {isCompleted && (
-                <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-[#FF5A1F]/30 bg-[#FF5A1F]/10 px-4 py-3">
+                <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-[#FF5A1F]/30 bg-[#FF5A1F]/10 px-4 py-3.5">
                   <div className="min-w-0">
                     <p className="text-[14px] font-bold text-white">How was your meal?</p>
-                    <p className="text-[12px] text-[#C4C4C4]">Share verified feedback on the dishes you ordered.</p>
+                    <p className="text-[13px] text-[#C4C4C4]">Rate the dishes from this completed order.</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setReviewOpen(true)}
-                    className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-full bg-[#FF5A1F] px-4 text-[12px] font-bold text-white hover:bg-[#E84D15]"
+                    className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full bg-[#FF5A1F] px-4 text-[13px] font-bold text-white hover:bg-[#E84D15]"
                   >
-                    <Star className="h-3.5 w-3.5" aria-hidden="true" />
+                    <Star className="h-4 w-4" aria-hidden="true" />
                     Rate dishes
                   </button>
                 </div>
@@ -670,44 +594,34 @@ const OrderTrackingPage = () => {
               {order.arrival_code ? ` or code ${order.arrival_code}` : ""} to staff on collection or at your table.
             </p>
           )}
-          <div className="mt-4 flex flex-col gap-2.5 sm:flex-row">
-            {!isCancelled && hasOrderDrinks && (
-              <button
-                type="button"
-                onClick={() => setAnotherRoundOpen(true)}
-                className="flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-full bg-[#FF5A1F] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[#E84D15]"
-              >
-                <Wine className="h-4 w-4" aria-hidden="true" />
-                Order Another Round
-              </button>
-            )}
-            {isCompleted && (
-              <button
-                type="button"
-                onClick={() => setReorderOpen(true)}
-                className="flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-full border border-white/15 bg-[#303030] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[#3A3A3A]"
-              >
-                Order Again (Revalidate Prices)
-              </button>
-            )}
-          </div>
+          {isCompleted && (
+            <button
+              type="button"
+              onClick={() => setReorderOpen(true)}
+              className="mt-4 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-[#303030] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[#3A3A3A]"
+            >
+              Order Again (Check Live Prices)
+            </button>
+          )}
         </section>
 
-        {/* Private Feedback to Management */}
-        <section className="mt-4 flex items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-[#242424] px-4 py-3.5">
-          <div className="min-w-0">
-            <p className="text-[14px] font-bold text-white">Private dining feedback</p>
-            <p className="text-[12px] text-[#A3A3A3]">Compliments, issues, or request a duty manager privately.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setFeedbackOpen(true)}
-            className="inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-[#303030] px-3.5 text-[13px] font-semibold text-white hover:bg-[#3A3A3A]"
-          >
-            <MessageSquareHeart className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
-            Message
-          </button>
-        </section>
+        {/* Feature 10: Private Dining Feedback on Completed Orders */}
+        {isCompleted && (
+          <section className="mt-4 flex items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-[#242424] px-4 py-3.5">
+            <div className="min-w-0">
+              <p className="text-[14px] font-bold text-white">Private dining feedback</p>
+              <p className="text-[13px] text-[#A3A3A3]">Share private notes on your visit directly with management.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFeedbackOpen(true)}
+              className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-[#303030] px-4 text-[13px] font-semibold text-white hover:bg-[#3A3A3A]"
+            >
+              <MessageSquareHeart className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+              Feedback
+            </button>
+          </section>
+        )}
 
         {/* Corrections & Cancellation Support for Active Orders */}
         {isActive && (
@@ -802,17 +716,11 @@ const OrderTrackingPage = () => {
         orderItems={order.items}
       />
 
-      <OrderAnotherRoundSheet
-        open={anotherRoundOpen}
-        onOpenChange={setAnotherRoundOpen}
-        orderNumber={orderNumber}
-        orderItems={order.items}
-      />
-
       <PrivateFeedbackSheet
         open={feedbackOpen}
         onOpenChange={setFeedbackOpen}
         orderId={String(order.id)}
+        orderReference={orderNumber}
       />
     </div>
   );

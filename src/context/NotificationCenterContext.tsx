@@ -14,6 +14,7 @@ import {
   subscribeUserToWebPush,
   unsubscribeUserFromWebPush,
 } from "@/lib/orderStatusNotify";
+import { isBackendMissingError } from "@/lib/featureAvailability";
 
 export interface UserNotificationRow {
   id: string;
@@ -90,19 +91,13 @@ type DynamicClient = {
   };
 };
 
-function isMissingRelationError(err: { code?: string; message?: string } | null): boolean {
-  if (!err) return false;
-  const blob = `${err.code ?? ""} ${err.message ?? ""}`.toLowerCase();
-  return blob.includes("42p01") || blob.includes("pgrst205") || blob.includes("schema cache") || blob.includes("does not exist");
-}
-
 export function NotificationCenterProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<UserNotificationRow[]>([]);
   const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_PREFS);
   const [loading, setLoading] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [backendAvailable, setBackendAvailable] = useState(true);
+  const [backendAvailable, setBackendAvailable] = useState(false);
 
   const db = supabase as unknown as DynamicClient;
 
@@ -128,7 +123,7 @@ export function NotificationCenterProvider({ children }: { children: ReactNode }
           .maybeSingle(),
       ]);
 
-      if (isMissingRelationError(notifRes.error)) {
+      if (isBackendMissingError(notifRes.error)) {
         setBackendAvailable(false);
         setNotifications([]);
       } else if (!notifRes.error) {

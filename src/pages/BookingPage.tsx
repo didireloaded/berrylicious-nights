@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Info, ListOrdered, Minus, Plus, Sparkles } from "lucide-react";
+import { ArrowLeft, CalendarDays, Info, ListOrdered, Minus, Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { bookingTimeSlots } from "@/lib/bookingSlots";
@@ -9,6 +9,7 @@ import { insertBookingWithArrivalCode, isBookingSlotConflictError } from "@/lib/
 import { supabase } from "@/integrations/supabase/client";
 import { parseRpcBookedTimes } from "@/lib/bookingRpc";
 import { getWindhoekDateISO } from "@/lib/windhoekDate";
+import { WaitlistSheet } from "@/components/WaitlistSheet";
 
 type RpcSupabaseClient = {
   rpc: (
@@ -41,17 +42,6 @@ function buildWindhoekDateStrip(startISO: string, days = 14): DayChip[] {
   return result;
 }
 
-const OCCASION_OPTIONS = [
-  { id: "", label: "None" },
-  { id: "birthday", label: "Birthday" },
-  { id: "anniversary", label: "Anniversary" },
-  { id: "celebration", label: "Celebration" },
-  { id: "date_night", label: "Date Night" },
-  { id: "business", label: "Business" },
-] as const;
-
-type OccasionId = (typeof OCCASION_OPTIONS)[number]["id"];
-
 const BookingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -73,7 +63,6 @@ const BookingPage = () => {
   const [guests, setGuests] = useState(
     typeof suggestedGuests === "number" && suggestedGuests > 0 ? suggestedGuests : 2,
   );
-  const [occasion, setOccasion] = useState<OccasionId>("");
   const [specialRequests, setSpecialRequests] = useState(() => (eventTitle ? `Event: ${eventTitle}` : ""));
   const [guestName, setGuestName] = useState(() => {
     try {
@@ -93,15 +82,13 @@ const BookingPage = () => {
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
   const [checkingTimes, setCheckingTimes] = useState(true);
   const [timesError, setTimesError] = useState(false);
-  const [waitlistBusy, setWaitlistBusy] = useState(false);
-  const [waitlistSnap, setWaitlistSnap] = useState<{ position: number; est: number } | null>(null);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setCheckingTimes(true);
     setTimesError(false);
     setBookedTimes([]);
-    setWaitlistSnap(null);
     void Promise.resolve(rpcClient.rpc("booked_table_times", { p_date: date }))
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -180,15 +167,6 @@ const BookingPage = () => {
       return;
     }
 
-    const occasionLabel = OCCASION_OPTIONS.find((o) => o.id === occasion)?.label ?? "";
-    const trimmedNotes = specialRequests.trim();
-    const combinedSpecialRequests =
-      occasion && occasionLabel
-        ? trimmedNotes
-          ? `[${occasionLabel}] ${trimmedNotes}`
-          : `[${occasionLabel}]`
-        : trimmedNotes || null;
-
     const bookingData = {
       user_id: user?.id || null,
       guest_name: user ? null : guestName.trim(),
@@ -196,8 +174,7 @@ const BookingPage = () => {
       date,
       time: selectedTime,
       guests,
-      occasion: occasion || null,
-      special_requests: combinedSpecialRequests,
+      special_requests: specialRequests.trim() || null,
     };
 
     let booking_id: string | null = null;
@@ -239,8 +216,7 @@ const BookingPage = () => {
       date,
       time: selectedTime,
       guests,
-      ...(occasionLabel ? { occasion: occasionLabel } : {}),
-      specialRequests: combinedSpecialRequests ?? "",
+      specialRequests: specialRequests.trim(),
       ...(eventTitle ? { eventTitle } : {}),
       createdAt: new Date().toISOString(),
       ...(arrival_code ? { arrival_code } : {}),
@@ -259,39 +235,6 @@ const BookingPage = () => {
     }
 
     navigate("/booking/success", { state: localData });
-  };
-
-  const joinWaitlist = async () => {
-    const name = user ? (profile?.display_name?.trim() || "Guest") : guestName.trim();
-    const phone = user ? (profile?.phone?.trim() || guestPhone.trim()) : guestPhone.trim();
-    if (!user && !name) {
-      toast.error("Please enter your name");
-      return;
-    }
-    if (phone.length < 6) {
-      toast.error("Add a phone number Butcher Block can use to contact you");
-      return;
-    }
-    setWaitlistBusy(true);
-    try {
-      const { data, error } = await rpcClient.rpc("join_waitlist", {
-        p_party_size: guests,
-        p_preferred_date: date,
-        p_guest_name: name,
-        p_guest_phone: phone,
-      });
-      if (error) throw error;
-      const j = data as unknown as { position?: number; estimated_wait_minutes?: number } | null;
-      setWaitlistSnap({
-        position: Number(j?.position) || 1,
-        est: Number(j?.estimated_wait_minutes) || 15,
-      });
-      toast.success("You're on the waitlist");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't join waitlist");
-    } finally {
-      setWaitlistBusy(false);
-    }
   };
 
   return (
@@ -398,24 +341,34 @@ const BookingPage = () => {
           )}
 
           {fullyBooked && !checkingTimes && !timesError && (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-[#242424] p-3.5 text-[14px] text-white/85">
-              <span>All listed times are currently taken for {date}. Join the waitlist below or check the next day.</span>
-              <button
-                type="button"
-                onClick={() => {
-                  const idx = dateStrip.findIndex((c) => c.iso === date);
-                  if (idx >= 0 && idx + 1 < dateStrip.length) {
-                    setDate(dateStrip[idx + 1].iso);
-                  } else {
-                    const [y, m, d] = date.split("-").map(Number);
-                    const next = new Date(Date.UTC(y, (m || 1) - 1, (d || 1) + 1, 12, 0, 0));
-                    setDate(next.toISOString().slice(0, 10));
-                  }
-                }}
-                className="min-h-[38px] rounded-full bg-[#FF5A1F] px-3.5 text-[13px] font-bold text-white"
-              >
-                Try next day
-              </button>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-white/10 bg-[#242424] p-4 text-[14px] text-white/85">
+              <span>All listed times are currently taken for {date}.</span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWaitlistOpen(true)}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-[#FF5A1F] px-4 text-[13px] font-bold text-white hover:bg-[#E84D15]"
+                >
+                  <ListOrdered className="h-4 w-4" aria-hidden="true" />
+                  Join the waitlist
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const idx = dateStrip.findIndex((c) => c.iso === date);
+                    if (idx >= 0 && idx + 1 < dateStrip.length) {
+                      setDate(dateStrip[idx + 1].iso);
+                    } else {
+                      const [y, m, d] = date.split("-").map(Number);
+                      const next = new Date(Date.UTC(y, (m || 1) - 1, (d || 1) + 1, 12, 0, 0));
+                      setDate(next.toISOString().slice(0, 10));
+                    }
+                  }}
+                  className="min-h-[44px] rounded-full border border-white/15 bg-[#303030] px-4 text-[13px] font-semibold text-white"
+                >
+                  Try next day
+                </button>
+              </div>
             </div>
           )}
 
@@ -448,6 +401,21 @@ const BookingPage = () => {
               );
             })}
           </div>
+
+          {/* Contextual waitlist action only when slots are taken or unavailable */}
+          {!checkingTimes && (bookedTimes.length > 0 || timesError) && !fullyBooked && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#1B1B1B] px-4 py-2.5">
+              <span className="text-[13px] text-[#A3A3A3]">Preferred time taken?</span>
+              <button
+                type="button"
+                onClick={() => setWaitlistOpen(true)}
+                className="inline-flex min-h-[40px] items-center gap-1.5 text-[13px] font-semibold text-[#FF5A1F] hover:text-white"
+              >
+                <ListOrdered className="h-4 w-4" aria-hidden="true" />
+                Join the waitlist
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Guests Counter */}
@@ -516,42 +484,6 @@ const BookingPage = () => {
           </section>
         )}
 
-        {/* Special Occasion (Birthday, Anniversary & Celebrations) */}
-        <section className="mt-7" aria-labelledby="occasion-heading">
-          <h2 id="occasion-heading" className="text-[15px] font-bold text-white">
-            Special Occasion <span className="font-normal text-[#A3A3A3]">(optional)</span>
-          </h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {OCCASION_OPTIONS.map((opt) => {
-              const active = occasion === opt.id;
-              return (
-                <button
-                  key={opt.id || "none"}
-                  type="button"
-                  onClick={() => setOccasion(opt.id)}
-                  aria-pressed={active}
-                  className={
-                    "min-h-[42px] rounded-full border px-4 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
-                    (active
-                      ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
-                      : "border-white/10 bg-[#242424] text-white/85 hover:bg-[#303030]")
-                  }
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-          {occasion && (
-            <div className="mt-3 flex items-start gap-2.5 rounded-2xl border border-[#FF5A1F]/30 bg-[#FF5A1F]/10 px-3.5 py-3 text-[13px] text-[#E5E5E5]">
-              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
-              <p>
-                Noted for our host team. Any available Butcher Block occasion touches or perks are confirmed directly by staff at your table.
-              </p>
-            </div>
-          )}
-        </section>
-
         {/* Special Requests */}
         <section className="mt-7">
           <label htmlFor="booking-notes" className="mb-2 block text-[15px] font-bold text-white">
@@ -561,7 +493,7 @@ const BookingPage = () => {
             id="booking-notes"
             value={specialRequests}
             onChange={(e) => setSpecialRequests(e.target.value)}
-            placeholder="Birthday celebration, dietary requirements, terrace seating..."
+            placeholder="Dietary requirements, terrace seating, celebratory note..."
             className="h-24 w-full resize-none rounded-2xl border border-white/10 bg-[#242424] p-4 text-[16px] text-white placeholder:text-[#737373] focus:border-[#FF5A1F] focus:outline-none sm:text-[15px]"
           />
         </section>
@@ -588,12 +520,24 @@ const BookingPage = () => {
               : timesError
                 ? "Availability Unavailable"
                 : fullyBooked
-                  ? "No Open Times — Join Waitlist Below"
+                  ? "No Open Times — Join the Waitlist"
                   : "Confirm Reservation"}
         </button>
 
+        {/* Secondary waitlist trigger when no suitable reservation time is open */}
+        {(fullyBooked || timesError) && !checkingTimes && (
+          <button
+            type="button"
+            onClick={() => setWaitlistOpen(true)}
+            className="mt-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-[#242424] px-6 text-[14px] font-semibold text-white transition-colors hover:bg-[#303030]"
+          >
+            <ListOrdered className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+            Join the waitlist
+          </button>
+        )}
+
         {/* Reservation & Cancellation Policy */}
-        <section className="mt-6 flex items-start gap-3 rounded-[20px] border border-white/10 bg-[#1B1B1B] p-4 text-[13px] leading-relaxed text-[#A3A3A3]">
+        <section className="mt-6 flex items-start gap-3 rounded-[20px] border border-white/10 bg-[#1B1B1B] p-4 text-[14px] leading-relaxed text-[#A3A3A3]">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
           <p>
             Tables are held for 15 minutes past your booking time. Running late, modifying party size, or cancelling? Call Butcher Block on{" "}
@@ -603,32 +547,17 @@ const BookingPage = () => {
             .
           </p>
         </section>
-
-        {/* Smart Waitlist preserved */}
-        <section className="mt-6 rounded-[22px] border border-white/10 bg-[#242424] p-4">
-          <div className="flex items-center gap-2 text-[15px] font-bold text-white">
-            <ListOrdered className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
-            Smart Waitlist
-          </div>
-          <p className="mt-1 text-[13px] leading-relaxed text-[#A3A3A3]">
-            Prefer to queue for {date}? We&apos;ll notify you if an earlier table opens up.
-          </p>
-          {waitlistSnap ? (
-            <p className="mt-3 text-[14px] font-semibold text-white">
-              You&apos;re #{waitlistSnap.position} in line · ~{waitlistSnap.est} min estimated.
-            </p>
-          ) : (
-            <button
-              type="button"
-              disabled={waitlistBusy}
-              onClick={() => void joinWaitlist()}
-              className="mt-3 min-h-[44px] w-full rounded-full border border-white/15 bg-[#303030] text-[14px] font-semibold text-white transition-colors hover:bg-[#3A3A3A] disabled:opacity-50"
-            >
-              {waitlistBusy ? "Joining waitlist…" : "Join waitlist for this date"}
-            </button>
-          )}
-        </section>
       </div>
+
+      <WaitlistSheet
+        open={waitlistOpen}
+        onOpenChange={setWaitlistOpen}
+        defaultDate={date}
+        defaultTime={selectedTime}
+        defaultGuests={guests}
+        defaultName={user ? (profile?.display_name ?? "") : guestName}
+        defaultPhone={user ? (profile?.phone ?? "") : guestPhone}
+      />
     </div>
   );
 };

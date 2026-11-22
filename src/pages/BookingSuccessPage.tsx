@@ -12,7 +12,6 @@ const BookingSuccessPage = () => {
     date: string;
     time: string;
     guests: number;
-    occasion?: string;
     eventTitle?: string;
     arrival_code?: string;
     reservation_number?: string;
@@ -78,19 +77,6 @@ const BookingSuccessPage = () => {
                   <span className="font-mono text-[15px] font-bold text-[#FF5A1F]">
                     {reservationNumber}
                   </span>
-                </div>
-              )}
-
-              {booking.occasion && (
-                <div className="flex items-center gap-3 py-3.5">
-                  <Sparkles className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
-                  <div>
-                    <p className="text-[12px] uppercase tracking-[0.08em] text-[#A3A3A3]">Special Occasion</p>
-                    <p className="text-[15px] font-semibold text-white">{booking.occasion}</p>
-                    <p className="mt-0.5 text-[12px] text-[#A3A3A3]">
-                      Noted for our host team — available occasion touches confirmed at your table.
-                    </p>
-                  </div>
                 </div>
               )}
 

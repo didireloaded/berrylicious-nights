@@ -1,5 +1,7 @@
 import {
   User,
+  Bell,
+  BellRing,
   Clock,
   CalendarDays,
   CalendarHeart,
@@ -20,6 +22,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAboutSheet } from "@/context/AboutSheetContext";
 import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
+import { useNotificationCenter } from "@/context/NotificationCenterContext";
+import { useTableSession } from "@/context/TableSessionContext";
 import { formatPrice } from "@/lib/vibe";
 import { getWindhoekDateISO } from "@/lib/windhoekDate";
 import { useAuth } from "@/context/AuthContext";
@@ -77,6 +81,8 @@ const ProfilePage = () => {
   const navigate = useNavigate();
   const { openAbout } = useAboutSheet();
   const { openAssistant } = useRestaurantAssistant();
+  const { openNotificationCenter } = useNotificationCenter();
+  const { session: tableSession, openServiceSheet } = useTableSession();
   const { currentOrder, currentBooking } = useApp();
   const { favoriteIds } = useFavorites();
   const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -200,19 +206,26 @@ const ProfilePage = () => {
         </header>
 
         {user && (
-          <div className="mt-6 grid grid-cols-3 gap-2.5 rounded-[22px] border border-white/10 bg-[#242424] p-4 text-center">
+          <div
+            className={
+              "mt-6 grid gap-2.5 rounded-[22px] border border-white/10 bg-[#242424] p-4 text-center " +
+              (loyaltyPoints > 0 ? "grid-cols-3" : "grid-cols-2")
+            }
+          >
             <div>
               <p className="text-[20px] font-extrabold tabular-nums text-white">{totalVisits}</p>
-              <p className="text-[12px] font-medium text-[#A3A3A3]">Visits</p>
+              <p className="text-[13px] font-medium text-[#A3A3A3]">Visits</p>
             </div>
-            <div className="border-x border-white/10">
+            <div className={loyaltyPoints > 0 ? "border-x border-white/10" : "border-l border-white/10"}>
               <p className="text-[20px] font-extrabold tabular-nums text-white">{totalOrders}</p>
-              <p className="text-[12px] font-medium text-[#A3A3A3]">Orders</p>
+              <p className="text-[13px] font-medium text-[#A3A3A3]">Orders</p>
             </div>
-            <div>
-              <p className="text-[20px] font-extrabold tabular-nums text-[#FF5A1F]">{loyaltyPoints}</p>
-              <p className="text-[12px] font-medium text-[#A3A3A3]">Points</p>
-            </div>
+            {loyaltyPoints > 0 && (
+              <div>
+                <p className="text-[20px] font-extrabold tabular-nums text-[#FF5A1F]">{loyaltyPoints}</p>
+                <p className="text-[13px] font-medium text-[#A3A3A3]">Points</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -478,15 +491,41 @@ const ProfilePage = () => {
                 <span className="flex-1 text-[14px] font-semibold text-white">@butcherblocknamibia</span>
                 <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
               </a>
+              {tableSession && (
+                <button
+                  type="button"
+                  onClick={openServiceSheet}
+                  className="flex min-h-[56px] w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#303030]"
+                >
+                  <BellRing className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold text-white">Table Service ({tableSession.displayName})</span>
+                    <span className="block text-[13px] text-[#A3A3A3]">Call waiter, request water, condiments, or the bill</span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openNotificationCenter}
+                className="flex min-h-[56px] w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#303030]"
+              >
+                <Bell className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-semibold text-white">Notifications &amp; Preferences</span>
+                  <span className="block text-[13px] text-[#A3A3A3]">Order updates and alert settings</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
+              </button>
               <button
                 type="button"
                 onClick={() => setFeedbackOpen(true)}
-                className="flex min-h-[52px] w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#303030]"
+                className="flex min-h-[56px] w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#303030]"
               >
                 <MessageSquareHeart className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <span className="block text-[14px] font-semibold text-white">Private Dining Feedback</span>
-                  <span className="block text-[12px] text-[#A3A3A3]">Compliments, service issues, or manager request</span>
+                  <span className="block text-[13px] text-[#A3A3A3]">Share private notes directly with management</span>
                 </div>
                 <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
               </button>

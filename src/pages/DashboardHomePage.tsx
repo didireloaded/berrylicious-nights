@@ -3,13 +3,11 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   Bell,
-  Bookmark,
   CalendarDays,
   CalendarHeart,
   Clock,
   MapPin,
   MessageSquare,
-  RotateCcw,
   User,
   UtensilsCrossed,
   Wine,
@@ -20,15 +18,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useCart } from "@/context/CartContext";
 import { useActiveUpdates } from "@/hooks/useActiveUpdates";
-import { useDiningPreferences } from "@/hooks/useDiningPreferences";
 import { useAboutSheet } from "@/context/AboutSheetContext";
 import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
 import { useNotificationCenter } from "@/context/NotificationCenterContext";
 import { isActiveOrderStatus } from "@/lib/orderLifecycle";
 import { EventDetailSheet } from "@/components/EventDetailSheet";
 import { ActiveOrderBanner } from "@/components/ActiveOrderBanner";
-import { SmartSuggestionsSection } from "@/components/SmartSuggestionsSection";
-import { ReorderPreviewSheet } from "@/components/ReorderPreviewSheet";
 import { formatPrice } from "@/lib/vibe";
 import { getWindhoekDateISO } from "@/lib/windhoekDate";
 import type { HomeUpdateRow } from "@/lib/eventBooking";
@@ -65,24 +60,8 @@ export default function DashboardHomePage() {
   const updates = useActiveUpdates();
   const { openAbout } = useAboutSheet();
   const { openAssistant } = useRestaurantAssistant();
-  const { unreadCount, openNotificationCenter } = useNotificationCenter();
-  const { prefs } = useDiningPreferences();
+  const { unreadCount, backendAvailable: notifBackendAvailable, openNotificationCenter } = useNotificationCenter();
   const [selectedEvent, setSelectedEvent] = useState<HomeUpdateRow | null>(null);
-  const [usualOpen, setUsualOpen] = useState(false);
-
-  const usualOrderLines = useMemo(
-    () =>
-      prefs.usualItems.map((u) => ({
-        id: u.menuItemId,
-        name: u.name,
-        qty: u.quantity,
-        weight: u.weight,
-        doneness: u.doneness,
-        side: u.side,
-        sauces: u.sauces,
-      })),
-    [prefs.usualItems],
-  );
 
   const savedGuestName =
     typeof localStorage !== "undefined" ? (localStorage.getItem("butcher-block-guest-name") || "").trim() : "";
@@ -103,7 +82,8 @@ export default function DashboardHomePage() {
   const upcomingBooking =
     currentBooking && currentBooking.date >= todayISO ? currentBooking : null;
 
-  const hasNotificationDot = unreadCount > 0 || hasLiveOrder;
+  const verifiedUnreadCount = notifBackendAvailable ? unreadCount : 0;
+  const hasNotificationDot = verifiedUnreadCount > 0 || hasLiveOrder;
 
   return (
     <div
@@ -138,13 +118,13 @@ export default function DashboardHomePage() {
             <button
               type="button"
               onClick={openNotificationCenter}
-              aria-label={unreadCount > 0 ? `Open notifications, ${unreadCount} unread` : "Open notifications"}
+              aria-label={verifiedUnreadCount > 0 ? `Open notifications, ${verifiedUnreadCount} unread` : "Open notifications"}
               className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#242424] text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
             >
               <Bell className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
-              {unreadCount > 0 ? (
+              {verifiedUnreadCount > 0 ? (
                 <span className="absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF5A1F] px-1 text-[10px] font-bold text-white tabular-nums">
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                  {verifiedUnreadCount > 9 ? "9+" : verifiedUnreadCount}
                 </span>
               ) : hasNotificationDot ? (
                 <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-[#FF5A1F]" aria-hidden="true" />
@@ -275,38 +255,6 @@ export default function DashboardHomePage() {
           </div>
         </section>
 
-        {/* Personalized Suggestions (shown ONLY when dietary prefs, favourites, or past orders exist) */}
-        <SmartSuggestionsSection />
-
-        {/* My Usual Quick-Reorder Strip (shown ONLY when guest has saved usual items) */}
-        {prefs.usualItems.length > 0 && (
-          <section className="mt-7" aria-labelledby="home-usual-heading">
-            <div className="flex items-center justify-between gap-3 rounded-[22px] border border-[#FF5A1F]/30 bg-[#242424] px-4 py-3.5">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FF5A1F]/15 text-[#FF5A1F]">
-                  <Bookmark className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div className="min-w-0">
-                  <h2 id="home-usual-heading" className="text-[15px] font-bold text-white">
-                    My Usual Order
-                  </h2>
-                  <p className="truncate text-[13px] text-[#A3A3A3]">
-                    {prefs.usualItems.map((u) => `${u.quantity}× ${u.name}`).join(", ")}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setUsualOpen(true)}
-                className="inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full bg-[#FF5A1F] px-4 text-[13px] font-bold text-white transition-colors hover:bg-[#E84D15]"
-              >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                Reorder
-              </button>
-            </div>
-          </section>
-        )}
-
         {/* Active Reservation (only rendered when user holds an upcoming reservation) */}
         {upcomingBooking && (
           <section className="mt-7" aria-labelledby="upcoming-booking-heading">
@@ -394,12 +342,6 @@ export default function DashboardHomePage() {
       </div>
 
       <EventDetailSheet event={selectedEvent} onClose={() => setSelectedEvent(null)} />
-      <ReorderPreviewSheet
-        open={usualOpen}
-        onOpenChange={setUsualOpen}
-        orderNumber="USUAL"
-        orderItems={usualOrderLines}
-      />
     </div>
   );
 }

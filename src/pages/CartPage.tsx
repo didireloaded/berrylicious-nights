@@ -4,12 +4,14 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  BellRing,
   CalendarDays,
   Clock,
   Minus,
   Plus,
   ShoppingBag,
   Trash2,
+  Users,
   UtensilsCrossed,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -18,6 +20,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useTableSession } from "@/context/TableSessionContext";
 import { useMenuAvailability } from "@/hooks/useMenuAvailability";
+import { GroupOrderSheet } from "@/components/GroupOrderSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/vibe";
 import { menuArtwork } from "@/lib/menuArtwork";
@@ -56,9 +59,10 @@ export default function CartPage() {
   const { items, updateQuantity, removeItem, clearCart, totalItems } = useCart();
   const { user, profile, refreshProfile } = useAuth();
   const { setCurrentOrder } = useApp();
-  const { session: tableSession, verifySessionLive } = useTableSession();
+  const { session: tableSession, verifySessionLive, openServiceSheet } = useTableSession();
   const { isUnavailable, refresh: refreshAvailability } = useMenuAvailability();
   const navigate = useNavigate();
+  const [groupSheetOpen, setGroupSheetOpen] = useState(false);
 
   const today = getWindhoekDateISO();
   const [orderType, setOrderType] = useState<OrderType>(() => (tableSession ? "dinein" : "pickup"));
@@ -109,6 +113,17 @@ export default function CartPage() {
     }
     return sum;
   }, [items]);
+
+  const splitPreviewItems = useMemo(
+    () =>
+      items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        unitPriceNad: resolveCanonicalUnitPrice(item) ?? item.price,
+        quantity: item.quantity,
+      })),
+    [items],
+  );
 
   const toggleDietaryFlag = (flag: string) => {
     setDietaryFlags((prev) =>
@@ -378,6 +393,24 @@ export default function CartPage() {
             Add more
           </Link>
         </header>
+
+        {/* Validated Table Context Banner (shown ONLY when a real table session is active) */}
+        {tableSession && (
+          <div className="mt-5 flex items-center justify-between gap-3 rounded-[20px] border border-[#FF5A1F]/30 bg-[#242424] px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[14px] font-bold text-white">Ordering for {tableSession.displayName}</p>
+              <p className="text-[13px] text-[#A3A3A3]">{tableSession.area} · Dine-in prefilled</p>
+            </div>
+            <button
+              type="button"
+              onClick={openServiceSheet}
+              className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-[#303030] px-3.5 text-[13px] font-semibold text-white hover:bg-[#3A3A3A]"
+            >
+              <BellRing className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+              Waiter
+            </button>
+          </div>
+        )}
 
         {items.length === 0 ? (
           <section className="flex min-h-[60dvh] flex-col items-center justify-center px-4 text-center">
@@ -787,6 +820,19 @@ export default function CartPage() {
                   Your order goes directly to the Butcher Block kitchen with an itemized receipt and order number. No card payment is taken in-app — settle at the restaurant.
                 </p>
 
+                {/* Feature 07: Contextual Group Ordering & Split Bill Preview Entry */}
+                <button
+                  type="button"
+                  onClick={() => setGroupSheetOpen(true)}
+                  className="mt-4 flex min-h-[46px] w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#1B1B1B] px-4 py-2.5 text-left transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Users className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+                    <span className="text-[14px] font-semibold text-white">Ordering with friends?</span>
+                  </span>
+                  <span className="text-[13px] font-semibold text-[#FF5A1F]">Split preview</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => void handleCheckout()}
@@ -809,6 +855,14 @@ export default function CartPage() {
           </div>
         )}
       </div>
+
+      <GroupOrderSheet
+        open={groupSheetOpen}
+        onOpenChange={setGroupSheetOpen}
+        cartItems={splitPreviewItems}
+        tableLabel={tableSession?.displayName ?? null}
+        groupBackendStatus="coming_soon"
+      />
     </div>
   );
 }

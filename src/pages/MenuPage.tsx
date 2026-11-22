@@ -13,6 +13,7 @@ import {
   type PriceBand,
 } from "@/components/SearchAndCategories";
 import { ActiveOrderBanner } from "@/components/ActiveOrderBanner";
+import { MyUsualSection } from "@/components/MyUsualSection";
 
 function itemBasePrice(item: MenuItem): number {
   if (item.variations && item.variations.length > 0) {
@@ -143,6 +144,11 @@ export default function MenuPage() {
         </header>
 
         <ActiveOrderBanner />
+
+        {/* Contextual reorder entry from genuine order history (hidden when no past orders) */}
+        <div className="mt-4">
+          <MyUsualSection compact />
+        </div>
 
         <SearchAndCategories
           ref={searchInput}
