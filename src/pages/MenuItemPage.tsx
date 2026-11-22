@@ -1,6 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, Flame, Minus, Plus, Share2, ShoppingBag, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Flame,
+  Heart,
+  Leaf,
+  MessageSquare,
+  Minus,
+  Plus,
+  Salad,
+  Share2,
+  Soup,
+  Utensils,
+  Wheat,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   menuItems,
@@ -10,6 +25,7 @@ import {
 } from "@/data/menu";
 import { useCart } from "@/context/CartContext";
 import { useMenuAvailability } from "@/hooks/useMenuAvailability";
+import { useFavorites } from "@/hooks/useFavorites";
 import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
 import { menuArtwork } from "@/lib/menuArtwork";
 import { getUpsellItems } from "@/services/upsell";
@@ -17,14 +33,25 @@ import { formatPrice } from "@/lib/vibe";
 import MenuCard from "@/components/MenuCard";
 import restaurantPhoto from "@/assets/hero-restaurant.jpg";
 
+function SideIcon({ side }: { side: string }) {
+  const lower = side.toLowerCase();
+  if (lower.includes("salad")) return <Salad className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />;
+  if (lower.includes("veg")) return <Leaf className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />;
+  if (lower.includes("mash") || lower.includes("pap")) return <Soup className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />;
+  if (lower.includes("rice") || lower.includes("onion")) return <Wheat className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />;
+  if (lower.includes("baked")) return <Flame className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />;
+  return <Utensils className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />;
+}
+
 export default function MenuItemPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addItem, totalItems } = useCart();
   const { isUnavailable } = useMenuAvailability();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const { openAssistant } = useRestaurantAssistant();
   const [quantity, setQuantity] = useState(1);
-  const [added, setAdded] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
 
   const item = menuItems.find((candidate) => candidate.id === id);
 
@@ -44,7 +71,7 @@ export default function MenuItemPage() {
 
   useEffect(() => {
     setQuantity(1);
-    setAdded(false);
+    setJustAdded(false);
     setSelectedVariation(item?.variations?.[0]?.size ?? "");
     setSelectedDoneness("Medium Rare");
     setSelectedSide("Chips");
@@ -78,10 +105,15 @@ export default function MenuItemPage() {
 
   if (!item) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col items-start justify-center bg-[#121212] px-7 text-white">
-        <h1 className="text-3xl font-semibold">We couldn't find that item.</h1>
-        <p className="mt-3 text-sm text-white/55">It may have been removed from the menu.</p>
-        <Link to="/menu" className="mt-7 inline-flex min-h-12 items-center gap-3 rounded-full bg-[#ff5a1f] px-6 text-sm font-semibold">Back to the menu <ArrowRight className="h-4 w-4" /></Link>
+      <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col items-start justify-center bg-[#121212] px-6 text-white">
+        <h1 className="text-[28px] font-bold">Item not found</h1>
+        <p className="mt-2 text-[14px] text-[#A3A3A3]">This dish or drink may no longer be on the menu.</p>
+        <Link
+          to="/menu"
+          className="mt-6 inline-flex min-h-[48px] items-center gap-2 rounded-full bg-[#FF5A1F] px-6 text-[15px] font-semibold text-white"
+        >
+          Back to Menu <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
       </div>
     );
   }
@@ -89,16 +121,22 @@ export default function MenuItemPage() {
   const artwork = menuArtwork(item);
   const imageSrc = artwork.src ?? restaurantPhoto;
   const unavailable = isUnavailable(item.id) || isSeasonalQuote;
+  const favorited = isFavorite(item.id);
   const unitPrice = isSteakCut ? baseUnitPrice + saucesPrice : baseUnitPrice;
-  const numberPrice = new Intl.NumberFormat("en-NA", { maximumFractionDigits: 2 }).format(unitPrice);
+  const lineTotal = unitPrice * quantity;
   const activeDonenessNote = PDF_DONENESS_GUIDE.find((d) => d.label === selectedDoneness)?.note ?? "";
   const backRoute = item.menuSection === "drinks" ? "/drinks" : "/menu";
 
   const toggleSauce = (sauceName: string) => {
-    setAdded(false);
+    setJustAdded(false);
     setSelectedSauces((prev) =>
       prev.includes(sauceName) ? prev.filter((s) => s !== sauceName) : [...prev, sauceName],
     );
+  };
+
+  const handleToggleFavorite = () => {
+    const added = toggleFavorite(item.id);
+    toast.success(added ? `Saved ${item.name} to favourites` : `Removed ${item.name} from favourites`);
   };
 
   const addToBag = () => {
@@ -112,9 +150,9 @@ export default function MenuItemPage() {
         priceOverride: unitPrice,
       };
       for (let count = 0; count < quantity; count += 1) addItem(item, customization);
-      setAdded(true);
+      setJustAdded(true);
       const summary = [selectedVariation, selectedDoneness, selectedSide].filter(Boolean).join(" · ");
-      toast.success(`${quantity} × ${item.name} (${summary}) added to your order`);
+      toast.success(`${quantity} × ${item.name} (${summary}) added to order`);
       return;
     }
     if (hasVariations || (item.alcoholFreeOption && alcoholFree)) {
@@ -124,14 +162,14 @@ export default function MenuItemPage() {
         priceOverride: unitPrice,
       };
       for (let count = 0; count < quantity; count += 1) addItem(item, customization);
-      setAdded(true);
+      setJustAdded(true);
       const summary = [selectedVariation, alcoholFree ? "Alcohol-Free" : ""].filter(Boolean).join(" · ");
-      toast.success(`${quantity} × ${item.name}${summary ? ` (${summary})` : ""} added to your order`);
+      toast.success(`${quantity} × ${item.name}${summary ? ` (${summary})` : ""} added to order`);
       return;
     }
     for (let count = 0; count < quantity; count += 1) addItem(item);
-    setAdded(true);
-    toast.success(`${quantity} × ${item.name} added to your order`);
+    setJustAdded(true);
+    toast.success(`${quantity} × ${item.name} added to order`);
   };
 
   const share = async () => {
@@ -152,371 +190,393 @@ export default function MenuItemPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[560px] bg-[#121212] text-white">
-      <section className="relative isolate flex min-h-[100dvh] flex-col overflow-hidden bg-black">
-        <img
-          src={imageSrc}
-          alt={item.name}
-          decoding="async"
-          className="food-photo absolute inset-0 -z-20 h-full w-full object-cover object-center"
-        />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/70 via-black/25 via-[40%] to-black/90" aria-hidden="true" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/20 via-transparent to-transparent" aria-hidden="true" />
+    <div className="min-h-dvh bg-[#121212] pb-32 text-white lg:pb-24">
+      <div className="mx-auto max-w-[560px] lg:max-w-4xl lg:px-8 lg:pt-8">
+        <div className="lg:grid lg:grid-cols-12 lg:gap-10">
+          {/* Full-bleed Hero Photography matching Screen 04 */}
+          <div className="relative h-[300px] w-full overflow-hidden bg-[#181818] sm:h-[340px] lg:col-span-5 lg:h-[460px] lg:rounded-[28px] lg:border lg:border-white/10">
+            <img
+              src={imageSrc}
+              alt={artwork.isExactDish ? item.name : ""}
+              decoding="async"
+              className="h-full w-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-[#121212] lg:to-black/40" />
 
-        <header className="flex items-start justify-between gap-5 px-5 pt-[max(28px,env(safe-area-inset-top,0px))] sm:px-7">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            aria-label="Go back"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#121212] transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-          >
-            <ArrowLeft className="h-5 w-5" strokeWidth={2} />
-          </button>
-          <Link
-            to="/cart"
-            aria-label={`View your bag, ${totalItems} items`}
-            className="relative flex min-h-[56px] w-14 flex-col items-center justify-center rounded-[18px] border border-white/25 bg-black/45 text-white backdrop-blur-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-          >
-            <ShoppingBag className="h-5 w-5" strokeWidth={1.8} />
-            <span className="mt-1 text-[12px] font-semibold">{totalItems}</span>
-          </Link>
-        </header>
-
-        <div className="food-enter px-5 pt-[clamp(35px,9vh,80px)] sm:px-7">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#ff7647]">
-            {item.menuSection === "drinks" ? "BUTCHER BLOCK CELLAR & BAR" : "BUTCHER BLOCK MENU"}
-          </p>
-          <h1 className="mt-4 text-[clamp(3rem,13vw,5.2rem)] font-extrabold leading-[0.94] tracking-[-0.075em]">{item.category}</h1>
-          <p className="mt-3 max-w-[370px] text-[21px] font-medium leading-snug tracking-[-0.03em] text-white/90">{item.name}</p>
-          {item.region && (
-            <p className="mt-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-white/60">{item.region}</p>
-          )}
-          {(isSteakCut || hasVariations || item.alcoholFreeOption) && (
-            <button
-              type="button"
-              onClick={() => document.getElementById("dish-information")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              className="mt-6 inline-flex min-h-12 items-center gap-2.5 rounded-full border border-white/55 bg-white/10 px-5 text-[14px] font-medium text-white backdrop-blur-lg transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-            >
-              <Flame className="h-4 w-4 text-[#ff7647]" aria-hidden="true" />
-              {isSteakCut ? "Customize cut" : hasVariations ? "Choose size" : "Options"}
-            </button>
-          )}
-        </div>
-
-        <div className="mt-auto flex flex-col items-end px-5 pb-3 pt-6 sm:px-7">
-          <button
-            type="button"
-            onClick={openAssistant}
-            className="group mb-5 inline-flex max-w-[210px] items-center gap-2 rounded-full border border-white/40 bg-black/55 py-2 pl-2 pr-4 text-left text-[12px] font-medium leading-tight text-white backdrop-blur-md transition-colors hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ff5a1f]"><Sparkles className="h-4 w-4" aria-hidden="true" /></span>
-            Need a suggestion? Ask us.
-          </button>
-        </div>
-
-        <div className="relative mt-2 flex w-full items-end">
-          <div className="flex min-h-[178px] w-[calc(100%-106px)] flex-col justify-center rounded-tr-[75px] border-r border-t border-white/20 bg-black/65 px-6 py-5 backdrop-blur-xl sm:px-8">
-            <span className="text-[12px] font-medium uppercase tracking-[0.14em] text-white/55">
-              {isSeasonalQuote
-                ? "Seasonal Quote"
-                : isSteakCut && selectedVariation
-                  ? `${selectedVariation} · ${selectedDoneness}`
-                  : selectedVariation
-                    ? selectedVariation
-                    : item.menuSection === "drinks"
-                      ? "Price"
-                      : "Price per dish"}
-            </span>
-            <div className="mt-1 flex items-baseline gap-2">
-              {isSeasonalQuote ? (
-                <span className="text-[clamp(2.5rem,9vw,3.4rem)] font-semibold leading-none tracking-[-0.05em]">S.Q.</span>
-              ) : (
-                <>
-                  <span className="text-[18px] font-medium text-white/70">N$</span>
-                  <span className="text-[clamp(2.7rem,10vw,3.7rem)] font-semibold leading-none tracking-[-0.07em]">{numberPrice}</span>
-                </>
-              )}
-            </div>
-            {!isSeasonalQuote && (
-              <div className="mt-4 flex items-center gap-3">
-                <span className="text-[13px] text-white/65">Quantity</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    aria-label="Decrease quantity"
-                    onClick={() => { setQuantity((value) => Math.max(1, value - 1)); setAdded(false); }}
-                    disabled={quantity <= 1 || unavailable}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/30 text-white disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-                  ><Minus className="h-4 w-4" /></button>
-                  <span className="min-w-4 text-center text-sm font-semibold tabular-nums">{quantity}</span>
-                  <button
-                    type="button"
-                    aria-label="Increase quantity"
-                    onClick={() => { setQuantity((value) => Math.min(20, value + 1)); setAdded(false); }}
-                    disabled={quantity >= 20 || unavailable}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/30 text-white disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-                  ><Plus className="h-4 w-4" /></button>
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="flex w-[106px] justify-center pb-[max(22px,env(safe-area-inset-bottom,0px))]">
-            <button
-              type="button"
-              onClick={addToBag}
-              disabled={unavailable}
-              aria-label={isSeasonalQuote ? "Ask your waiter for today's price" : unavailable ? "Currently unavailable" : `Add ${quantity} ${item.name} to your order`}
-              className="flex h-[129px] w-[76px] flex-col items-center justify-center gap-2 rounded-full border border-white/35 bg-white/15 text-white backdrop-blur-lg transition-transform hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-            >
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#121212]"><ShoppingBag className="h-5 w-5" strokeWidth={1.9} /></span>
-              <span className="max-w-14 text-center text-[11px] font-semibold leading-[1.3]">
-                {isSeasonalQuote ? "Ask waiter" : unavailable ? "Not available" : added ? "Added" : "Add to order"}
-              </span>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section id="dish-information" className="scroll-mt-5 px-6 py-14 sm:px-8" aria-labelledby="about-dish">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#ff784a]">THE DETAILS</p>
-        <h2 id="about-dish" className="mt-2 text-[31px] font-semibold tracking-[-0.05em]">{item.name}</h2>
-        <p className="mt-4 text-[15px] leading-7 text-white/65">{item.description}</p>
-        {isSeasonalQuote && (
-          <p className="mt-4 rounded-xl border border-white/15 bg-[#222] p-4 text-sm text-white/75">
-            Seasonal Quote (S.Q.) — please confirm availability and today&apos;s market price with your waiter.
-          </p>
-        )}
-        {!isSeasonalQuote && unavailable && (
-          <p role="status" className="mt-4 rounded-xl border border-white/15 bg-[#222] p-4 text-sm text-white/75">
-            This item isn&apos;t available right now. Browse the rest of the menu instead.
-          </p>
-        )}
-
-        {/* Wine Bottle/Glass OR Garlic Bread Variations (non-steak) */}
-        {!isSteakCut && hasVariations && item.variations && !unavailable && (
-          <div className="mt-7 border-t border-white/10 pt-7">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#ff784a]">
-              Select Option
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
-              {item.variations.map((v) => {
-                const active = selectedVariation === v.size;
-                return (
-                  <button
-                    key={v.size}
-                    type="button"
-                    onClick={() => { setSelectedVariation(v.size); setAdded(false); }}
-                    aria-pressed={active}
-                    className={
-                      "rounded-2xl border px-4 py-3 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] " +
-                      (active
-                        ? "border-[#ff5a1f] bg-[#ff5a1f] text-white"
-                        : "border-white/15 bg-[#242424] text-white/80 hover:border-white/35")
-                    }
-                  >
-                    <span className="block text-[15px] font-bold">{v.size}</span>
-                    <span className={"mt-0.5 block text-[12px] " + (active ? "text-white/90" : "text-white/55")}>
-                      {formatPrice(v.price)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Cocktail Alcohol-Free Option ("* Alcohol free if you wish" from Cocktail PDF) */}
-        {item.alcoholFreeOption && !unavailable && (
-          <div className="mt-7 border-t border-white/10 pt-7">
-            <button
-              type="button"
-              onClick={() => { setAlcoholFree((prev) => !prev); setAdded(false); }}
-              aria-pressed={alcoholFree}
-              className={
-                "flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-[14px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] " +
-                (alcoholFree
-                  ? "border-[#ff5a1f] bg-[#ff5a1f]/15 text-white"
-                  : "border-white/15 bg-[#242424] text-white/80 hover:border-white/35")
-              }
-            >
-              <span>Make it Alcohol-Free (Mocktail)</span>
-              <span
-                className={
-                  "flex h-5 w-5 shrink-0 items-center justify-center rounded border " +
-                  (alcoholFree ? "border-[#ff5a1f] bg-[#ff5a1f] text-white" : "border-white/30")
-                }
+            {/* Top bar controls */}
+            <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-4 pt-[max(18px,env(safe-area-inset-top,0px))] sm:px-6 lg:pt-4">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                aria-label="Go back"
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#121212]/70 text-white backdrop-blur-md transition-transform active:scale-95 hover:bg-[#121212]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
               >
-                {alcoholFree && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-              </span>
-            </button>
-          </div>
-        )}
+                <ArrowLeft className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
+              </button>
 
-        {/* Full PDF Steak Customizer for Choice Cuts, Butcher's Choice & Combos */}
-        {isSteakCut && !unavailable && (
-          <div id="customize" className="mt-8 space-y-7 border-t border-white/10 pt-8">
-            {item.variations && item.variations.length > 0 && (
-              <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#ff784a]">
-                  1. Select Cut / Weight
-                </p>
-                <div className={`mt-3 grid gap-2.5 ${item.variations.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void share()}
+                  aria-label={`Share ${item.name}`}
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#121212]/70 text-white backdrop-blur-md transition-transform active:scale-95 hover:bg-[#121212]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+                >
+                  <Share2 className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleFavorite}
+                  aria-pressed={favorited}
+                  aria-label={favorited ? `Remove ${item.name} from favourites` : `Save ${item.name} to favourites`}
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#121212]/70 text-white backdrop-blur-md transition-transform active:scale-95 hover:bg-[#121212]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+                >
+                  <Heart
+                    className={"h-5 w-5 transition-colors " + (favorited ? "fill-[#FF5A1F] text-[#FF5A1F]" : "text-white")}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+            </header>
+          </div>
+
+          {/* Product Details & Inline Customization */}
+          <div className="-mt-6 relative z-10 px-5 sm:px-6 lg:col-span-7 lg:mt-0 lg:px-0">
+            <h1 className="font-display text-[28px] font-extrabold leading-tight tracking-[-0.04em] text-white sm:text-[32px]">
+              {item.name}
+            </h1>
+            <p className="mt-1 text-[14px] font-medium text-[#A3A3A3]">
+              {item.category}
+              {selectedVariation ? ` · ${selectedVariation}` : ""}
+              {item.region ? ` · ${item.region}` : ""}
+            </p>
+
+            <p className="mt-3 text-[24px] font-extrabold tabular-nums text-[#FF5A1F]">
+              {isSeasonalQuote ? "S.Q." : formatPrice(unitPrice)}
+            </p>
+
+            <p className="mt-3 text-[15px] leading-relaxed text-[#C4C4C4]">{item.description}</p>
+
+            {isSeasonalQuote && (
+              <p className="mt-4 rounded-2xl border border-white/10 bg-[#242424] p-4 text-[14px] text-white/80">
+                Seasonal Quote (S.Q.) — please confirm availability and today&apos;s market price with your waiter.
+              </p>
+            )}
+
+            {!isSeasonalQuote && unavailable && (
+              <p role="status" className="mt-4 rounded-2xl border border-white/10 bg-[#242424] p-4 text-[14px] text-white/80">
+                This item isn&apos;t available right now.
+              </p>
+            )}
+
+            {/* Non-steak variations (Wine Bottle/Glass, Garlic Bread, etc.) */}
+            {!isSteakCut && hasVariations && item.variations && !unavailable && (
+              <section className="mt-6" aria-label="Choose option">
+                <h2 className="text-[15px] font-bold text-white">Select Option</h2>
+                <div className="mt-3 grid grid-cols-2 gap-2.5">
                   {item.variations.map((v) => {
                     const active = selectedVariation === v.size;
                     return (
                       <button
                         key={v.size}
                         type="button"
-                        onClick={() => { setSelectedVariation(v.size); setAdded(false); }}
+                        onClick={() => {
+                          setSelectedVariation(v.size);
+                          setJustAdded(false);
+                        }}
                         aria-pressed={active}
                         className={
-                          "rounded-2xl border px-3 py-3 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] " +
+                          "min-h-[56px] rounded-2xl border px-4 py-2.5 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
                           (active
-                            ? "border-[#ff5a1f] bg-[#ff5a1f] text-white"
-                            : "border-white/15 bg-[#242424] text-white/80 hover:border-white/35")
+                            ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
+                            : "border-white/10 bg-[#242424] text-white/85 hover:bg-[#303030]")
                         }
                       >
-                        <span className="block text-[14px] font-bold">{v.size}</span>
-                        <span className={"mt-0.5 block text-[12px] " + (active ? "text-white/90" : "text-white/55")}>
+                        <span className="block text-[15px] font-bold">{v.size}</span>
+                        <span className={"mt-0.5 block text-[13px] tabular-nums " + (active ? "text-white/90" : "text-[#A3A3A3]")}>
                           {formatPrice(v.price)}
                         </span>
                       </button>
                     );
                   })}
                 </div>
+              </section>
+            )}
+
+            {/* Alcohol-free cocktail toggle */}
+            {item.alcoholFreeOption && !unavailable && (
+              <section className="mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAlcoholFree((prev) => !prev);
+                    setJustAdded(false);
+                  }}
+                  aria-pressed={alcoholFree}
+                  className={
+                    "flex min-h-[52px] w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-[14px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+                    (alcoholFree
+                      ? "border-[#FF5A1F] bg-[#FF5A1F]/15 text-white"
+                      : "border-white/10 bg-[#242424] text-white/85 hover:bg-[#303030]")
+                  }
+                >
+                  <span>Prepare Alcohol-Free (Mocktail)</span>
+                  <span
+                    className={
+                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border " +
+                      (alcoholFree ? "border-[#FF5A1F] bg-[#FF5A1F] text-white" : "border-white/30")
+                    }
+                  >
+                    {alcoholFree && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                  </span>
+                </button>
+              </section>
+            )}
+
+            {/* Full Steak Customization matching Screen 04 */}
+            {isSteakCut && !unavailable && (
+              <div className="mt-6 space-y-6">
+                {/* 1. Weight / Cut Size */}
+                {item.variations && item.variations.length > 1 && (
+                  <section aria-label="Choose cut weight">
+                    <h2 className="text-[15px] font-bold text-white">Select Cut Weight</h2>
+                    <div className={`mt-3 grid gap-2.5 ${item.variations.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                      {item.variations.map((v) => {
+                        const active = selectedVariation === v.size;
+                        return (
+                          <button
+                            key={v.size}
+                            type="button"
+                            onClick={() => {
+                              setSelectedVariation(v.size);
+                              setJustAdded(false);
+                            }}
+                            aria-pressed={active}
+                            className={
+                              "min-h-[56px] rounded-2xl border px-3 py-2.5 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+                              (active
+                                ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
+                                : "border-white/10 bg-[#242424] text-white/85 hover:bg-[#303030]")
+                            }
+                          >
+                            <span className="block text-[15px] font-bold">{v.size}</span>
+                            <span className={"mt-0.5 block text-[12px] tabular-nums " + (active ? "text-white/90" : "text-[#A3A3A3]")}>
+                              {formatPrice(v.price)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                {/* 2. Choose Doneness (Screen 04 inline tile bar) */}
+                <section aria-label="Choose doneness">
+                  <h2 className="text-[15px] font-bold text-white">Choose Doneness</h2>
+                  <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                    {PDF_DONENESS_GUIDE.map((opt) => {
+                      const active = selectedDoneness === opt.label;
+                      return (
+                        <button
+                          key={opt.label}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDoneness(opt.label);
+                            setJustAdded(false);
+                          }}
+                          aria-pressed={active}
+                          className={
+                            "flex min-h-[48px] items-center justify-center rounded-2xl border px-2 py-2 text-center text-[13px] font-semibold leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+                            (active
+                              ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
+                              : "border-white/10 bg-[#242424] text-white/85 hover:bg-[#303030]")
+                          }
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {activeDonenessNote && (
+                    <p className="mt-2.5 text-[13px] text-[#A3A3A3]">{activeDonenessNote}</p>
+                  )}
+                </section>
+
+                {/* 3. Select a Side (1 Included — Screen 04 icon-tile grid) */}
+                <section aria-label="Select a complimentary side">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h2 className="text-[15px] font-bold text-white">
+                      Select a Side <span className="font-medium text-[#A3A3A3]">(1 Included)</span>
+                    </h2>
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2.5 sm:grid-cols-4">
+                    {PDF_COMPLIMENTARY_SIDES.map((side) => {
+                      const active = selectedSide === side;
+                      return (
+                        <button
+                          key={side}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSide(side);
+                            setJustAdded(false);
+                          }}
+                          aria-pressed={active}
+                          className={
+                            "relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-2xl border px-2 py-3 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+                            (active
+                              ? "border-[#FF5A1F] bg-[#FF5A1F]/15 text-white"
+                              : "border-white/10 bg-[#242424] text-[#C4C4C4] hover:bg-[#303030]")
+                          }
+                        >
+                          {active && (
+                            <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-[#FF5A1F] text-white">
+                              <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden="true" />
+                            </span>
+                          )}
+                          <span className={active ? "text-[#FF5A1F]" : "text-[#A3A3A3]"}>
+                            <SideIcon side={side} />
+                          </span>
+                          <span className="line-clamp-2 text-[12px] font-semibold leading-tight">
+                            {side}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* 4. Optional Sauces */}
+                <section aria-label="Optional sauces">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h2 className="text-[15px] font-bold text-white">Add a Sauce</h2>
+                    <span className="text-[13px] text-[#A3A3A3]">Optional</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {PDF_SAUCE_ADDONS.map((sauce) => {
+                      const active = selectedSauces.includes(sauce.id);
+                      return (
+                        <button
+                          key={sauce.id}
+                          type="button"
+                          onClick={() => toggleSauce(sauce.id)}
+                          aria-pressed={active}
+                          className={
+                            "flex min-h-[48px] items-center justify-between gap-2 rounded-2xl border px-3 py-2 text-left text-[13px] font-medium leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+                            (active
+                              ? "border-[#FF5A1F] bg-[#FF5A1F]/15 text-white"
+                              : "border-white/10 bg-[#242424] text-white/85 hover:bg-[#303030]")
+                          }
+                        >
+                          <span className="min-w-0">{sauce.id}</span>
+                          <span className="shrink-0 text-[12px] font-bold tabular-nums text-[#FF5A1F]">
+                            +{formatPrice(sauce.price)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
               </div>
             )}
 
-            <div>
-              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#ff784a]">
-                2. How would you like it cooked?
-              </p>
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                {PDF_DONENESS_GUIDE.map((opt) => {
-                  const active = selectedDoneness === opt.label;
-                  return (
-                    <button
-                      key={opt.label}
-                      type="button"
-                      onClick={() => { setSelectedDoneness(opt.label); setAdded(false); }}
-                      aria-pressed={active}
-                      className={
-                        "min-h-10 shrink-0 rounded-full px-4 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] " +
-                        (active
-                          ? "bg-white text-[#121212]"
-                          : "border border-white/15 bg-[#242424] text-white/80 hover:border-white/35")
-                      }
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {activeDonenessNote && (
-                <p className="mt-2.5 text-[12px] italic text-white/55">&ldquo;{activeDonenessNote}&rdquo;</p>
+            {/* Inline assistant & bag link */}
+            <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5">
+              <button
+                type="button"
+                onClick={openAssistant}
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/10 bg-[#242424] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+              >
+                <MessageSquare className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+                Ask about pairings
+              </button>
+              {totalItems > 0 && (
+                <Link
+                  to="/cart"
+                  className="inline-flex min-h-[44px] items-center gap-1.5 text-[14px] font-semibold text-[#FF5A1F] hover:text-white"
+                >
+                  View cart ({totalItems}) <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
               )}
             </div>
-
-            <div>
-              <div className="flex items-baseline justify-between">
-                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#ff784a]">
-                  3. Complimentary Side
-                </p>
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">Included</span>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {PDF_COMPLIMENTARY_SIDES.map((side) => {
-                  const active = selectedSide === side;
-                  return (
-                    <button
-                      key={side}
-                      type="button"
-                      onClick={() => { setSelectedSide(side); setAdded(false); }}
-                      aria-pressed={active}
-                      className={
-                        "flex min-h-11 items-center justify-between gap-2 rounded-2xl border px-3.5 py-2.5 text-left text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] " +
-                        (active
-                          ? "border-[#ff5a1f] bg-[#ff5a1f]/15 text-white"
-                          : "border-white/10 bg-[#242424] text-white/75 hover:border-white/30")
-                      }
-                    >
-                      <span>{side}</span>
-                      <span
-                        className={
-                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border " +
-                          (active ? "border-[#ff5a1f] bg-[#ff5a1f] text-white" : "border-white/25")
-                        }
-                      >
-                        {active && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-baseline justify-between">
-                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#ff784a]">
-                  4. Sauces ({PDF_SAUCE_ADDONS.length} available)
-                </p>
-                <span className="text-[11px] text-white/45">Optional</span>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {PDF_SAUCE_ADDONS.map((sauce) => {
-                  const active = selectedSauces.includes(sauce.id);
-                  return (
-                    <button
-                      key={sauce.id}
-                      type="button"
-                      onClick={() => toggleSauce(sauce.id)}
-                      aria-pressed={active}
-                      className={
-                        "flex min-h-11 items-center justify-between gap-2 rounded-2xl border px-3 py-2 text-left text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] " +
-                        (active
-                          ? "border-[#ff5a1f] bg-[#ff5a1f]/15 text-white"
-                          : "border-white/10 bg-[#242424] text-white/80 hover:border-white/30")
-                      }
-                    >
-                      <span className="min-w-0 truncate">{sauce.id}</span>
-                      <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[#ff8157]">
-                        +{formatPrice(sauce.price)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={addToBag}
-              className="flex min-h-14 w-full items-center justify-between rounded-full bg-[#ff5a1f] px-6 text-[15px] font-semibold text-white transition-colors hover:bg-[#fa703f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-            >
-              <span>{added ? "Added to your bag" : `Add ${quantity} × ${item.name}`}</span>
-              <span className="font-bold tabular-nums">{formatPrice(unitPrice * quantity)}</span>
-            </button>
           </div>
-        )}
-
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link to="/cart" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#ff5a1f] px-5 text-[14px] font-semibold text-white"><ShoppingBag className="h-4 w-4" /> View your bag ({totalItems})</Link>
-          <button type="button" onClick={() => void share()} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 px-5 text-[14px] font-semibold text-white"><Share2 className="h-4 w-4" /> Share item</button>
         </div>
-      </section>
 
-      {related.length > 0 && (
-        <section className="border-t border-white/10 px-6 pb-20 pt-10 sm:px-8" aria-labelledby="related-heading">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#ff784a]">KEEP EXPLORING</p>
-          <h2 id="related-heading" className="mt-2 text-[29px] font-semibold tracking-[-0.045em]">Pairs well with</h2>
-          <div className="mt-5 grid grid-cols-2 gap-x-3 gap-y-5">
-            {related.map((suggestion) => <MenuCard key={suggestion.id} item={suggestion} disabled={isUnavailable(suggestion.id)} />)}
-          </div>
-          <Link to={backRoute} className="mt-8 inline-flex min-h-11 items-center gap-2 text-[14px] font-semibold text-[#ff8157]">
-            Back to {item.menuSection === "drinks" ? "drinks" : "the menu"} <ArrowRight className="h-4 w-4" />
-          </Link>
-        </section>
-      )}
+        {/* Related recommendations */}
+        {related.length > 0 && (
+          <section className="mt-12 border-t border-white/10 px-5 pt-8 sm:px-6 lg:px-0" aria-labelledby="related-heading">
+            <div className="flex items-baseline justify-between gap-4">
+              <h2 id="related-heading" className="text-[20px] font-bold tracking-[-0.03em] text-white">
+                Pairs well with
+              </h2>
+              <Link to={backRoute} className="text-[14px] font-semibold text-[#FF5A1F] hover:text-white">
+                Full {item.menuSection === "drinks" ? "drinks" : "menu"}
+              </Link>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {related.map((suggestion) => (
+                <MenuCard key={suggestion.id} item={suggestion} disabled={isUnavailable(suggestion.id)} />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+
+      {/* Sticky iOS Bottom Action Bar matching Screen 04 */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#121212]/95 px-4 pb-[max(14px,env(safe-area-inset-bottom,0px))] pt-3 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[560px] items-center gap-3 lg:max-w-4xl">
+          {!isSeasonalQuote && (
+            <div className="flex h-[52px] shrink-0 items-center gap-1 rounded-full border border-white/10 bg-[#242424] px-1.5">
+              <button
+                type="button"
+                aria-label="Decrease quantity"
+                onClick={() => {
+                  setQuantity((v) => Math.max(1, v - 1));
+                  setJustAdded(false);
+                }}
+                disabled={quantity <= 1 || unavailable}
+                className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-[#303030] disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+              >
+                <Minus className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <output aria-label="Quantity" className="min-w-[26px] text-center text-[16px] font-bold tabular-nums text-white">
+                {quantity}
+              </output>
+              <button
+                type="button"
+                aria-label="Increase quantity"
+                onClick={() => {
+                  setQuantity((v) => Math.min(20, v + 1));
+                  setJustAdded(false);
+                }}
+                disabled={quantity >= 20 || unavailable}
+                className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-[#303030] disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={addToBag}
+            disabled={unavailable}
+            className="flex min-h-[52px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#FF5A1F] px-4 text-[15px] font-bold text-white transition-colors hover:bg-[#E84D15] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            {isSeasonalQuote ? (
+              <span>Ask waiter for today&apos;s quote</span>
+            ) : unavailable ? (
+              <span>Currently Unavailable</span>
+            ) : justAdded ? (
+              <>
+                <Check className="h-5 w-5" strokeWidth={2.4} aria-hidden="true" />
+                <span>Added · {formatPrice(lineTotal)}</span>
+              </>
+            ) : (
+              <span>Add to Order · {formatPrice(lineTotal)}</span>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

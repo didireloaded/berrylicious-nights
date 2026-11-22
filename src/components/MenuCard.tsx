@@ -1,15 +1,18 @@
 import { memo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, Plus } from "lucide-react";
+import { ArrowRight, Heart, Plus, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
+import { useFavorites } from "@/hooks/useFavorites";
 import { menuArtwork } from "@/lib/menuArtwork";
 import type { MenuItem } from "@/data/menu";
 import { formatPrice } from "@/lib/vibe";
 
 const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: MenuItem; disabled?: boolean }) {
   const { addItem } = useCart();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const artwork = menuArtwork(item);
+  const favorited = isFavorite(item.id);
 
   const isSeasonalQuote = Boolean(item.priceLabel);
   const priceText = item.priceLabel
@@ -18,66 +21,134 @@ const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: Menu
       ? `From ${formatPrice(Math.min(...item.variations.map((v) => v.price)))}`
       : formatPrice(item.price);
 
-  const add = () => {
+  const sizeHint =
+    item.variations && item.variations.length > 0
+      ? item.variations.map((v) => v.size).join(" / ")
+      : item.region || null;
+
+  const handleQuickAdd = () => {
     if (disabled || isSeasonalQuote) return;
+    const defaultVariation = item.variations?.[0];
+    if (defaultVariation) {
+      addItem(item, {
+        weight: defaultVariation.size,
+        priceOverride: defaultVariation.price,
+      });
+      toast.success(`${item.name} (${defaultVariation.size}) added to your order`);
+      return;
+    }
     addItem(item);
     toast.success(`${item.name} added to your order`);
   };
 
+  const handleToggleFavorite = () => {
+    const added = toggleFavorite(item.id);
+    toast.success(added ? `Saved ${item.name} to favourites` : `Removed ${item.name} from favourites`);
+  };
+
   return (
-    <article className={"relative mt-12 flex min-w-0 flex-col justify-between rounded-[27px] bg-[#242424] px-4 pb-4 pt-[72px] transition-transform duration-200 " + (disabled ? "opacity-55" : "hover:-translate-y-1")}>
-      <Link
-        to={`/menu/${item.id}`}
-        className="group absolute -top-11 left-1/2 flex h-[112px] w-[112px] -translate-x-1/2 items-center justify-center overflow-hidden rounded-full border-[5px] border-[#121212] bg-[#303030] shadow-[0_12px_20px_rgba(0,0,0,0.22)] outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-        aria-label={`View ${item.name}`}
-      >
-        {artwork.src ? (
-          <img
-            src={artwork.src}
-            alt={artwork.isExactDish ? item.name : ""}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.08]"
-          />
-        ) : (
-          <span className="max-w-[80px] text-center text-[11px] font-bold uppercase tracking-[0.12em] text-white/65">{item.category}</span>
-        )}
-      </Link>
-      <div className="mt-3 flex flex-1 flex-col">
-        <Link to={`/menu/${item.id}`} className="min-h-[55px] text-[17px] font-semibold leading-[1.2] tracking-[-0.035em] text-white outline-none focus-visible:underline">
-          {item.name}
+    <article
+      style={{ contentVisibility: "auto", containIntrinsicSize: "272px" }}
+      className={
+        "group relative flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[#242424] transition-colors " +
+        (disabled ? "opacity-55" : "hover:border-white/20")
+      }
+    >
+      {/* Visual header (representative photo or honest clean category header fallback) */}
+      <div className="relative h-[156px] w-full overflow-hidden bg-[#1B1B1B]">
+        <Link
+          to={`/menu/${item.id}`}
+          aria-label={`View ${item.name}`}
+          className="block h-full w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#FF5A1F]"
+        >
+          {artwork.src ? (
+            <>
+              <img
+                src={artwork.src}
+                alt={artwork.isExactDish ? item.name : ""}
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#242424] via-[#242424]/25 to-transparent" />
+            </>
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-[#2B2B2B] to-[#1A1A1A] px-6 text-center">
+              <UtensilsCrossed className="h-7 w-7 text-[#FF5A1F]/80" strokeWidth={1.6} aria-hidden="true" />
+              <span className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#A3A3A3]">
+                {item.category}
+              </span>
+            </div>
+          )}
         </Link>
-        <p className="mt-2 line-clamp-2 min-h-[38px] text-[12px] leading-[1.45] text-[#a4a4a4]">{item.description}</p>
-        <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#ff7b50]">
-          {item.tag ? `${item.category} · ${item.tag}` : item.category}
-        </div>
-        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
-          <div>
-            <span className="block text-[17px] font-semibold tracking-tight text-white">
+
+        {/* Real persisted favourite button */}
+        <button
+          type="button"
+          onClick={handleToggleFavorite}
+          aria-pressed={favorited}
+          aria-label={favorited ? `Remove ${item.name} from favourites` : `Save ${item.name} to favourites`}
+          className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#121212]/70 text-white backdrop-blur-md transition-transform active:scale-95 hover:bg-[#121212]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+        >
+          <Heart
+            className={"h-5 w-5 transition-colors " + (favorited ? "fill-[#FF5A1F] text-[#FF5A1F]" : "text-white")}
+            strokeWidth={1.9}
+            aria-hidden="true"
+          />
+        </button>
+
+        {disabled && (
+          <span className="absolute left-3 top-3 rounded-full bg-[#121212]/85 px-3 py-1 text-[12px] font-semibold text-white/80">
+            Unavailable
+          </span>
+        )}
+      </div>
+
+      {/* Dish details & primary action row */}
+      <div className="flex flex-1 flex-col px-4 pb-4 pt-2">
+        <Link
+          to={`/menu/${item.id}`}
+          className="focus-visible:outline-none focus-visible:underline"
+        >
+          <h3 className="text-[18px] font-bold leading-snug tracking-[-0.025em] text-white">
+            {item.name}
+          </h3>
+        </Link>
+
+        {sizeHint && (
+          <p className="mt-0.5 text-[13px] font-medium text-white/75">{sizeHint}</p>
+        )}
+
+        <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-[#A3A3A3]">
+          {item.description}
+        </p>
+
+        <div className="mt-auto flex items-center justify-between gap-3 pt-4">
+          <Link to={`/menu/${item.id}`} className="min-w-0">
+            <span className="block text-[18px] font-extrabold tabular-nums text-[#FF5A1F]">
               {priceText}
             </span>
-            {disabled && <span className="mt-1 block text-xs text-white/50">Unavailable</span>}
-          </div>
+          </Link>
+
           {!disabled && (
-            <div className="flex items-center gap-1.5">
+            isSeasonalQuote ? (
               <Link
                 to={`/menu/${item.id}`}
-                aria-label={`Details for ${item.name}`}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+                aria-label={`View seasonal quote details for ${item.name}`}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/15 bg-[#303030] px-4 text-[13px] font-semibold text-white hover:bg-[#3A3A3A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
               >
-                <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                Details <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
-              {!isSeasonalQuote && (
-                <button
-                  type="button"
-                  onClick={add}
-                  aria-label={`Add ${item.name} to order`}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#121212] transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-                >
-                  <Plus className="h-5 w-5" aria-hidden="true" />
-                </button>
-              )}
-            </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleQuickAdd}
+                aria-label={`Add ${item.name} to order`}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FF5A1F] text-white transition-transform hover:bg-[#E84D15] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <Plus className="h-5 w-5" strokeWidth={2.4} aria-hidden="true" />
+              </button>
+            )
           )}
         </div>
       </div>

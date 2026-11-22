@@ -8,19 +8,23 @@ import {
   ChevronRight,
   Shield,
   Info,
-  Package,
   Instagram,
   MapPin,
-  PartyPopper,
+  MessageSquare,
+  Heart,
   Wine,
   Check,
+  UtensilsCrossed,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAboutSheet } from "@/context/AboutSheetContext";
+import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
 import { formatPrice } from "@/lib/vibe";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
+import { useFavorites } from "@/hooks/useFavorites";
+import { menuItems } from "@/data/menu";
 import { supabase } from "@/integrations/supabase/client";
 import { requestOrderNotificationPermission } from "@/lib/orderStatusNotify";
 import { useEffect, useMemo, useState } from "react";
@@ -67,7 +71,9 @@ const ProfilePage = () => {
   const { user, profile, loading, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
   const { openAbout } = useAboutSheet();
+  const { openAssistant } = useRestaurantAssistant();
   const { currentOrder, currentBooking } = useApp();
+  const { favoriteIds } = useFavorites();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [guestNameInput, setGuestNameInput] = useState(() => readLocal("butcher-block-guest-name"));
@@ -82,6 +88,14 @@ const ProfilePage = () => {
   const loyaltyPoints = profile?.loyalty_points ?? 0;
   const loyaltyTarget = 5;
   const loyaltyPercent = Math.min((totalVisits / loyaltyTarget) * 100, 100);
+
+  const savedFavorites = useMemo(
+    () =>
+      favoriteIds
+        .map((id) => menuItems.find((item) => item.id === id))
+        .filter((item): item is (typeof menuItems)[number] => item != null),
+    [favoriteIds],
+  );
 
   useEffect(() => {
     if (user) {
@@ -121,16 +135,10 @@ const ProfilePage = () => {
     const cleanedName = guestNameInput.trim();
     const cleanedPhone = guestPhoneInput.trim();
     try {
-      if (cleanedName) {
-        localStorage.setItem("butcher-block-guest-name", cleanedName);
-      } else {
-        localStorage.removeItem("butcher-block-guest-name");
-      }
-      if (cleanedPhone) {
-        localStorage.setItem("butcher-block-guest-phone", cleanedPhone);
-      } else {
-        localStorage.removeItem("butcher-block-guest-phone");
-      }
+      if (cleanedName) localStorage.setItem("butcher-block-guest-name", cleanedName);
+      else localStorage.removeItem("butcher-block-guest-name");
+      if (cleanedPhone) localStorage.setItem("butcher-block-guest-phone", cleanedPhone);
+      else localStorage.removeItem("butcher-block-guest-phone");
     } catch {
       /* ignore storage errors */
     }
@@ -140,17 +148,10 @@ const ProfilePage = () => {
     setTimeout(() => setSavedNotice(false), 2000);
   };
 
-  const lastOrder = orders[0];
-
   const handleSignOut = async () => {
     await signOut();
     navigate("/home");
   };
-
-  const orderLine = useMemo(() => {
-    if (!lastOrder?.items?.length) return "Your last order";
-    return lastOrder.items.map((i) => `${i.name ?? "Item"} × ${i.qty ?? 1}`).join(", ");
-  }, [lastOrder]);
 
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
   const orderLive =
@@ -163,489 +164,414 @@ const ProfilePage = () => {
     typeof currentBooking.guests === "number" &&
     currentBooking.guests > 0;
 
-  const milestoneLabel = useMemo(() => {
-    if (totalVisits >= 12) return "House favourite";
-    if (totalVisits >= 4) return "Regular";
-    if (totalVisits >= 1) return "On the list";
-    return null;
-  }, [totalVisits]);
-
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-muted-foreground">
-        <div className="h-9 w-9 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        <p className="text-sm">Loading your profile…</p>
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-[#121212] text-[#A3A3A3]">
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-[#FF5A1F] border-t-transparent" />
+        <p className="text-[14px]">Loading your profile…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-safe-nav max-w-lg mx-auto">
-      {/* Profile hero */}
-      <div className="relative overflow-hidden px-6 pt-8 pb-10">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/12 via-primary/5 to-transparent" />
-        <div className="pointer-events-none absolute -top-24 right-0 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative flex flex-col items-center text-center">
-          <div className="relative mb-4">
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/10 text-2xl font-bold text-primary ring-4 ring-background shadow-xl">
-              {user || savedGuestName ? initials(displayName) : <User className="h-10 w-10 text-primary" strokeWidth={1.75} />}
-            </div>
-            {user && (
-              <span
-                className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-background"
-                title="Signed in"
-                aria-hidden
-              />
+    <div className="min-h-dvh bg-[#121212] pb-32 text-white lg:pb-16">
+      <div className="mx-auto max-w-[560px] px-5 pt-[max(24px,env(safe-area-inset-top,0px))] sm:px-6 lg:max-w-3xl lg:pt-8">
+        {/* Profile Header */}
+        <header className="flex items-center gap-4">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#303030] text-[20px] font-bold text-[#FF5A1F]">
+            {user || savedGuestName ? initials(displayName) : <User className="h-7 w-7 text-[#A3A3A3]" aria-hidden="true" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-display text-[24px] font-extrabold tracking-[-0.03em] text-white">
+              {displayName}
+            </h1>
+            {user?.email ? (
+              <p className="truncate text-[14px] text-[#A3A3A3]">{user.email}</p>
+            ) : (
+              <p className="text-[14px] text-[#A3A3A3]">Butcher Block Steakhouse · Windhoek</p>
             )}
           </div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">{displayName}</h1>
-          {user?.email && <p className="mt-1 max-w-[280px] truncate text-sm text-muted-foreground">{user.email}</p>}
-          {user?.created_at && (
-            <p className="mt-1.5 text-[11px] text-muted-foreground/90">
-              Member since{" "}
-              {new Date(user.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}
-            </p>
-          )}
           {!user && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Save your details for faster checkout &amp; table bookings
-            </p>
+            <Link
+              to="/auth"
+              className="inline-flex min-h-[44px] shrink-0 items-center rounded-full bg-[#FF5A1F] px-4 text-[13px] font-bold text-white transition-colors hover:bg-[#E84D15]"
+            >
+              Sign in
+            </Link>
           )}
-          {user && milestoneLabel && (
-            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1">
-              <PartyPopper className="h-3.5 w-3.5 text-primary" />
-              <span className="text-[11px] font-bold uppercase tracking-wide text-primary">{milestoneLabel}</span>
-            </div>
-          )}
-
-          {user && (
-            <div className="mt-6 grid w-full max-w-sm grid-cols-3 gap-2 rounded-2xl border border-border/80 bg-card/80 p-3 shadow-sm backdrop-blur-sm">
-              <div className="text-center">
-                <p className="font-display text-xl font-bold text-foreground">{totalVisits}</p>
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Visits</p>
-              </div>
-              <div className="border-x border-border/60 text-center">
-                <p className="font-display text-xl font-bold text-foreground">{totalOrders}</p>
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Orders</p>
-              </div>
-              <div className="text-center">
-                <p className="font-display text-xl font-bold text-primary">{loyaltyPoints}</p>
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Points</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-6 px-6 -mt-2">
-        {!user && (
-          <section className="rounded-2xl border border-border bg-card p-4 space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-display text-sm font-semibold text-foreground">Your details</h2>
-              <Link to="/auth" className="text-xs font-semibold text-primary hover:underline">
-                Sign in to sync
-              </Link>
-            </div>
-            <form onSubmit={handleSaveGuestProfile} className="space-y-3">
-              <div>
-                <label htmlFor="profile-guest-name" className="mb-1 block text-xs text-muted-foreground">
-                  Display name
-                </label>
-                <input
-                  id="profile-guest-name"
-                  type="text"
-                  value={guestNameInput}
-                  onChange={(e) => setGuestNameInput(e.target.value)}
-                  placeholder="Enter your name"
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
-                />
-              </div>
-              <div>
-                <label htmlFor="profile-guest-phone" className="mb-1 block text-xs text-muted-foreground">
-                  Phone number
-                </label>
-                <input
-                  id="profile-guest-phone"
-                  type="tel"
-                  value={guestPhoneInput}
-                  onChange={(e) => setGuestPhoneInput(e.target.value)}
-                  placeholder="+264 81 000 0000"
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
-                />
-              </div>
-              <button
-                type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground btn-press"
-              >
-                {savedNotice ? (
-                  <>
-                    <Check className="h-4 w-4" /> Saved
-                  </>
-                ) : (
-                  "Save profile details"
-                )}
-              </button>
-            </form>
-          </section>
-        )}
+        </header>
 
         {user && (
-          <div className="flex gap-2">
-            <Link
-              to="/booking"
-              className="flex flex-1 flex-col items-center gap-1.5 rounded-xl border border-border bg-card py-3 text-center btn-press hover:border-primary/40"
-            >
-              <CalendarDays className="h-5 w-5 text-primary" />
-              <span className="text-xs font-semibold text-foreground">Book</span>
-            </Link>
-            <Link
-              to="/menu"
-              className="flex flex-1 flex-col items-center gap-1.5 rounded-xl border border-border bg-card py-3 text-center btn-press hover:border-primary/40"
-            >
-              <Package className="h-5 w-5 text-primary" />
-              <span className="text-xs font-semibold text-foreground">Order</span>
-            </Link>
-            <Link
-              to="/events"
-              className="flex flex-1 flex-col items-center gap-1.5 rounded-xl border border-border bg-card py-3 text-center btn-press hover:border-primary/40"
-            >
-              <CalendarHeart className="h-5 w-5 text-primary" />
-              <span className="text-xs font-semibold text-foreground">Events</span>
-            </Link>
+          <div className="mt-6 grid grid-cols-3 gap-2.5 rounded-[22px] border border-white/10 bg-[#242424] p-4 text-center">
+            <div>
+              <p className="text-[20px] font-extrabold tabular-nums text-white">{totalVisits}</p>
+              <p className="text-[12px] font-medium text-[#A3A3A3]">Visits</p>
+            </div>
+            <div className="border-x border-white/10">
+              <p className="text-[20px] font-extrabold tabular-nums text-white">{totalOrders}</p>
+              <p className="text-[12px] font-medium text-[#A3A3A3]">Orders</p>
+            </div>
+            <div>
+              <p className="text-[20px] font-extrabold tabular-nums text-[#FF5A1F]">{loyaltyPoints}</p>
+              <p className="text-[12px] font-medium text-[#A3A3A3]">Points</p>
+            </div>
           </div>
         )}
 
-        {(orderLive || bookingTonight) && (
-          <section className="space-y-2">
-            <h2 className="px-0.5 font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Right now
+        <div className="mt-6 space-y-6">
+          {/* Guest details form (when not signed in) */}
+          {!user && (
+            <section className="rounded-[22px] border border-white/10 bg-[#242424] p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-[15px] font-bold text-white">Your details</h2>
+                <Link to="/auth" className="text-[13px] font-semibold text-[#FF5A1F] hover:underline">
+                  Sync across devices
+                </Link>
+              </div>
+              <form onSubmit={handleSaveGuestProfile} className="mt-3.5 space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="profile-guest-name" className="mb-1 block text-[13px] text-[#A3A3A3]">
+                      Display name
+                    </label>
+                    <input
+                      id="profile-guest-name"
+                      type="text"
+                      value={guestNameInput}
+                      onChange={(e) => setGuestNameInput(e.target.value)}
+                      placeholder="Enter your name"
+                      className="min-h-[46px] w-full rounded-xl border border-white/10 bg-[#181818] px-3.5 text-[16px] text-white placeholder:text-[#737373] focus:border-[#FF5A1F] focus:outline-none sm:text-[14px]"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="profile-guest-phone" className="mb-1 block text-[13px] text-[#A3A3A3]">
+                      Phone number
+                    </label>
+                    <input
+                      id="profile-guest-phone"
+                      type="tel"
+                      value={guestPhoneInput}
+                      onChange={(e) => setGuestPhoneInput(e.target.value)}
+                      placeholder="+264 81 000 0000"
+                      className="min-h-[46px] w-full rounded-xl border border-white/10 bg-[#181818] px-3.5 text-[16px] text-white placeholder:text-[#737373] focus:border-[#FF5A1F] focus:outline-none sm:text-[14px]"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  className="flex min-h-[46px] w-full items-center justify-center gap-2 rounded-full bg-[#FF5A1F] text-[14px] font-bold text-white transition-colors hover:bg-[#E84D15]"
+                >
+                  {savedNotice ? (
+                    <>
+                      <Check className="h-4 w-4" aria-hidden="true" /> Saved
+                    </>
+                  ) : (
+                    "Save profile details"
+                  )}
+                </button>
+              </form>
+            </section>
+          )}
+
+          {/* Active order / booking right now */}
+          {(orderLive || bookingTonight) && (
+            <section className="space-y-2.5">
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
+                Right Now
+              </h2>
+              {orderLive && currentOrder && (
+                <Link
+                  to={`/order/${currentOrder.id}`}
+                  className="flex items-center justify-between gap-3 rounded-[20px] border border-[#FF5A1F]/40 bg-[#FF5A1F]/10 px-4 py-3.5"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-bold text-[#FF5A1F]">
+                      Order #BB-{String(currentOrder.id).slice(0, 6).toUpperCase()}
+                    </p>
+                    <p className="text-[13px] text-[#A3A3A3]">Status: {String(currentOrder.status)} · tap for receipt</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                </Link>
+              )}
+              {bookingTonight && currentBooking && (
+                <Link
+                  to="/booking/success"
+                  state={currentBooking}
+                  className="flex items-center justify-between gap-3 rounded-[20px] border border-white/15 bg-[#242424] px-4 py-3.5"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-bold text-white">Table Tonight</p>
+                    <p className="text-[13px] text-[#A3A3A3]">
+                      {currentBooking.time} · {currentBooking.guests} guests
+                      {currentBooking.arrival_code ? ` · #${currentBooking.arrival_code}` : ""}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[#A3A3A3]" aria-hidden="true" />
+                </Link>
+              )}
+            </section>
+          )}
+
+          {/* Quick Navigation Grid */}
+          <section aria-labelledby="explore-heading">
+            <h2 id="explore-heading" className="mb-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
+              Explore
             </h2>
-            {orderLive && currentOrder && (
+            <div className="grid grid-cols-2 gap-2.5">
               <Link
-                to={`/order/${currentOrder.id}`}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-primary/35 bg-primary/10 px-4 py-3.5 transition-colors hover:bg-primary/15"
+                to="/menu"
+                className="flex items-center gap-3 rounded-[20px] border border-white/10 bg-[#242424] p-3.5 transition-colors hover:bg-[#303030]"
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-primary">
-                    Order #BB-{String(currentOrder.id).slice(0, 6).toUpperCase()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Status: {String(currentOrder.status)} · tap for receipt</p>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-primary" />
-              </Link>
-            )}
-            {bookingTonight && currentBooking && (
-              <Link
-                to="/booking/success"
-                state={currentBooking}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3.5 transition-colors hover:bg-emerald-500/15"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-emerald-200">Table tonight</p>
-                  <p className="text-xs text-muted-foreground">
-                    {currentBooking.time} · {currentBooking.guests} guests
-                    {currentBooking.arrival_code ? ` · #${currentBooking.arrival_code}` : ""}
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-emerald-300" />
-              </Link>
-            )}
-          </section>
-        )}
-
-        <section>
-          <h2 className="mb-3 px-0.5 font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Explore
-          </h2>
-          <div className="grid grid-cols-2 gap-2">
-            <Link
-              to="/menu"
-              className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/35"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Package className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">Food menu</p>
-                <p className="text-[10px] text-muted-foreground">Cuts, burgers &amp; grill</p>
-              </div>
-            </Link>
-            <Link
-              to="/drinks"
-              className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/35"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Wine className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">Wine &amp; Drinks</p>
-                <p className="text-[10px] text-muted-foreground">Cocktails &amp; cellar</p>
-              </div>
-            </Link>
-            <Link
-              to="/events"
-              className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/35"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <CalendarHeart className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">Events</p>
-                <p className="text-[10px] text-muted-foreground">Weekly steak nights</p>
-              </div>
-            </Link>
-            <Link
-              to="/booking"
-              className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/35"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <CalendarDays className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">Reserve</p>
-                <p className="text-[10px] text-muted-foreground">Pick date &amp; time</p>
-              </div>
-            </Link>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-border/80 bg-gradient-to-br from-card to-background/60 p-4">
-          <h2 className="font-display text-sm font-semibold text-foreground">At Am Weinberg Estate</h2>
-          <ul className="mt-3 space-y-2.5 text-xs leading-relaxed text-muted-foreground">
-            <li className="flex gap-2">
-              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-              13 Jan Jonker Road, Klein Windhoek · Open Mon–Sat 11:30–22:00, Sun 11:30–21:00.
-            </li>
-            <li className="flex gap-2">
-              <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-              Fridays &amp; Ladies/Men&apos;s Nights fill fast after 19:00 — book ahead to lock your reservation number.
-            </li>
-          </ul>
-        </section>
-
-        {user && (
-          <section className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/20 text-primary">
-                  <Gift className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="font-display text-base font-semibold text-foreground">Rewards</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {loyaltyPoints} pts · +more when orders complete
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="mb-1.5 flex justify-between text-xs">
-                <span className="text-muted-foreground">Visits toward free drink</span>
-                <span className="font-semibold text-foreground">
-                  {totalVisits} / {loyaltyTarget}
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FF5A1F]/15 text-[#FF5A1F]">
+                  <UtensilsCrossed className="h-5 w-5" aria-hidden="true" />
                 </span>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-bold text-white">Food Menu</p>
+                  <p className="text-[12px] text-[#A3A3A3]">Steaks &amp; grill</p>
+                </div>
+              </Link>
+              <Link
+                to="/drinks"
+                className="flex items-center gap-3 rounded-[20px] border border-white/10 bg-[#242424] p-3.5 transition-colors hover:bg-[#303030]"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FF5A1F]/15 text-[#FF5A1F]">
+                  <Wine className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-bold text-white">Wine &amp; Drinks</p>
+                  <p className="text-[12px] text-[#A3A3A3]">Cellar &amp; bar</p>
+                </div>
+              </Link>
+              <Link
+                to="/events"
+                className="flex items-center gap-3 rounded-[20px] border border-white/10 bg-[#242424] p-3.5 transition-colors hover:bg-[#303030]"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FF5A1F]/15 text-[#FF5A1F]">
+                  <CalendarHeart className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-bold text-white">Events</p>
+                  <p className="text-[12px] text-[#A3A3A3]">Weekly nights</p>
+                </div>
+              </Link>
+              <button
+                type="button"
+                onClick={openAssistant}
+                className="flex items-center gap-3 rounded-[20px] border border-white/10 bg-[#242424] p-3.5 text-left transition-colors hover:bg-[#303030]"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FF5A1F]/15 text-[#FF5A1F]">
+                  <MessageSquare className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-bold text-white">Ask Us</p>
+                  <p className="text-[12px] text-[#A3A3A3]">AI assistant</p>
+                </div>
+              </button>
+            </div>
+          </section>
+
+          {/* Saved Favourites (real persisted items) */}
+          {savedFavorites.length > 0 && (
+            <section aria-labelledby="saved-favs-heading">
+              <h2 id="saved-favs-heading" className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
+                <Heart className="h-3.5 w-3.5 fill-[#FF5A1F] text-[#FF5A1F]" aria-hidden="true" />
+                Saved Favourites ({savedFavorites.length})
+              </h2>
+              <div className="divide-y divide-white/10 overflow-hidden rounded-[22px] border border-white/10 bg-[#242424]">
+                {savedFavorites.slice(0, 6).map((item) => (
+                  <Link
+                    key={item.id}
+                    to={`/menu/${item.id}`}
+                    className="flex min-h-[56px] items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-[#303030]"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[14px] font-semibold text-white">{item.name}</p>
+                      <p className="text-[12px] text-[#A3A3A3]">{item.category}</p>
+                    </div>
+                    <span className="shrink-0 text-[14px] font-bold tabular-nums text-[#FF5A1F]">
+                      {item.priceLabel ?? formatPrice(item.price)}
+                    </span>
+                  </Link>
+                ))}
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-background/80">
-                <div
-                  className="h-full rounded-full bg-primary transition-all duration-500"
-                  style={{ width: `${loyaltyPercent}%` }}
-                />
+            </section>
+          )}
+
+          {/* Signed-in rewards */}
+          {user && (
+            <section className="rounded-[22px] border border-white/10 bg-[#242424] p-5">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FF5A1F]/15 text-[#FF5A1F]">
+                  <Gift className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="text-[16px] font-bold text-white">Rewards</h2>
+                  <p className="text-[13px] text-[#A3A3A3]">{loyaltyPoints} pts earned</p>
+                </div>
               </div>
-              {loyaltyPercent >= 100 && (
-                <p className="mt-3 text-sm font-semibold text-primary">You’ve earned a free drink — show staff your profile.</p>
+              <div className="mt-4">
+                <div className="mb-1.5 flex justify-between text-[13px]">
+                  <span className="text-[#A3A3A3]">Visits toward complimentary drink</span>
+                  <span className="font-bold text-white">
+                    {totalVisits} / {loyaltyTarget}
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-[#303030]">
+                  <div className="h-full rounded-full bg-[#FF5A1F]" style={{ width: `${loyaltyPercent}%` }} />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Reservations */}
+          {bookings.length > 0 && (
+            <section aria-labelledby="profile-bookings-heading">
+              <h2 id="profile-bookings-heading" className="mb-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
+                Reservations
+              </h2>
+              <div className="divide-y divide-white/10 overflow-hidden rounded-[22px] border border-white/10 bg-[#242424]">
+                {bookings.slice(0, 6).map((b, i) => {
+                  const resNo =
+                    b.arrival_code ||
+                    b.reservation_number ||
+                    (b.id ? `BB-${String(b.id).slice(0, 6).toUpperCase()}` : null);
+                  return (
+                    <Link
+                      key={b.id || String(i)}
+                      to="/booking/success"
+                      state={{
+                        id: b.id,
+                        date: b.date,
+                        time: b.time,
+                        guests: b.guests,
+                        eventTitle: b.eventTitle,
+                        arrival_code: resNo ?? undefined,
+                        assigned_table_code: b.assigned_table_code,
+                      }}
+                      className="flex min-h-[60px] items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-[#303030]"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[14px] font-semibold text-white">
+                          {b.eventTitle ? `${b.eventTitle} · ` : ""}
+                          {b.guests} guests · {b.time}
+                        </p>
+                        <p className="mt-0.5 text-[13px] text-[#A3A3A3]">
+                          {b.date}
+                          {resNo ? ` · #${resNo}` : ""}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-[#303030] px-2.5 py-1 text-[11px] font-bold uppercase text-[#FF5A1F]">
+                        {b.status || "Booked"}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Order Receipts */}
+          {orders.length > 0 && (
+            <section aria-labelledby="profile-orders-heading">
+              <h2 id="profile-orders-heading" className="mb-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
+                Order Receipts
+              </h2>
+              <div className="space-y-2">
+                {orders.map((o, i) => (
+                  <div
+                    key={o.id || String(i)}
+                    className="flex items-center justify-between gap-3 rounded-[20px] border border-white/10 bg-[#242424] px-4 py-3.5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-semibold text-white">
+                        {Array.isArray(o.items) ? o.items.map((x) => x.name).filter(Boolean).join(", ") || "Order" : "Order"}
+                      </p>
+                      <p className="mt-0.5 text-[12px] text-[#A3A3A3]">
+                        {o.id ? `#BB-${String(o.id).slice(0, 6).toUpperCase()} · ` : ""}
+                        {new Date(o.created_at || o.createdAt || "").toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-[14px] font-bold tabular-nums text-[#FF5A1F]">
+                        {formatPrice(Number(o.total))}
+                      </span>
+                      {o.id && (
+                        <Link to={`/order/${o.id}`} className="text-[13px] font-semibold text-white hover:text-[#FF5A1F]">
+                          Receipt
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Restaurant Details & Account Links */}
+          <section aria-labelledby="restaurant-info-heading">
+            <h2 id="restaurant-info-heading" className="mb-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
+              Butcher Block Windhoek
+            </h2>
+            <div className="divide-y divide-white/10 overflow-hidden rounded-[22px] border border-white/10 bg-[#242424]">
+              <div className="flex items-start gap-3 px-4 py-3.5 text-[14px] text-[#C4C4C4]">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                <span>Am Weinberg Estate, 13 Jan Jonker Road, Klein Windhoek</span>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3.5 text-[14px] text-[#C4C4C4]">
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                <span>Mon–Sat: 11:30 – 22:00 · Sun: 11:30 – 21:00</span>
+              </div>
+              <a
+                href="https://www.instagram.com/butcherblocknamibia/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex min-h-[52px] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-[#303030]"
+              >
+                <Instagram className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                <span className="flex-1 text-[14px] font-semibold text-white">@butcherblocknamibia</span>
+                <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
+              </a>
+              <button
+                type="button"
+                onClick={openAbout}
+                className="flex min-h-[52px] w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#303030]"
+              >
+                <Info className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                <span className="flex-1 text-[14px] font-semibold text-white">About, contact &amp; map</span>
+                <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
+              </button>
+              <Link
+                to="/booking"
+                className="flex min-h-[52px] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-[#303030]"
+              >
+                <CalendarDays className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                <span className="flex-1 text-[14px] font-semibold text-white">Reserve a Table</span>
+                <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
+              </Link>
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  className="flex min-h-[52px] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-[#303030]"
+                >
+                  <Shield className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                  <span className="flex-1 text-[14px] font-semibold text-white">Admin Console</span>
+                  <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
+                </Link>
               )}
             </div>
           </section>
-        )}
 
-        {lastOrder && (
-          <section>
-            <h2 className="mb-3 px-0.5 font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Recent activity
-            </h2>
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-semibold text-foreground">Last order</span>
-                </div>
-                {lastOrder.id && (
-                  <span className="font-mono text-xs font-bold text-primary">
-                    #BB-{String(lastOrder.id).slice(0, 6).toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <p className="text-sm leading-relaxed text-foreground line-clamp-2">{orderLine}</p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {formatPrice(Number(lastOrder.total))} ·{" "}
-                {new Date(lastOrder.created_at || lastOrder.createdAt || "").toLocaleDateString(undefined, {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                })}
-              </p>
-              <div className="mt-4 flex items-center gap-5">
-                {lastOrder.id && (
-                  <Link
-                    to={`/order/${lastOrder.id}`}
-                    className="inline-flex items-center gap-1 text-sm font-bold text-primary hover:opacity-90"
-                  >
-                    View receipt <ChevronRight className="h-4 w-4" />
-                  </Link>
-                )}
-                <Link
-                  to="/menu"
-                  className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground"
-                >
-                  Order again
-                </Link>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {bookings.length > 0 && (
-          <section>
-            <h2 className="mb-3 px-0.5 font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Reservations
-            </h2>
-            <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-              {bookings.slice(0, 6).map((b, i) => {
-                const resNo =
-                  b.arrival_code ||
-                  b.reservation_number ||
-                  (b.id ? `BB-${String(b.id).slice(0, 6).toUpperCase()}` : null);
-                return (
-                  <Link
-                    key={b.id || String(i)}
-                    to="/booking/success"
-                    state={{
-                      id: b.id,
-                      date: b.date,
-                      time: b.time,
-                      guests: b.guests,
-                      eventTitle: b.eventTitle,
-                      arrival_code: resNo ?? undefined,
-                      assigned_table_code: b.assigned_table_code,
-                    }}
-                    className="flex items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-muted/20"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">
-                        {b.eventTitle ? `${b.eventTitle} · ` : ""}
-                        {b.guests} guests · {b.time}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {b.date
-                          ? new Date(b.date + "T12:00:00").toLocaleDateString(undefined, {
-                              weekday: "short",
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : ""}
-                        {resNo ? ` · #${resNo}` : ""}
-                      </p>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                        b.status === "confirmed" || b.status === "arrived"
-                          ? "bg-primary/15 text-primary"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {b.status || "booked"}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {orders.length > 0 && (
-          <section>
-            <h2 className="mb-3 px-0.5 font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Order receipts
-            </h2>
-            <div className="space-y-2">
-              {orders.map((o, i) => (
-                <div
-                  key={o.id || String(i)}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-card/50 px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-foreground">
-                      {Array.isArray(o.items) ? o.items.map((x) => x.name).filter(Boolean).join(", ") || "Order" : "Order"}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {o.id ? `#BB-${String(o.id).slice(0, 6).toUpperCase()} · ` : ""}
-                      {new Date(o.created_at || o.createdAt || "").toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-sm font-bold text-primary">{formatPrice(Number(o.total))}</span>
-                    {o.id && (
-                      <Link to={`/order/${o.id}`} className="text-[11px] font-semibold text-primary hover:underline">
-                        Receipt
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section>
-          <h2 className="mb-3 px-0.5 font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Account
-          </h2>
-          <div className="overflow-hidden rounded-2xl border border-border bg-card divide-y divide-border">
-            <a
-              href="https://www.instagram.com/butcherblocknamibia/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-4 py-4 transition-colors hover:bg-muted/30 active:bg-muted/50"
-            >
-              <Instagram className="h-5 w-5 shrink-0 text-pink-400" />
-              <span className="flex-1 text-sm font-medium text-foreground">@butcherblocknamibia</span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-            </a>
+          {user && (
             <button
               type="button"
-              onClick={() => openAbout()}
-              className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-muted/30 active:bg-muted/50"
+              onClick={() => void handleSignOut()}
+              className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-[#242424] text-[14px] font-semibold text-[#A3A3A3] transition-colors hover:text-white"
             >
-              <Info className="h-5 w-5 text-primary shrink-0" />
-              <span className="flex-1 text-sm font-medium text-foreground">About &amp; hours</span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              Sign out
             </button>
-            {isAdmin && (
-              <Link
-                to="/admin"
-                className="flex items-center gap-3 px-4 py-4 transition-colors hover:bg-muted/30 active:bg-muted/50"
-              >
-                <Shield className="h-5 w-5 text-primary shrink-0" />
-                <span className="flex-1 text-sm font-medium text-foreground">Admin</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </Link>
-            )}
-          </div>
-        </section>
-
-        {user && (
-          <button
-            type="button"
-            onClick={() => void handleSignOut()}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border py-4 text-sm font-semibold text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive btn-press"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </button>
-        )}
-
-        <p className="pb-4 text-center text-[11px] text-muted-foreground">Butcher Block Steakhouse · Profile</p>
+          )}
+        </div>
       </div>
     </div>
   );

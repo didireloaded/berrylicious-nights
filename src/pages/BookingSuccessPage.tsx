@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect } from "react";
-import { CalendarDays, Clock, Sparkles, Users } from "lucide-react";
+import { CalendarDays, Check, Clock, Sparkles, Users } from "lucide-react";
 import { ArrivalCodeCard } from "@/components/ArrivalCodeCard";
 import { useApp } from "@/context/AppContext";
 
@@ -34,128 +34,123 @@ const BookingSuccessPage = () => {
   }, [booking?.date, booking?.time, booking?.guests, reservationNumber, setCurrentBooking]);
 
   const formattedDate = booking?.date
-    ? new Date(booking.date + "T00:00").toLocaleDateString("en-ZA", {
+    ? new Date(booking.date + "T12:00:00Z").toLocaleDateString("en-ZA", {
         weekday: "long",
         day: "numeric",
         month: "long",
+        timeZone: "UTC",
       })
     : null;
 
   return (
-    <div className="min-h-screen pb-safe-nav flex flex-col items-center justify-center px-6 max-w-lg mx-auto text-center animate-fade-in">
-      {/* Animated checkmark */}
-      <div className="w-24 h-24 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center mb-6">
-        <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M5 13l4 4L19 7"
-            stroke="hsl(43, 65%, 52%)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="animate-draw-check"
-          />
-        </svg>
-      </div>
+    <div className="min-h-dvh bg-[#121212] px-5 pb-32 pt-[max(32px,env(safe-area-inset-top,0px))] text-white lg:pb-16">
+      <div className="mx-auto flex max-w-[520px] flex-col items-center text-center animate-fade-in">
+        <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#FF5A1F] bg-[#FF5A1F]/15 text-[#FF5A1F]">
+          <Check className="h-8 w-8" strokeWidth={2.6} aria-hidden="true" />
+        </div>
 
-      <h1 className="font-display text-3xl font-bold text-foreground mb-2">
-        {booking ? "Your table is booked" : "Reservation not found"}
-      </h1>
+        <h1 className="font-display text-[28px] font-extrabold tracking-[-0.04em] text-white">
+          {booking ? "Table Reserved" : "Reservation Not Found"}
+        </h1>
 
-      {booking ? (
-        <>
-          {reservationNumber ? (
-            <ArrivalCodeCard
-              code={reservationNumber}
-              bookingDate={booking.date}
-              bookingTime={booking.time}
-              className="mb-5"
-            />
-          ) : null}
+        {booking ? (
+          <>
+            <p className="mt-1.5 text-[14px] text-[#A3A3A3]">
+              Butcher Block Steakhouse · Am Weinberg Estate
+            </p>
 
-          {/* Booking summary card */}
-          <div className="bg-card border border-border rounded-xl p-5 w-full mb-4 text-left space-y-3">
             {reservationNumber && (
-              <>
-                <div className="flex items-center justify-between">
-                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Reservation Number</p>
-                  <p className="font-mono text-sm font-bold text-primary">{reservationNumber}</p>
-                </div>
-                <div className="border-t border-border" />
-              </>
+              <ArrivalCodeCard
+                code={reservationNumber}
+                bookingDate={booking.date}
+                bookingTime={booking.time}
+                className="mt-6 rounded-[24px] border-white/10 bg-[#242424]"
+              />
             )}
-            {booking.eventTitle && (
-              <>
-                <div className="flex items-center gap-3">
-                  <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+
+            <div className="mt-5 w-full divide-y divide-white/10 rounded-[22px] border border-white/10 bg-[#242424] px-5 text-left">
+              {reservationNumber && (
+                <div className="flex items-center justify-between py-3.5">
+                  <span className="text-[13px] font-medium uppercase tracking-[0.08em] text-[#A3A3A3]">
+                    Reservation Number
+                  </span>
+                  <span className="font-mono text-[15px] font-bold text-[#FF5A1F]">
+                    {reservationNumber}
+                  </span>
+                </div>
+              )}
+
+              {booking.eventTitle && (
+                <div className="flex items-center gap-3 py-3.5">
+                  <Sparkles className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
                   <div>
-                    <p className="text-muted-foreground text-xs uppercase tracking-wider">Event</p>
-                    <p className="text-foreground font-semibold">{booking.eventTitle}</p>
+                    <p className="text-[12px] uppercase tracking-[0.08em] text-[#A3A3A3]">Event</p>
+                    <p className="text-[15px] font-semibold text-white">{booking.eventTitle}</p>
                   </div>
                 </div>
-                <div className="border-t border-border" />
-              </>
-            )}
-            <div className="flex items-center gap-3">
-              <CalendarDays className="w-5 h-5 text-primary flex-shrink-0" />
-              <div>
-                <p className="text-muted-foreground text-xs uppercase tracking-wider">Date</p>
-                <p className="text-foreground font-semibold">{formattedDate}</p>
-              </div>
-            </div>
-            <div className="border-t border-border" />
-            <div className="flex items-center gap-3">
-              <Clock className="w-5 h-5 text-primary flex-shrink-0" />
-              <div>
-                <p className="text-muted-foreground text-xs uppercase tracking-wider">Time</p>
-                <p className="text-foreground font-semibold">{booking.time}</p>
-              </div>
-            </div>
-            <div className="border-t border-border" />
-            <div className="flex items-center gap-3">
-              <Users className="w-5 h-5 text-primary flex-shrink-0" />
-              <div>
-                <p className="text-muted-foreground text-xs uppercase tracking-wider">Guests</p>
-                <p className="text-foreground font-semibold">
-                  {booking.guests} guest{booking.guests > 1 ? "s" : ""}
-                </p>
-              </div>
-            </div>
-            {booking.assigned_table_code ? (
-              <>
-                <div className="border-t border-border" />
-                <div>
-                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Table</p>
-                  <p className="text-foreground font-semibold font-mono tracking-wide">{booking.assigned_table_code}</p>
-                  <p className="text-[11px] text-muted-foreground mt-1">Auto-assigned for your party size — staff may adjust on arrival.</p>
-                </div>
-              </>
-            ) : null}
-          </div>
-          <p className="text-muted-foreground text-sm mb-8">
-            {reservationNumber
-              ? "Present your reservation number at Butcher Block upon arrival — you can also pull it up anytime in your Profile."
-              : "Save these details and bring them with you when you arrive."}
-          </p>
-        </>
-      ) : (
-        <p className="text-muted-foreground text-lg mb-8">
-          No reservation details were found. You can make a booking below.
-        </p>
-      )}
+              )}
 
-      <div className="flex gap-3 w-full">
-        <Link
-          to="/menu"
-          className="flex-1 bg-primary text-primary-foreground font-semibold py-4 rounded-lg text-center btn-press"
-        >
-          {booking ? "Explore the menu" : "Browse menu"}
-        </Link>
-        <Link
-          to="/home"
-          className="flex-1 border border-border text-foreground font-semibold py-4 rounded-lg text-center hover:bg-card transition-colors btn-press"
-        >
-          Back to Home
-        </Link>
+              <div className="flex items-center gap-3 py-3.5">
+                <CalendarDays className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                <div>
+                  <p className="text-[12px] uppercase tracking-[0.08em] text-[#A3A3A3]">Date</p>
+                  <p className="text-[15px] font-semibold text-white">{formattedDate}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 py-3.5">
+                <Clock className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                <div>
+                  <p className="text-[12px] uppercase tracking-[0.08em] text-[#A3A3A3]">Time</p>
+                  <p className="text-[15px] font-semibold text-white">{booking.time}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 py-3.5">
+                <Users className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                <div>
+                  <p className="text-[12px] uppercase tracking-[0.08em] text-[#A3A3A3]">Guests</p>
+                  <p className="text-[15px] font-semibold text-white">
+                    {booking.guests} {booking.guests === 1 ? "guest" : "guests"}
+                  </p>
+                </div>
+              </div>
+
+              {booking.assigned_table_code && (
+                <div className="py-3.5">
+                  <p className="text-[12px] uppercase tracking-[0.08em] text-[#A3A3A3]">Table</p>
+                  <p className="font-mono text-[15px] font-semibold text-white">{booking.assigned_table_code}</p>
+                  <p className="mt-1 text-[12px] text-[#A3A3A3]">
+                    Auto-assigned for your party size — staff may adjust on arrival.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <p className="mt-4 text-[13px] leading-relaxed text-[#A3A3A3]">
+              Present your reservation number on arrival. You can also view it anytime in Profile.
+            </p>
+          </>
+        ) : (
+          <p className="mt-4 text-[15px] text-[#A3A3A3]">
+            No reservation details were found. You can book a table anytime.
+          </p>
+        )}
+
+        <div className="mt-7 flex w-full gap-3">
+          <Link
+            to="/menu"
+            className="flex min-h-[50px] flex-1 items-center justify-center rounded-full bg-[#FF5A1F] text-[15px] font-bold text-white transition-colors hover:bg-[#E84D15]"
+          >
+            Browse Menu
+          </Link>
+          <Link
+            to="/home"
+            className="flex min-h-[50px] flex-1 items-center justify-center rounded-full border border-white/15 bg-[#242424] text-[15px] font-semibold text-white transition-colors hover:bg-[#303030]"
+          >
+            Back to Home
+          </Link>
+        </div>
       </div>
     </div>
   );

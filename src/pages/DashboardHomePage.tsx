@@ -1,182 +1,339 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, CalendarHeart, ShoppingBag } from "lucide-react";
-import butcherBlockLogo from "@/assets/butcher-block-logo.png";
-import { foodItems, drinkItems } from "@/data/menu";
+import {
+  ArrowRight,
+  Bell,
+  CalendarDays,
+  CalendarHeart,
+  Clock,
+  MapPin,
+  MessageSquare,
+  User,
+  UtensilsCrossed,
+  Wine,
+} from "lucide-react";
+import dishLamb from "@/assets/dish-lamb.jpg";
+import { foodItems } from "@/data/menu";
 import { useAuth } from "@/context/AuthContext";
+import { useApp } from "@/context/AppContext";
 import { useCart } from "@/context/CartContext";
 import { useActiveUpdates } from "@/hooks/useActiveUpdates";
 import { useAboutSheet } from "@/context/AboutSheetContext";
+import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
 import { EventDetailSheet } from "@/components/EventDetailSheet";
 import { ActiveOrderBanner } from "@/components/ActiveOrderBanner";
 import { formatPrice } from "@/lib/vibe";
+import { getWindhoekDateISO } from "@/lib/windhoekDate";
 import type { HomeUpdateRow } from "@/lib/eventBooking";
 
-const MEAL_OF_THE_DAY = foodItems.find((item) => item.id === "6") ?? foodItems[0];
-const DRINK_OF_THE_DAY = drinkItems.find((item) => item.id === "14") ?? drinkItems[0];
-const WINE_PICK = drinkItems.find((item) => item.category === "Sauvignon Blanc") ?? drinkItems[1];
+const SIGNATURE_IDS = ["cc-ribeye", "6"];
+
+function getWindhoekGreeting(): string {
+  try {
+    const hourStr = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Africa/Windhoek",
+      hour: "2-digit",
+      hour12: false,
+    }).format(new Date());
+    const hour = Number(hourStr);
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  } catch {
+    return "Welcome";
+  }
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 export default function DashboardHomePage() {
   const { user, profile } = useAuth();
+  const { currentOrder, currentBooking } = useApp();
   const { totalItems } = useCart();
   const updates = useActiveUpdates();
   const { openAbout } = useAboutSheet();
+  const { openAssistant } = useRestaurantAssistant();
   const [selectedEvent, setSelectedEvent] = useState<HomeUpdateRow | null>(null);
 
-  const guestSavedName =
-    typeof localStorage !== "undefined" ? localStorage.getItem("butcher-block-guest-name") : null;
-  const displayName = (profile?.display_name || user?.user_metadata?.full_name || guestSavedName || "Guest").trim();
-  const initial = displayName.charAt(0).toUpperCase();
+  const savedGuestName =
+    typeof localStorage !== "undefined" ? (localStorage.getItem("butcher-block-guest-name") || "").trim() : "";
+  const verifiedName = (profile?.display_name || user?.user_metadata?.full_name || savedGuestName).trim();
+  const firstName = verifiedName ? verifiedName.split(/\s+/)[0] : "";
+  const greeting = firstName ? `${getWindhoekGreeting()}, ${firstName}` : "Butcher Block Steakhouse";
+
+  const signatureDishes = useMemo(
+    () =>
+      SIGNATURE_IDS.map((id) => foodItems.find((item) => item.id === id)).filter(
+        (item): item is (typeof foodItems)[number] => item != null,
+      ),
+    [],
+  );
+
+  const hasLiveOrder = Boolean(
+    currentOrder && ["pending", "preparing", "ready"].includes(String(currentOrder.status)),
+  );
+  const todayISO = getWindhoekDateISO();
+  const upcomingBooking =
+    currentBooking && currentBooking.date >= todayISO ? currentBooking : null;
+
+  // Show notification bell ONLY when real active order or active updates exist
+  const hasRealNotifications = hasLiveOrder || updates.length > 0;
+  const notificationTarget = hasLiveOrder && currentOrder ? `/order/${currentOrder.id}` : "/events";
 
   return (
-    <div className={"min-h-dvh bg-[#121212] text-white " + (totalItems > 0 ? "pb-56" : "pb-36")}>
-      <div className="mx-auto max-w-[560px] px-5 pt-[max(30px,env(safe-area-inset-top,0px))] sm:px-8">
-        {/* Clean Header with Logo + Profile + Cart */}
-        <header className="flex items-center justify-between gap-4">
-          <Link to="/" aria-label="Butcher Block welcome screen" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]">
-            <img src={butcherBlockLogo} alt="Butcher Block Steakhouse" className="h-9 w-auto object-contain" />
+    <div
+      className={
+        "min-h-dvh bg-[#121212] text-white lg:pb-16 " +
+        (totalItems > 0 ? "pb-44" : "pb-28")
+      }
+    >
+      <div className="mx-auto max-w-[560px] px-5 pt-[max(20px,env(safe-area-inset-top,0px))] sm:px-6 lg:max-w-5xl lg:px-8 lg:pt-8">
+        {/* Compact iOS Greeting Header */}
+        <header className="flex items-center justify-between gap-3">
+          <Link
+            to="/profile"
+            aria-label={verifiedName ? `Open profile for ${verifiedName}` : "Open your profile"}
+            className="group flex min-w-0 items-center gap-3 rounded-full pr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#303030] text-[14px] font-bold text-white transition-colors group-hover:border-[#FF5A1F]">
+              {verifiedName ? getInitials(verifiedName) : <User className="h-5 w-5 text-[#A3A3A3]" aria-hidden="true" />}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-[15px] font-bold leading-snug text-white">
+                {greeting}
+              </span>
+              <span className="mt-0.5 flex items-center gap-1 truncate text-[13px] text-[#A3A3A3]">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                Am Weinberg Estate, Windhoek
+              </span>
+            </span>
           </Link>
-          <div className="flex items-center gap-2.5">
-            <Link
-              to="/profile"
-              aria-label={`Profile: ${displayName}`}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-[#242424] text-sm font-semibold text-white transition-colors hover:border-[#ff5a1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-            >
-              {initial}
-            </Link>
-            <Link
-              to="/cart"
-              aria-label={`Your order, ${totalItems} items`}
-              className="relative flex h-11 w-11 items-center justify-center rounded-full bg-[#242424] text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-            >
-              <ShoppingBag className="h-5 w-5" aria-hidden="true" />
-              {totalItems > 0 && (
-                <span className="absolute -right-1 -top-1 flex min-h-[19px] min-w-[19px] items-center justify-center rounded-full bg-[#ff5a1f] px-1 text-[10px] font-bold">
-                  {totalItems > 99 ? "99+" : totalItems}
-                </span>
-              )}
-            </Link>
+
+          <div className="flex shrink-0 items-center gap-2">
+            {hasRealNotifications && (
+              <Link
+                to={notificationTarget}
+                aria-label={hasLiveOrder ? "View active order update" : "View active announcements and events"}
+                className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#242424] text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+              >
+                <Bell className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
+                <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-[#FF5A1F]" aria-hidden="true" />
+              </Link>
+            )}
           </div>
         </header>
 
+        {/* Active order dynamic banner (only shown when a real order is in progress) */}
         <ActiveOrderBanner />
 
-        {/* Meal of the Day */}
-        <section className="mt-8" aria-labelledby="meal-of-day-heading">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#ff7342]">
-            MEAL OF THE DAY
-          </p>
-          <Link
-            to={`/menu/${MEAL_OF_THE_DAY.id}`}
-            className="group relative mt-3 block h-[270px] overflow-hidden rounded-[27px] border border-white/10 bg-[#242424] shadow-[0_14px_34px_rgba(0,0,0,0.34)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+        {/* Editorial Hero Composition matching Screen 02 */}
+        <section className="relative mt-6 overflow-hidden rounded-[26px] bg-[#121212] py-2 lg:mt-8 lg:grid lg:grid-cols-12 lg:items-center lg:gap-8">
+          <div className="relative z-10 max-w-[62%] py-3 lg:col-span-6 lg:max-w-none lg:py-6">
+            <h1 className="font-display text-[clamp(2.25rem,9.5vw,3rem)] font-extrabold leading-[1.03] tracking-[-0.045em] text-white lg:text-[3.4rem]">
+              <span className="block">Premium</span>
+              <span className="block text-[#FF5A1F]">Steaks</span>
+              <span className="block">&amp; More</span>
+            </h1>
+            <p className="mt-3 text-[14px] font-medium text-[#A3A3A3] lg:text-[16px]">
+              Grilled, Crafted, Served.
+            </p>
+          </div>
+
+          {/* Seamless right-aligned steak photo sculpted into #121212 */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 -right-5 w-[56%] overflow-hidden lg:relative lg:right-0 lg:col-span-6 lg:h-[260px] lg:w-full lg:rounded-[26px]"
           >
             <img
-              src={MEAL_OF_THE_DAY.image}
-              alt={MEAL_OF_THE_DAY.name}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+              src={dishLamb}
+              alt=""
+              className="h-full w-full object-cover object-center"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-5">
-              <div className="min-w-0">
-                <span className="inline-block rounded-full bg-[#ff5a1f] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white">
-                  {MEAL_OF_THE_DAY.category}
-                </span>
-                <h1 id="meal-of-day-heading" className="mt-2 text-[26px] font-bold leading-tight tracking-[-0.04em] text-white">
-                  {MEAL_OF_THE_DAY.name}
-                </h1>
-                <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-white/70">
-                  {MEAL_OF_THE_DAY.description}
-                </p>
-                <p className="mt-2 text-[16px] font-semibold text-white">{formatPrice(MEAL_OF_THE_DAY.price)}</p>
-              </div>
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#121212] transition-transform group-hover:scale-105">
-                <ArrowRight className="h-5 w-5" aria-hidden="true" />
-              </span>
-            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-[#121212] via-[#121212]/45 to-transparent lg:from-[#121212]/50 lg:via-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-[#121212]/60 lg:from-[#121212]/40 lg:to-transparent" />
+          </div>
+        </section>
+
+        {/* 4 Compact Primary Actions matching approved reference */}
+        <section className="mt-5 grid grid-cols-4 gap-2.5 sm:gap-3 lg:mt-6" aria-label="Primary actions">
+          <Link
+            to="/menu"
+            className="flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] bg-[#FF5A1F] px-2 py-3 text-center text-white transition-transform active:scale-[0.97] hover:bg-[#E84D15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            <UtensilsCrossed className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
+            <span className="text-[12px] font-bold leading-tight sm:text-[13px]">Order Food</span>
+          </Link>
+
+          <Link
+            to="/drinks"
+            className="flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-[#242424] px-2 py-3 text-center text-white transition-colors active:scale-[0.97] hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+          >
+            <Wine className="h-5 w-5 text-white/90" strokeWidth={1.9} aria-hidden="true" />
+            <span className="text-[12px] font-semibold leading-tight text-white/90 sm:text-[13px]">Drinks</span>
+          </Link>
+
+          <Link
+            to="/booking"
+            className="flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-[#242424] px-2 py-3 text-center text-white transition-colors active:scale-[0.97] hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+          >
+            <CalendarDays className="h-5 w-5 text-white/90" strokeWidth={1.9} aria-hidden="true" />
+            <span className="text-[12px] font-semibold leading-tight text-white/90 sm:text-[13px]">Reserve a Table</span>
+          </Link>
+
+          <Link
+            to="/events"
+            className="flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-[#242424] px-2 py-3 text-center text-white transition-colors active:scale-[0.97] hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+          >
+            <CalendarHeart className="h-5 w-5 text-white/90" strokeWidth={1.9} aria-hidden="true" />
+            <span className="text-[12px] font-semibold leading-tight text-white/90 sm:text-[13px]">Events</span>
           </Link>
         </section>
 
-        {/* Quiet Drinks Strip */}
-        <section className="mt-9" aria-labelledby="home-drinks-heading">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff7342]">FROM THE BAR &amp; CELLAR</p>
-              <h2 id="home-drinks-heading" className="mt-1 text-[22px] font-semibold tracking-[-0.04em]">Drinks today</h2>
-            </div>
-            <Link to="/drinks" className="mb-0.5 text-[13px] font-medium text-[#ff8157] hover:text-white">
-              Full drinks
+        {/* House Signatures (real menu data — never a fabricated "Today's Special") */}
+        <section className="mt-8" aria-labelledby="house-signatures-heading">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 id="house-signatures-heading" className="text-[20px] font-bold tracking-[-0.03em] text-white">
+              House Signatures
+            </h2>
+            <Link
+              to="/menu?category=Choice%20Cuts"
+              className="text-[14px] font-semibold text-[#FF5A1F] hover:text-white focus-visible:outline-none focus-visible:underline"
+            >
+              See all
             </Link>
           </div>
 
-          <div className="mt-3.5 grid grid-cols-2 gap-3">
-            {[DRINK_OF_THE_DAY, WINE_PICK].map((drink) => (
-              <Link
-                key={drink.id}
-                to={`/menu/${drink.id}`}
-                className="flex items-center gap-3 rounded-[22px] border border-white/10 bg-[#242424] p-3 transition-colors hover:border-white/25"
-              >
-                <img
-                  src={drink.image}
-                  alt={drink.name}
-                  className="h-12 w-12 shrink-0 rounded-full border-2 border-[#121212] object-cover"
-                  loading="lazy"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-white">{drink.name}</p>
-                  <p className="mt-0.5 text-[11px] text-white/50">{drink.category}</p>
-                  <p className="mt-1 text-[13px] font-semibold text-[#ff8055]">{formatPrice(drink.price)}</p>
-                </div>
-              </Link>
-            ))}
+          <div className="mt-3.5 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {signatureDishes.map((dish) => {
+              const weightLabel = dish.variations?.[0]?.size;
+              const showWeightPrefix = Boolean(
+                weightLabel && !dish.description.toLowerCase().startsWith(weightLabel.toLowerCase()),
+              );
+              return (
+                <Link
+                  key={dish.id}
+                  to={`/menu/${dish.id}`}
+                  className="group flex items-center gap-3.5 rounded-[22px] border border-white/10 bg-[#242424] p-3 transition-colors hover:bg-[#2C2C2C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+                >
+                  <img
+                    src={dish.image}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-[84px] w-[96px] shrink-0 rounded-[16px] object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-[16px] font-bold tracking-[-0.02em] text-white">
+                      {dish.name}
+                    </h3>
+                    <p className="mt-0.5 line-clamp-1 text-[13px] text-[#A3A3A3]">
+                      {showWeightPrefix ? `${weightLabel} · ` : ""}
+                      {dish.description}
+                    </p>
+                    <div className="mt-2.5 flex items-center justify-between gap-2">
+                      <span className="text-[16px] font-bold tabular-nums text-[#FF5A1F]">
+                        {formatPrice(dish.price)}
+                      </span>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FF5A1F] text-white transition-transform group-hover:translate-x-0.5">
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </section>
 
-        {/* Subtle, Calm Upcoming Events */}
-        {updates.length > 0 && (
-          <section className="mt-9" aria-labelledby="home-events-heading">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff7342]">ON THE CALENDAR</p>
-                <h2 id="home-events-heading" className="mt-1 text-[22px] font-semibold tracking-[-0.04em]">Upcoming events</h2>
+        {/* Active Reservation (only rendered when user holds an upcoming reservation) */}
+        {upcomingBooking && (
+          <section className="mt-7" aria-labelledby="upcoming-booking-heading">
+            <h2 id="upcoming-booking-heading" className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
+              Your Upcoming Table
+            </h2>
+            <Link
+              to="/booking/success"
+              state={upcomingBooking}
+              className="mt-2.5 flex items-center justify-between gap-3 rounded-[20px] border border-white/10 bg-[#242424] px-4 py-3.5 transition-colors hover:bg-[#2C2C2C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FF5A1F]/15 text-[#FF5A1F]">
+                  <CalendarDays className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-[15px] font-semibold text-white">
+                    {upcomingBooking.date} · {upcomingBooking.time}
+                  </p>
+                  <p className="text-[13px] text-[#A3A3A3]">
+                    {upcomingBooking.guests} {upcomingBooking.guests === 1 ? "guest" : "guests"}
+                    {upcomingBooking.arrival_code ? ` · Ref #${upcomingBooking.arrival_code}` : ""}
+                  </p>
+                </div>
               </div>
-              <Link to="/events" className="mb-0.5 text-[13px] font-medium text-[#ff8157] hover:text-white">
-                See all
+              <ArrowRight className="h-4 w-4 shrink-0 text-[#A3A3A3]" aria-hidden="true" />
+            </Link>
+          </section>
+        )}
+
+        {/* Active Events & Announcements (real data from useActiveUpdates) */}
+        {updates.length > 0 && (
+          <section className="mt-8" aria-labelledby="home-events-heading">
+            <div className="flex items-baseline justify-between gap-4">
+              <h2 id="home-events-heading" className="text-[20px] font-bold tracking-[-0.03em] text-white">
+                Upcoming Nights
+              </h2>
+              <Link
+                to="/events"
+                className="text-[14px] font-semibold text-[#FF5A1F] hover:text-white focus-visible:outline-none focus-visible:underline"
+              >
+                All events
               </Link>
             </div>
 
-            <div className="mt-3.5 divide-y divide-white/10 rounded-[24px] border border-white/10 bg-[#1c1c1c] px-4">
-              {updates.slice(0, 2).map((event) => (
+            <div className="mt-3 divide-y divide-white/10 rounded-[22px] border border-white/10 bg-[#242424] px-4">
+              {updates.slice(0, 3).map((event) => (
                 <button
                   key={event.id}
                   type="button"
                   onClick={() => setSelectedEvent(event)}
-                  className="flex w-full items-center justify-between gap-3 py-4 text-left transition-colors hover:text-[#ff8157] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+                  className="flex min-h-[64px] w-full items-center justify-between gap-3 py-3.5 text-left transition-colors hover:text-[#FF5A1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
                 >
-                  <div className="flex min-w-0 items-center gap-3.5">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#242424] text-[#ff7b50]">
-                      <CalendarHeart className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-[15px] font-semibold text-white">{event.title}</p>
-                      <p className="mt-0.5 truncate text-[12px] text-white/50">{event.type}</p>
-                    </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[15px] font-semibold text-white">{event.title}</p>
+                    <p className="mt-0.5 truncate text-[13px] text-[#A3A3A3]">{event.type}</p>
                   </div>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-white/45" aria-hidden="true" />
+                  <ArrowRight className="h-4 w-4 shrink-0 text-[#A3A3A3]" aria-hidden="true" />
                 </button>
               ))}
             </div>
           </section>
         )}
 
-        {/* Quick Menu & Contact Footer Row */}
-        <div className="mt-9 flex items-center justify-between gap-3 border-t border-white/10 pt-6 text-[13px] text-white/55">
-          <Link to="/menu" className="inline-flex items-center gap-1.5 font-semibold text-white hover:text-[#ff8157]">
-            Explore full food menu <ArrowRight className="h-4 w-4 text-[#ff7b50]" />
-          </Link>
-          <button type="button" onClick={openAbout} className="underline-offset-4 hover:text-white hover:underline">
-            Hours &amp; contact
+        {/* Restrained Concierge & Restaurant Hours Footer Row */}
+        <section className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
+          <button
+            type="button"
+            onClick={openAssistant}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/10 bg-[#242424] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+          >
+            <MessageSquare className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+            Ask Butcher Block
           </button>
-        </div>
+
+          <button
+            type="button"
+            onClick={openAbout}
+            className="inline-flex min-h-[44px] items-center gap-1.5 text-[14px] font-medium text-[#A3A3A3] transition-colors hover:text-white focus-visible:outline-none focus-visible:underline"
+          >
+            <Clock className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+            Hours &amp; location
+          </button>
+        </section>
       </div>
 
       <EventDetailSheet event={selectedEvent} onClose={() => setSelectedEvent(null)} />
