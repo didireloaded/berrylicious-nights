@@ -28,6 +28,7 @@ import {
 } from "@/lib/orderPricing";
 import { saveOrderSnapshotForTracking, type TrackableOrderSnapshot } from "@/lib/orderTrackingStorage";
 import { generateClientUuid, insertOrderWithArrivalCode } from "@/lib/supabaseArrivalInsert";
+import { generateGuestAccessToken, sha256Hex } from "@/lib/orderLifecycle";
 import { getWindhoekDateISO } from "@/lib/windhoekDate";
 
 type OrderType = "pickup" | "preorder" | "dinein";
@@ -221,6 +222,10 @@ export default function CartPage() {
       idempotencyRef.current = { fingerprint, orderId: stableOrderId };
     }
 
+    // Generate opaque guest tracking secret so guests can securely track/claim only their own order
+    const guestAccessToken = user ? null : generateGuestAccessToken();
+    const guestAccessTokenHash = guestAccessToken ? await sha256Hex(guestAccessToken) : null;
+
     let orderId: string;
     let arrivalCode: string | null = null;
     try {
@@ -230,6 +235,8 @@ export default function CartPage() {
           items: validated.items,
           total: validated.total,
           order_type: orderType,
+          ...(orderMeta.tableNumber ? { table_number: orderMeta.tableNumber } : {}),
+          ...(guestAccessTokenHash ? { guest_access_token_hash: guestAccessTokenHash } : {}),
         },
         { idempotencyId: stableOrderId },
       );
@@ -267,6 +274,8 @@ export default function CartPage() {
       scheduled_time: orderMeta.scheduledTime,
       guest_name: orderMeta.guestName,
       dietary_notes: orderMeta.dietaryNotes,
+      guest_access_token: guestAccessToken,
+      payment_status: typeof full?.payment_status === "string" ? full.payment_status : "unpaid",
       eta_minutes: typeof full?.eta_minutes === "number" ? full.eta_minutes : null,
       eta_set_at: typeof full?.eta_set_at === "string" ? full.eta_set_at : null,
       created_at: typeof full?.created_at === "string" ? full.created_at : new Date().toISOString(),

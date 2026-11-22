@@ -27,7 +27,6 @@ import { useApp } from "@/context/AppContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { menuItems } from "@/data/menu";
 import { supabase } from "@/integrations/supabase/client";
-import { requestOrderNotificationPermission } from "@/lib/orderStatusNotify";
 import { useEffect, useMemo, useState } from "react";
 
 type OrderRow = {
@@ -69,7 +68,7 @@ function readLocal(key: string): string {
 }
 
 const ProfilePage = () => {
-  const { user, profile, loading, isAdmin, signOut } = useAuth();
+  const { user, profile, loading, isAdmin, isStaff, signOut } = useAuth();
   const navigate = useNavigate();
   const { openAbout } = useAboutSheet();
   const { openAssistant } = useRestaurantAssistant();
@@ -123,12 +122,6 @@ const ProfilePage = () => {
         setBookings([]);
       }
     }
-  }, [user]);
-
-  useEffect(() => {
-    if (!user || typeof Notification === "undefined") return;
-    if (Notification.permission !== "default") return;
-    void requestOrderNotificationPermission();
   }, [user]);
 
   const handleSaveGuestProfile = (e: React.FormEvent) => {
@@ -549,13 +542,13 @@ const ProfilePage = () => {
                 <span className="flex-1 text-[14px] font-semibold text-white">Reserve a Table</span>
                 <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
               </Link>
-              {isAdmin && (
+              {(isAdmin || isStaff) && (
                 <Link
                   to="/admin"
                   className="flex min-h-[52px] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-[#303030]"
                 >
                   <Shield className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
-                  <span className="flex-1 text-[14px] font-semibold text-white">Admin Console</span>
+                  <span className="flex-1 text-[14px] font-semibold text-white">Staff &amp; Kitchen Ops</span>
                   <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
                 </Link>
               )}

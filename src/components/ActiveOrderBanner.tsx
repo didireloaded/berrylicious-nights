@@ -1,24 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ChefHat, Clock3, PackageCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChefHat, Clock3, PackageCheck, Utensils } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { TrackableOrderSnapshot } from "@/lib/orderTrackingStorage";
-
-const headlines: Record<string, string> = {
-  pending: "Order received",
-  preparing: "Preparing your order",
-  ready: "Ready for collection",
-  cancelled: "Order cancelled",
-};
-
-const progressByStatus: Record<string, number> = {
-  pending: 28,
-  preparing: 64,
-  ready: 94,
-  cancelled: 0,
-};
+import { getOrderStageCopy, isActiveOrderStatus } from "@/lib/orderLifecycle";
 
 const orderTypes: Record<string, string> = {
   pickup: "Pickup",
@@ -120,11 +107,24 @@ export function ActiveOrderBanner() {
 
   if (!currentOrder || !id) return null;
   const order = latest ?? currentOrder;
-  if (!["pending", "preparing", "ready", "cancelled"].includes(order.status)) return null;
+  if (!isActiveOrderStatus(order.status) && order.status !== "cancelled") return null;
 
-  const Icon = order.status === "ready" ? PackageCheck : order.status === "preparing" ? ChefHat : Clock3;
-  const progress = progressByStatus[order.status] ?? 28;
-  const etaRemaining = order.status === "ready" ? null : computeEtaRemaining(order.eta_minutes, order.eta_set_at);
+  const stageCopy = getOrderStageCopy(order.status, order.order_type);
+  const Icon =
+    order.status === "handover"
+      ? Utensils
+      : order.status === "ready"
+        ? PackageCheck
+        : order.status === "preparing"
+          ? ChefHat
+          : order.status === "confirmed"
+            ? CheckCircle2
+            : Clock3;
+  const progress = stageCopy.progressPercent;
+  const etaRemaining =
+    order.status === "ready" || order.status === "handover" || order.status === "cancelled"
+      ? null
+      : computeEtaRemaining(order.eta_minutes, order.eta_set_at);
   const serviceLabel =
     order.order_type === "dinein" && order.table_number
       ? `Dine-in · ${order.table_number}`
@@ -134,7 +134,7 @@ export function ActiveOrderBanner() {
   return (
     <Link
       to={`/order/${id}`}
-      aria-label={`Track order #${orderCode}. ${headlines[order.status]}`}
+      aria-label={`Track order #${orderCode}. ${stageCopy.headline}`}
       className="mt-4 block overflow-hidden rounded-[22px] border border-white/10 bg-[#242424] p-4 text-white transition-colors hover:bg-[#2C2C2C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
     >
       {/* Compact iOS horizontal status progress bar */}
@@ -152,7 +152,7 @@ export function ActiveOrderBanner() {
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className="text-[15px] font-bold leading-snug text-white">
-              {headlines[order.status]}
+              {stageCopy.headline}
             </span>
             {etaRemaining !== null && (
               <span className="rounded-full bg-[#303030] px-2 py-0.5 text-[11px] font-semibold text-[#FF5A1F]">

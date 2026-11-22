@@ -71,9 +71,25 @@ function isSchemaCacheOrMissingColumnError(err: unknown): boolean {
     blob.includes("arrival_code") ||
     blob.includes("arrival_verified") ||
     blob.includes("assigned_table") ||
+    blob.includes("guest_access_token_hash") ||
+    blob.includes("table_number") ||
+    blob.includes("table_session_id") ||
     blob.includes("pgrst204") ||
     blob.includes("pgrst205")
   );
+}
+
+function stripExtendedOrderColumns(row: Record<string, unknown>): Record<string, unknown> {
+  const {
+    guest_access_token_hash: _g,
+    table_number: _tn,
+    table_session_id: _ts,
+    ...legacyRow
+  } = row;
+  void _g;
+  void _tn;
+  void _ts;
+  return legacyRow;
 }
 
 /**
@@ -159,7 +175,9 @@ export async function insertOrderWithArrivalCode(
         return { id: stableId, arrival_code, deduplicated: true };
       }
       if (isSchemaCacheOrMissingColumnError(error)) {
-        const { error: legErr } = await supabase.from("orders").insert({ ...row, id: stableId });
+        const { error: legErr } = await supabase
+          .from("orders")
+          .insert({ ...stripExtendedOrderColumns(row), id: stableId });
         if (!legErr) return { id: stableId, arrival_code: null };
         if (isPrimaryKeyIdDuplicate(legErr)) return { id: stableId, arrival_code: null, deduplicated: true };
         throw legErr ?? error;
@@ -182,7 +200,7 @@ export async function insertOrderWithArrivalCode(
     if (error && isSchemaCacheOrMissingColumnError(error)) {
       const { data: legacy, error: legErr } = await supabase
         .from("orders")
-        .insert({ ...row, id: stableId })
+        .insert({ ...stripExtendedOrderColumns(row), id: stableId })
         .select("id")
         .single();
       if (!legErr && legacy?.id) return { id: String(legacy.id), arrival_code: null };
