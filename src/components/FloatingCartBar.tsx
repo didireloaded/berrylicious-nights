@@ -15,7 +15,9 @@ export function FloatingCartBar() {
     pathname === "/booking" ||
     pathname === "/booking/success" ||
     pathname.startsWith("/order/") ||
-    pathname.startsWith("/menu/")
+    pathname.startsWith("/menu/") ||
+    pathname.startsWith("/group/") ||
+    pathname.startsWith("/table/")
   ) {
     return null;
   }

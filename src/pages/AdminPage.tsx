@@ -16,6 +16,7 @@ import { AdminMenuDisabledPanel } from "@/components/admin/AdminMenuDisabledPane
 import { AdminReviewsPanel } from "@/components/admin/AdminReviewsPanel";
 import { AdminLoyaltyPanel } from "@/components/admin/AdminLoyaltyPanel";
 import { AdminTablesAndServicePanel } from "@/components/admin/AdminTablesAndServicePanel";
+import { AdminGroupBillsPanel } from "@/components/admin/AdminGroupBillsPanel";
 import AdminAIInsights from "@/components/admin/AdminAIInsights";
 import { toast } from "sonner";
 import {
@@ -80,11 +81,12 @@ function timeAgo(dateStr: string) {
 }
 
 /* ── Tab definitions ── */
-type AdminTab = "kitchen" | "tables" | "bookings" | "events" | "reviews" | "rewards" | "analytics" | "insights" | "messages" | "tools";
+type AdminTab = "kitchen" | "tables" | "group_bills" | "bookings" | "events" | "reviews" | "rewards" | "analytics" | "insights" | "messages" | "tools";
 
 const TABS: { id: AdminTab; label: string; icon: typeof ShoppingBag }[] = [
   { id: "kitchen", label: "Kitchen", icon: Flame },
   { id: "tables", label: "Tables & Floor", icon: QrCode },
+  { id: "group_bills", label: "Group Bills", icon: Users },
   { id: "bookings", label: "Bookings", icon: CalendarDays },
   { id: "reviews", label: "Reviews", icon: Star },
   { id: "rewards", label: "Rewards", icon: Gift },
@@ -707,6 +709,9 @@ const AdminPage = () => {
 
           {/* TABLES & WAITER SERVICE TAB */}
           {tab === "tables" && <AdminTablesAndServicePanel />}
+
+          {/* GROUP BILLS & SETTLEMENT TAB */}
+          {tab === "group_bills" && <AdminGroupBillsPanel />}
 
           {/* REVIEWS TAB */}
           {tab === "reviews" && <AdminReviewsPanel />}
