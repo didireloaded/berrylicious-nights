@@ -1,0 +1,143 @@
+name: CI — Quality, Security & Database Checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "feat/**", "frontend/**"]
+
+# Strict least-privilege workflow permissions; never expose production secrets to PRs
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-build:
+    name: TypeScript, ESLint, Unit Tests & Production Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies from committed lockfile
+        run: npm ci --no-audit --no-fund
+
+      - name: Secret & client-leak scan
+        run: npm run security:secrets
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Vitest unit & integration tests
+        run: npm test
+
+      - name: Production build (with synthetic public placeholders only)
+        env:
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-anon-key
+          VITE_ALLOW_LEGACY_SCHEMA_FALLBACK: "false"
+        run: npm run build
+
+      - name: Upload built dist artifact for Playwright smoke job
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-build
+          path: dist
+          retention-days: 1
+
+  database-verify:
+    name: Local Supabase Migrations & pgTAP Security Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify local-only database guard
+        run: node scripts/local-supabase-guard.mjs
+
+      - name: Start isolated local Supabase stack & apply all migrations
+        run: supabase start --exclude studio,imgproxy,logflare,vector
+
+      - name: Verify fresh migration reset & synthetic seed
+        run: supabase db reset --local
+
+      - name: Run pgTAP RLS, pricing, idempotency & transition tests
+        run: supabase test db --local
+
+      - name: Run local backend health check
+        run: |
+          ANON_KEY=$(supabase status --output json | node -e 'const d = JSON.parse(require("fs").readFileSync(0,"utf8")); console.log(d.ANON_KEY || d.anon_key || "");')
+          LOCAL_SUPABASE_URL="http://127.0.0.1:54321" LOCAL_SUPABASE_ANON_KEY="$ANON_KEY" node scripts/db-healthcheck.mjs
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop --no-backup
+
+  playwright-smoke:
+    name: Playwright Customer & Auth Smoke Suite
+    runs-on: ubuntu-latest
+    needs: [quality-and-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies from committed lockfile
+        run: npm ci --no-audit --no-fund
+
+      - name: Download built dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-build
+          path: dist
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests against preview server
+        run: npx playwright test --config=playwright.ci.config.ts tests/e2e/smoke.spec.ts
+
+      - name: Upload diagnostic trace/screenshots on failure (no credentials)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-smoke-diagnostics
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 5
+
+  dependency-audit:
+    name: Dependency Vulnerability Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Audit production dependencies (block on critical; report high)
+        run: |
+          npm audit --omit=dev --audit-level=critical
+          npm audit --omit=dev --audit-level=high || echo "::warning::High-severity upstream advisories present; review Dependabot PRs."

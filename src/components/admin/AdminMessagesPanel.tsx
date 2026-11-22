@@ -39,7 +39,7 @@ export function AdminMessagesPanel() {
     // Fetch display names from profiles
     const rows = (data ?? []) as { id: string; user_id: string; updated_at: string }[];
     const userIds = [...new Set(rows.map((r) => r.user_id))];
-    let nameMap: Record<string, string | null> = {};
+    const nameMap: Record<string, string | null> = {};
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
         .from("profiles")
