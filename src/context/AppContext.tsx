@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { TrackableOrderSnapshot } from "@/lib/orderTrackingStorage";
+import { AUTH_SIGNED_OUT_EVENT } from "@/lib/authUtils";
 
 export type CurrentOrderState = (TrackableOrderSnapshot & { id: string }) | null;
 
@@ -94,6 +95,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setCurrentBooking = useCallback((booking: CurrentBookingState) => {
     setCurrentBookingRaw(booking);
     writeSessionBooking(booking);
+  }, []);
+
+  useEffect(() => {
+    const onSignedOut = () => {
+      setCurrentOrderState(null);
+      setCurrentBookingRaw(null);
+      writeActiveOrder(null);
+      writeSessionBooking(null);
+    };
+    window.addEventListener(AUTH_SIGNED_OUT_EVENT, onSignedOut);
+    return () => window.removeEventListener(AUTH_SIGNED_OUT_EVENT, onSignedOut);
   }, []);
 
   const value = useMemo(
