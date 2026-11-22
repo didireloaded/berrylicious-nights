@@ -1,6 +1,5 @@
 import {
   User,
-  Gift,
   Clock,
   CalendarDays,
   CalendarHeart,
@@ -26,6 +25,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { MyReviewsSection } from "@/components/MyReviewsSection";
+import { RewardsAndGuestSection } from "@/components/RewardsAndGuestSection";
 import { menuItems } from "@/data/menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useMemo, useState } from "react";
@@ -87,8 +87,6 @@ const ProfilePage = () => {
   const totalVisits = profile?.total_visits || 0;
   const totalOrders = profile?.total_orders || orders.length;
   const loyaltyPoints = profile?.loyalty_points ?? 0;
-  const loyaltyTarget = 5;
-  const loyaltyPercent = Math.min((totalVisits / loyaltyTarget) * 100, 100);
 
   const savedFavorites = useMemo(
     () =>
@@ -392,31 +390,8 @@ const ProfilePage = () => {
             </section>
           )}
 
-          {/* Signed-in rewards */}
-          {user && (
-            <section className="rounded-[22px] border border-white/10 bg-[#242424] p-5">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FF5A1F]/15 text-[#FF5A1F]">
-                  <Gift className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div>
-                  <h2 className="text-[16px] font-bold text-white">Rewards</h2>
-                  <p className="text-[13px] text-[#A3A3A3]">{loyaltyPoints} pts earned</p>
-                </div>
-              </div>
-              <div className="mt-4">
-                <div className="mb-1.5 flex justify-between text-[13px]">
-                  <span className="text-[#A3A3A3]">Visits toward complimentary drink</span>
-                  <span className="font-bold text-white">
-                    {totalVisits} / {loyaltyTarget}
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-[#303030]">
-                  <div className="h-full rounded-full bg-[#FF5A1F]" style={{ width: `${loyaltyPercent}%` }} />
-                </div>
-              </div>
-            </section>
-          )}
+          {/* Real Butcher Block Rewards Ledger & Consent-Gated Guest of the Week */}
+          <RewardsAndGuestSection />
 
           {/* Reservations */}
           {bookings.length > 0 && (
