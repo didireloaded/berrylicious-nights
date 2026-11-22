@@ -37,6 +37,7 @@ const AuthPage = lazy(() => retryImport(() => import("@/pages/AuthPage")));
 const AdminPage = lazy(() => retryImport(() => import("@/pages/AdminPage")));
 const OrderTrackingPage = lazy(() => retryImport(() => import("@/pages/OrderTrackingPage")));
 const TableEntryPage = lazy(() => retryImport(() => import("@/pages/TableEntryPage")));
+const GroupOrderPage = lazy(() => retryImport(() => import("@/pages/GroupOrderPage")));
 const MessagesPage = lazy(() => retryImport(() => import("@/pages/MessagesPage")));
 const NotFound = lazy(() => retryImport(() => import("@/pages/NotFound")));
 
@@ -105,6 +106,8 @@ export default function AppProviders() {
                         <Route path="/admin" element={<AdminPage />} />
                         <Route path="/order/:id" element={<OrderTrackingPage />} />
                         <Route path="/table/:tableCode" element={<TableEntryPage />} />
+                        <Route path="/group/new" element={<GroupOrderPage />} />
+                        <Route path="/group/:inviteCode" element={<GroupOrderPage />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </Suspense>
