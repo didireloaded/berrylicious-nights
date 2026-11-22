@@ -1,7 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
-import { MessageSquare, ShoppingBag } from "lucide-react";
+import { Bell, MessageSquare, ShoppingBag } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
+import { useNotificationCenter } from "@/context/NotificationCenterContext";
 import butcherBlockLogo from "@/assets/butcher-block-logo.png";
 
 const links = [
@@ -17,6 +18,7 @@ export default function SiteHeader() {
   const { pathname } = useLocation();
   const { totalItems } = useCart();
   const { openAssistant } = useRestaurantAssistant();
+  const { unreadCount, openNotificationCenter } = useNotificationCenter();
 
   if (pathname === "/" || pathname.startsWith("/admin")) return null;
 
@@ -53,6 +55,19 @@ export default function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={openNotificationCenter}
+            aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+            className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#242424] text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+          >
+            <Bell className="h-4 w-4 text-white" aria-hidden="true" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF5A1F] px-1 text-[10px] font-bold text-white tabular-nums">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
           <button
             type="button"
             onClick={openAssistant}

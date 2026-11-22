@@ -10,6 +10,8 @@ export type TrackableOrderSnapshot = {
   scheduled_time?: string | null;
   guest_name?: string | null;
   dietary_notes?: string | null;
+  guest_access_token?: string | null;
+  payment_status?: string | null;
   eta_minutes?: number | null;
   eta_set_at?: string | null;
   created_at?: string;

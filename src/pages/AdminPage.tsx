@@ -22,17 +22,19 @@ import {
   aggregateShiftAnalytics, type AdminOrderLike,
 } from "@/lib/adminDashboardIntel";
 import { extractOrderMetaFromItems } from "@/lib/orderPricing";
+import { getKitchenActionLabel, getNextKitchenStage } from "@/lib/orderLifecycle";
 import { getWindhoekDateISO } from "@/lib/windhoekDate";
 import { getPopularItems } from "@/services/analytics";
 
 /* ── Status badge colors ── */
 const statusColors: Record<string, string> = {
-  confirmed: "bg-primary/20 text-primary",
+  confirmed: "bg-sky-500/20 text-sky-400",
   arrived: "bg-emerald-500/20 text-emerald-400",
   cancelled: "bg-destructive/20 text-destructive",
   pending: "bg-primary/20 text-primary",
   preparing: "bg-yellow-500/20 text-yellow-400",
   ready: "bg-green-500/20 text-green-400",
+  handover: "bg-amber-500/20 text-amber-300",
   completed: "bg-muted text-muted-foreground",
   seated: "bg-sky-500/20 text-sky-400",
 };
@@ -92,7 +94,8 @@ const TABS: { id: AdminTab; label: string; icon: typeof ShoppingBag }[] = [
    ═══════════════════════════════════════════════════════════════════ */
 
 const AdminPage = () => {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, isStaff, staffRole, loading } = useAuth();
+  const canAccessOps = isAdmin || isStaff;
   const navigate = useNavigate();
   const [tab, setTab] = useState<AdminTab>("kitchen");
   const [bookings, setBookings] = useState<any[]>([]);
@@ -130,7 +133,7 @@ const AdminPage = () => {
 
   /* ── Realtime ── */
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canAccessOps) return;
     refreshAll();
     const channel = supabase
       .channel("admin-dashboard")
@@ -139,7 +142,7 @@ const AdminPage = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "updates" }, () => fetchUpdates())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [isAdmin, refreshAll, fetchBookings, fetchOrders, fetchUpdates]);
+  }, [canAccessOps, refreshAll, fetchBookings, fetchOrders, fetchUpdates]);
 
   /* ── New order alert ── */
   useEffect(() => {
@@ -165,8 +168,44 @@ const AdminPage = () => {
     fetchBookings();
   };
   const updateOrderStatus = async (id: string, status: string) => {
-    await supabase.from("orders").update({ status }).eq("id", id);
+    type OpsRpc = {
+      rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error: { code?: string; message?: string } | null }>;
+    };
+    const { error: rpcErr } = await (supabase as unknown as OpsRpc).rpc("transition_order_status", {
+      p_order_id: id,
+      p_next_status: status,
+    });
+    if (rpcErr) {
+      const msg = `${rpcErr.code ?? ""} ${rpcErr.message ?? ""}`.toLowerCase();
+      if (msg.includes("pgrst202") || msg.includes("does not exist") || msg.includes("schema cache")) {
+        // Fallback when Phase 1 SQL migration has not yet been applied to remote Supabase
+        const legacyStatus = status === "confirmed" ? "preparing" : status === "handover" ? "completed" : status;
+        const { error: fallbackErr } = await supabase.from("orders").update({ status: legacyStatus }).eq("id", id);
+        if (fallbackErr) {
+          toast.error(fallbackErr.message || "Could not update order status");
+          return;
+        }
+      } else {
+        toast.error(rpcErr.message || "Status change rejected");
+        return;
+      }
+    }
     toast.success(`Order → ${status}`);
+    fetchOrders();
+  };
+  const markOrderPaid = async (id: string, paymentStatus: "paid" | "unpaid" | "refunded") => {
+    type OpsRpc = {
+      rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error: { message?: string } | null }>;
+    };
+    const { error } = await (supabase as unknown as OpsRpc).rpc("mark_order_payment_status", {
+      p_order_id: id,
+      p_payment_status: paymentStatus,
+    });
+    if (error) {
+      toast.error(error.message || "Payment update requires Phase 1 SQL migration");
+      return;
+    }
+    toast.success(`Payment status → ${paymentStatus}`);
     fetchOrders();
   };
   const setOrderETA = async (id: string, minutes: number) => {
@@ -196,8 +235,17 @@ const AdminPage = () => {
 
   /* ── Computed ── */
   const grouped = useMemo(() => groupOrdersByKitchenStatus(orders as AdminOrderLike[]), [orders]);
-  const activeCount = grouped.pending.length + grouped.preparing.length + grouped.ready.length;
-  const load = kitchenLoadLevel(grouped.pending.length, grouped.preparing.length, grouped.ready.length);
+  const activeCount =
+    grouped.pending.length +
+    grouped.confirmed.length +
+    grouped.preparing.length +
+    grouped.ready.length +
+    grouped.handover.length;
+  const load = kitchenLoadLevel(
+    grouped.pending.length + grouped.confirmed.length,
+    grouped.preparing.length,
+    grouped.ready.length + grouped.handover.length,
+  );
   const opm = useMemo(() => ordersPerMinuteLastWindow(orders as AdminOrderLike[], 5), [orders]);
   const bookingsToday = useMemo(() => bookings.filter((b) => b.date === todayStr), [bookings, todayStr]);
   const bookingsNext10 = useMemo(() => bookingsInNextMinutes(bookings as any, new Date(), 10), [bookings]);
@@ -223,11 +271,11 @@ const AdminPage = () => {
   /* ── Auth guards ── */
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
   if (!user) return <Navigate to="/auth" replace state={{ from: "/admin" }} />;
-  if (!isAdmin) return (
+  if (!canAccessOps) return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center max-w-md mx-auto">
-      <h1 className="font-display text-2xl font-bold text-foreground mb-2">Admin access required</h1>
-      <p className="text-muted-foreground text-sm mb-4">This account doesn't have admin privileges.</p>
-      <button onClick={() => navigate("/auth", { state: { from: "/admin" } })} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold btn-press">Sign in as admin</button>
+      <h1 className="font-display text-2xl font-bold text-foreground mb-2">Staff access required</h1>
+      <p className="text-muted-foreground text-sm mb-4">This account doesn&apos;t have staff or admin privileges.</p>
+      <button onClick={() => navigate("/auth", { state: { from: "/admin" } })} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold btn-press">Sign in as staff</button>
       <Link to="/home" className="text-sm text-primary font-medium mt-3">Back to home</Link>
     </div>
   );
@@ -247,9 +295,16 @@ const AdminPage = () => {
                 <LayoutDashboard className="w-4 h-4 text-primary" />
               </div>
               <div>
-                <h1 className="font-display text-base font-bold text-foreground leading-none">Butcher Block Ops</h1>
+                <h1 className="font-display text-base font-bold text-foreground leading-none">
+                  Butcher Block Ops
+                  {staffRole && (
+                    <span className="ml-2 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                      {staffRole}
+                    </span>
+                  )}
+                </h1>
                 <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                  {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
+                  {new Date().toLocaleDateString("en-GB", { timeZone: "Africa/Windhoek", weekday: "long", day: "numeric", month: "long" })}
                 </p>
               </div>
             </div>
@@ -332,16 +387,22 @@ const AdminPage = () => {
           {tab === "kitchen" && (
             <div className="flex flex-col xl:flex-row gap-5">
               <div className="flex-1 min-w-0 space-y-4">
-                {/* Kanban board */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <KanbanColumn title="New" count={grouped.pending.length} orders={grouped.pending} activeCount={activeCount}
+                {/* 5-Column Active Kitchen Kanban (Stages 1-5 -> Stage 6 Completed) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                  <KanbanColumn title="1. Received" count={grouped.pending.length} orders={grouped.pending} activeCount={activeCount}
                     selectedId={selectedId} onSelect={setSelectedId} accentColor="primary"
+                    onQuickAdvance={(id) => updateOrderStatus(id, "confirmed")} />
+                  <KanbanColumn title="2. Confirmed" count={grouped.confirmed.length} orders={grouped.confirmed} activeCount={activeCount}
+                    selectedId={selectedId} onSelect={setSelectedId} accentColor="sky-500"
                     onQuickAdvance={(id) => updateOrderStatus(id, "preparing")} />
-                  <KanbanColumn title="Preparing" count={grouped.preparing.length} orders={grouped.preparing} activeCount={activeCount}
+                  <KanbanColumn title="3. Preparing" count={grouped.preparing.length} orders={grouped.preparing} activeCount={activeCount}
                     selectedId={selectedId} onSelect={setSelectedId} accentColor="yellow-500"
                     onQuickAdvance={(id) => updateOrderStatus(id, "ready")} />
-                  <KanbanColumn title="Ready" count={grouped.ready.length} orders={grouped.ready} activeCount={activeCount}
+                  <KanbanColumn title="4. Ready" count={grouped.ready.length} orders={grouped.ready} activeCount={activeCount}
                     selectedId={selectedId} onSelect={setSelectedId} accentColor="green-500"
+                    onQuickAdvance={(id) => updateOrderStatus(id, "handover")} />
+                  <KanbanColumn title="5. Handover" count={grouped.handover.length} orders={grouped.handover} activeCount={activeCount}
+                    selectedId={selectedId} onSelect={setSelectedId} accentColor="amber-500"
                     onQuickAdvance={(id) => updateOrderStatus(id, "completed")} />
                 </div>
 
@@ -392,7 +453,7 @@ const AdminPage = () => {
                     </div>
                   ) : (
                     <OrderDetailInline key={selected.id} order={selected} activeCount={activeCount}
-                      onStatusChange={updateOrderStatus} onSetETA={setOrderETA} />
+                      onStatusChange={updateOrderStatus} onSetETA={setOrderETA} onMarkPaid={markOrderPaid} />
                   )}
                 </div>
               </aside>
@@ -691,7 +752,7 @@ const AdminPage = () => {
               <ChevronRight className="w-3.5 h-3.5 rotate-180" /> Back
             </button>
             <OrderDetailInline key={selected.id} order={selected} activeCount={activeCount}
-              onStatusChange={updateOrderStatus} onSetETA={setOrderETA} />
+              onStatusChange={updateOrderStatus} onSetETA={setOrderETA} onMarkPaid={markOrderPaid} />
           </div>
         </div>
       )}
@@ -745,8 +806,10 @@ function AnalyticCard({ label, value, accent, icon }: { label: string; value: st
 
 const COLUMN_HEADER_STYLES: Record<string, { headerBg: string; badge: string }> = {
   primary: { headerBg: "bg-primary/10", badge: "text-primary bg-primary/15" },
+  "sky-500": { headerBg: "bg-sky-500/10", badge: "text-sky-400 bg-sky-500/15" },
   "yellow-500": { headerBg: "bg-yellow-500/10", badge: "text-yellow-400 bg-yellow-500/15" },
   "green-500": { headerBg: "bg-green-500/10", badge: "text-green-400 bg-green-500/15" },
+  "amber-500": { headerBg: "bg-amber-500/10", badge: "text-amber-300 bg-amber-500/15" },
 };
 
 function KanbanColumn({ title, count, orders, activeCount, selectedId, onSelect, accentColor, onQuickAdvance }: {
@@ -809,31 +872,38 @@ function KanbanColumn({ title, count, orders, activeCount, selectedId, onSelect,
   );
 }
 
-function OrderDetailInline({ order: o, activeCount, onStatusChange, onSetETA }: {
+function OrderDetailInline({ order: o, activeCount, onStatusChange, onSetETA, onMarkPaid }: {
   order: any; activeCount: number;
   onStatusChange: (id: string, status: string) => void;
   onSetETA: (id: string, mins: number) => void;
+  onMarkPaid: (id: string, paymentStatus: "paid" | "unpaid" | "refunded") => void;
 }) {
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const nextStatus = getNextOrderStatus(o.status);
+  const nextStatus = getNextKitchenStage(o.status) ?? getNextOrderStatus(o.status);
+  const nextLabel = getKitchenActionLabel(o.status, o.order_type) ?? (nextStatus ? `Move to ${nextStatus}` : null);
   const meta = extractOrderMetaFromItems(o.items);
-  const canCancel = o.status === "pending" || o.status === "preparing" || o.status === "ready";
+  const tableLabel = o.table_number || meta.tableNumber;
+  const isPaid = o.payment_status === "paid";
+  const canCancel = ["pending", "confirmed", "preparing", "ready", "handover"].includes(String(o.status));
 
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center gap-2 flex-wrap">
         <h2 className="font-display text-lg font-bold text-foreground">#BB-{String(o.id).slice(0, 6).toUpperCase()}</h2>
         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColors[o.status] ?? "bg-muted text-muted-foreground"}`}>{o.status}</span>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isPaid ? "bg-emerald-500/20 text-emerald-400" : "bg-muted text-muted-foreground"}`}>
+          {isPaid ? "Paid" : o.payment_status === "refunded" ? "Refunded" : "Unpaid"}
+        </span>
         {inferredPriority(o) === "high" && <span className="text-[9px] font-bold uppercase tracking-wide text-orange-400">Priority</span>}
         {o.order_type && <span className="text-[10px] text-muted-foreground">{typeBadge[o.order_type]}</span>}
       </div>
 
       <div className="text-[11px] text-muted-foreground space-y-0.5">
-        {meta.tableNumber && <p className="font-semibold text-foreground">Table: {meta.tableNumber}</p>}
+        {tableLabel && <p className="font-semibold text-foreground">Table: {tableLabel}</p>}
         {meta.scheduledTime && <p className="font-semibold text-foreground">Scheduled: {meta.scheduledTime}</p>}
         {meta.guestName && <p>Guest: {meta.guestName}</p>}
         <p>Prep ~{estimatePrepMinutes(o, activeCount)} min · {timeAgo(o.created_at)}</p>
-        <p className="text-muted-foreground/60">{new Date(o.created_at).toLocaleString()}</p>
+        <p className="text-muted-foreground/60">{new Date(o.created_at).toLocaleString("en-GB", { timeZone: "Africa/Windhoek" })}</p>
       </div>
 
       {meta.dietaryNotes && (
@@ -898,12 +968,33 @@ function OrderDetailInline({ order: o, activeCount, onStatusChange, onSetETA }: 
         </div>
       )}
 
-      {nextStatus && (
+      {nextStatus && nextLabel && (
         <button onClick={() => onStatusChange(o.id, nextStatus)}
           className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground btn-press shadow-md shadow-primary/20 flex items-center justify-center gap-2">
-          Move to {nextStatus} <ChevronRight className="w-3.5 h-3.5" />
+          {nextLabel} <ChevronRight className="w-3.5 h-3.5" />
         </button>
       )}
+
+      {/* Staff payment settlement verification (gates spend-based loyalty awards) */}
+      <div className="flex gap-2">
+        {!isPaid ? (
+          <button
+            type="button"
+            onClick={() => onMarkPaid(o.id, "paid")}
+            className="flex-1 rounded-xl border border-emerald-500/35 bg-emerald-500/10 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-colors"
+          >
+            Confirm paid at POS
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onMarkPaid(o.id, "refunded")}
+            className="flex-1 rounded-xl border border-amber-500/35 bg-amber-500/10 py-2.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 transition-colors"
+          >
+            Mark refunded
+          </button>
+        )}
+      </div>
 
       {canCancel && (
         confirmCancel ? (

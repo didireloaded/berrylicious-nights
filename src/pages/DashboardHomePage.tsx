@@ -20,6 +20,8 @@ import { useCart } from "@/context/CartContext";
 import { useActiveUpdates } from "@/hooks/useActiveUpdates";
 import { useAboutSheet } from "@/context/AboutSheetContext";
 import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
+import { useNotificationCenter } from "@/context/NotificationCenterContext";
+import { isActiveOrderStatus } from "@/lib/orderLifecycle";
 import { EventDetailSheet } from "@/components/EventDetailSheet";
 import { ActiveOrderBanner } from "@/components/ActiveOrderBanner";
 import { formatPrice } from "@/lib/vibe";
@@ -58,6 +60,7 @@ export default function DashboardHomePage() {
   const updates = useActiveUpdates();
   const { openAbout } = useAboutSheet();
   const { openAssistant } = useRestaurantAssistant();
+  const { unreadCount, openNotificationCenter } = useNotificationCenter();
   const [selectedEvent, setSelectedEvent] = useState<HomeUpdateRow | null>(null);
 
   const savedGuestName =
@@ -74,16 +77,12 @@ export default function DashboardHomePage() {
     [],
   );
 
-  const hasLiveOrder = Boolean(
-    currentOrder && ["pending", "preparing", "ready"].includes(String(currentOrder.status)),
-  );
+  const hasLiveOrder = Boolean(currentOrder && isActiveOrderStatus(currentOrder.status));
   const todayISO = getWindhoekDateISO();
   const upcomingBooking =
     currentBooking && currentBooking.date >= todayISO ? currentBooking : null;
 
-  // Show notification bell ONLY when real active order or active updates exist
-  const hasRealNotifications = hasLiveOrder || updates.length > 0;
-  const notificationTarget = hasLiveOrder && currentOrder ? `/order/${currentOrder.id}` : "/events";
+  const hasNotificationDot = unreadCount > 0 || hasLiveOrder;
 
   return (
     <div
@@ -115,16 +114,21 @@ export default function DashboardHomePage() {
           </Link>
 
           <div className="flex shrink-0 items-center gap-2">
-            {hasRealNotifications && (
-              <Link
-                to={notificationTarget}
-                aria-label={hasLiveOrder ? "View active order update" : "View active announcements and events"}
-                className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#242424] text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
-              >
-                <Bell className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
+            <button
+              type="button"
+              onClick={openNotificationCenter}
+              aria-label={unreadCount > 0 ? `Open notifications, ${unreadCount} unread` : "Open notifications"}
+              className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#242424] text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+            >
+              <Bell className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
+              {unreadCount > 0 ? (
+                <span className="absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF5A1F] px-1 text-[10px] font-bold text-white tabular-nums">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              ) : hasNotificationDot ? (
                 <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-[#FF5A1F]" aria-hidden="true" />
-              </Link>
-            )}
+              ) : null}
+            </button>
           </div>
         </header>
 

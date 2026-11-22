@@ -1,53 +1,40 @@
 import { useParams, Link } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { loadOrderSnapshotFromStorage, saveOrderSnapshotForTracking } from "@/lib/orderTrackingStorage";
 import { extractOrderMetaFromItems } from "@/lib/orderPricing";
+import {
+  getOrderStageCopy,
+  isActiveOrderStatus,
+  ORDER_STAGE_SEQUENCE,
+} from "@/lib/orderLifecycle";
 import { formatPrice } from "@/lib/vibe";
 import { menuItems } from "@/data/menu";
 import { useCart } from "@/context/CartContext";
 import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
+import { useNotificationCenter } from "@/context/NotificationCenterContext";
 import {
   AlertTriangle,
   ArrowLeft,
-  Clock,
+  Bell,
   CheckCircle2,
   ChefHat,
+  Clock,
   MessageSquare,
   PackageCheck,
   Phone,
   Plus,
   ReceiptText,
+  Star,
+  Utensils,
+  WifiOff,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { notifyOrderStatusTransition, requestOrderNotificationPermission } from "@/lib/orderStatusNotify";
+import { notifyOrderStatusTransition } from "@/lib/orderStatusNotify";
 import { ArrivalCodeCard } from "@/components/ArrivalCodeCard";
-
-const statusSteps = [
-  { key: "pending", label: "Order received", icon: Clock },
-  { key: "preparing", label: "Preparing", icon: ChefHat },
-  { key: "ready", label: "Ready", icon: PackageCheck },
-  { key: "completed", label: "Completed", icon: CheckCircle2 },
-];
-
-const statusHeadline: Record<string, string> = {
-  pending: "Order received",
-  preparing: "Preparing your order",
-  ready: "Ready for collection",
-  completed: "Order completed",
-  cancelled: "Order cancelled",
-};
-
-const statusSubline: Record<string, string> = {
-  pending: "The Butcher Block kitchen has received your ticket.",
-  preparing: "The grill and kitchen team are preparing your dishes.",
-  ready: "Your order is ready — collect at the counter or watch for your server.",
-  completed: "Thank you for dining with Butcher Block Steakhouse.",
-  cancelled: "This order was cancelled and is no longer being prepared by the kitchen.",
-};
 
 const WHILE_WAIT_MENU_IDS = ["14", "12", "19"];
 
@@ -61,7 +48,27 @@ function formatOrderNumber(id: string): string {
   return `BB-${id.slice(0, 6).toUpperCase()}`;
 }
 
+function formatWindhoekTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString("en-GB", {
+      timeZone: "Africa/Windhoek",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
+type StatusHistoryEntry = {
+  id?: string;
+  from_status?: string | null;
+  to_status: string;
+  created_at: string;
+};
+
 type TrackedOrderItem = {
+  id?: string;
   name?: string;
   qty?: number;
   price?: number;
@@ -81,17 +88,29 @@ type TrackedOrder = {
   scheduled_time?: string | null;
   guest_name?: string | null;
   dietary_notes?: string | null;
+  guest_access_token?: string | null;
+  payment_status?: string | null;
   eta_minutes?: number | null;
   eta_set_at?: string | null;
   created_at?: string;
   arrival_code?: string | null;
 };
 
-type CancelRpcClient = {
+type DynamicRpcClient = {
   rpc: (
     fn: string,
     args: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+  from: (table: string) => {
+    select: (cols: string) => {
+      eq: (col: string, val: string) => {
+        order: (col: string, opts: { ascending: boolean }) => Promise<{
+          data: StatusHistoryEntry[] | null;
+          error: { message?: string } | null;
+        }>;
+      };
+    };
+  };
 };
 
 const OrderTrackingPage = () => {
@@ -100,10 +119,13 @@ const OrderTrackingPage = () => {
   const { user } = useAuth();
   const { setCurrentOrder, clearCurrentOrder, currentOrder } = useApp();
   const { openAssistant } = useRestaurantAssistant();
+  const { openNotificationCenter, preferences, togglePushSubscription } = useNotificationCenter();
   const [order, setOrder] = useState<TrackedOrder | null>(null);
+  const [history, setHistory] = useState<StatusHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [etaRemaining, setEtaRemaining] = useState<number | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [isOffline, setIsOffline] = useState(() => (typeof navigator !== "undefined" ? !navigator.onLine : false));
 
   const whileYouWaitItems = useMemo(
     () =>
@@ -113,39 +135,81 @@ const OrderTrackingPage = () => {
     [],
   );
 
-  useEffect(() => {
-    if (!id) return;
-
-    const hydrateOrder = (raw: TrackedOrder | null, snap: ReturnType<typeof loadOrderSnapshotFromStorage>): TrackedOrder | null => {
+  const hydrateOrder = useCallback(
+    (
+      raw: TrackedOrder | null,
+      snap: ReturnType<typeof loadOrderSnapshotFromStorage>,
+    ): TrackedOrder | null => {
       if (!raw) return snap;
       const embeddedMeta = extractOrderMetaFromItems(raw.items);
       return {
         ...raw,
         arrival_code: raw.arrival_code ?? snap?.arrival_code ?? null,
-        table_number: snap?.table_number ?? embeddedMeta.tableNumber ?? null,
+        table_number: raw.table_number ?? snap?.table_number ?? embeddedMeta.tableNumber ?? null,
         scheduled_time: snap?.scheduled_time ?? embeddedMeta.scheduledTime ?? null,
         guest_name: snap?.guest_name ?? embeddedMeta.guestName ?? null,
         dietary_notes: snap?.dietary_notes ?? embeddedMeta.dietaryNotes ?? null,
+        guest_access_token: raw.guest_access_token ?? snap?.guest_access_token ?? null,
+        payment_status: raw.payment_status ?? snap?.payment_status ?? "unpaid",
       };
-    };
+    },
+    [],
+  );
 
-    const fetchOrder = async () => {
-      const snap = loadOrderSnapshotFromStorage(id);
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session && snap) {
-        setOrder(hydrateOrder(snap, snap));
-        setLoading(false);
-        return;
+  const refreshOrder = useCallback(async () => {
+    if (!id) return;
+    const snap = loadOrderSnapshotFromStorage(id);
+    const dynamicClient = supabase as unknown as DynamicRpcClient;
+    const { data: sessionData } = await supabase.auth.getSession();
+
+    if (!sessionData?.session) {
+      if (snap?.guest_access_token) {
+        try {
+          const { data: rpcData, error: rpcErr } = await dynamicClient.rpc("get_guest_order_status", {
+            p_order_id: id,
+            p_access_token: snap.guest_access_token,
+          });
+          if (!rpcErr && rpcData && typeof rpcData === "object") {
+            const payload = rpcData as TrackedOrder & { history?: StatusHistoryEntry[] };
+            setOrder(hydrateOrder(payload, snap));
+            if (Array.isArray(payload.history)) setHistory(payload.history);
+            setLoading(false);
+            return;
+          }
+        } catch {
+          /* fall back to last-known guest snapshot */
+        }
       }
-      const { data } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-      setOrder(hydrateOrder(data as TrackedOrder | null, snap));
+      setOrder(hydrateOrder(snap, snap));
       setLoading(false);
-    };
-    void fetchOrder();
+      return;
+    }
+
+    const { data } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    setOrder(hydrateOrder(data as TrackedOrder | null, snap));
+
+    try {
+      const { data: histRows, error: histErr } = await dynamicClient
+        .from("order_status_history")
+        .select("id, from_status, to_status, created_at")
+        .eq("order_id", id)
+        .order("created_at", { ascending: true });
+      if (!histErr && Array.isArray(histRows)) {
+        setHistory(histRows);
+      }
+    } catch {
+      /* ignore if migration not yet deployed */
+    }
+    setLoading(false);
+  }, [id, hydrateOrder]);
+
+  useEffect(() => {
+    if (!id) return;
+    void refreshOrder();
 
     const channel = supabase
       .channel(`order-${id}`)
@@ -156,18 +220,45 @@ const OrderTrackingPage = () => {
           const neu = payload.new as TrackedOrder;
           const oldRow = payload.old as { status?: string } | undefined;
           if (neu?.id && neu.status) {
-            notifyOrderStatusTransition(neu.id, oldRow?.status, neu.status);
+            notifyOrderStatusTransition(neu.id, oldRow?.status, neu.status, neu.order_type);
           }
           const snap = loadOrderSnapshotFromStorage(id);
           setOrder(hydrateOrder(neu, snap));
+          void refreshOrder();
         },
       )
       .subscribe();
 
+    const handleOnline = () => {
+      setIsOffline(false);
+      void refreshOrder();
+    };
+    const handleOffline = () => setIsOffline(true);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void refreshOrder();
+    };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Light polling fallback for guests with a secure guest_access_token while order is active
+    const poll = setInterval(() => {
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        const snap = loadOrderSnapshotFromStorage(id);
+        if (snap?.guest_access_token && isActiveOrderStatus(snap.status)) {
+          void refreshOrder();
+        }
+      }
+    }, 20_000);
+
     return () => {
+      clearInterval(poll);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      document.removeEventListener("visibilitychange", handleVisibility);
       void supabase.removeChannel(channel);
     };
-  }, [id]);
+  }, [id, refreshOrder, hydrateOrder]);
 
   useEffect(() => {
     if (!order?.id) return;
@@ -181,6 +272,8 @@ const OrderTrackingPage = () => {
       scheduled_time: order.scheduled_time ?? null,
       guest_name: order.guest_name ?? null,
       dietary_notes: order.dietary_notes ?? null,
+      guest_access_token: order.guest_access_token ?? null,
+      payment_status: order.payment_status ?? null,
       eta_minutes: order.eta_minutes ?? null,
       eta_set_at: order.eta_set_at ?? null,
       created_at: order.created_at,
@@ -195,13 +288,6 @@ const OrderTrackingPage = () => {
       clearCurrentOrder();
     }
   }, [order?.status, currentOrder?.id, id, clearCurrentOrder]);
-
-  useEffect(() => {
-    if (!id || typeof sessionStorage === "undefined") return;
-    if (sessionStorage.getItem("berrylicious-order-notify-asked")) return;
-    sessionStorage.setItem("berrylicious-order-notify-asked", "1");
-    void requestOrderNotificationPermission();
-  }, [id]);
 
   useEffect(() => {
     if (!order?.eta_minutes || !order?.eta_set_at) {
@@ -221,7 +307,7 @@ const OrderTrackingPage = () => {
     if (!order?.id || !user || order.status !== "pending" || cancelling) return;
     setCancelling(true);
     try {
-      const rpc = supabase as unknown as CancelRpcClient;
+      const rpc = supabase as unknown as DynamicRpcClient;
       const { data, error } = await rpc.rpc("cancel_own_pending_order", { p_order_id: order.id });
       if (error || !data) {
         toast.error("Please call +264 83 288 8000 so the kitchen can update or cancel your ticket.");
@@ -259,16 +345,44 @@ const OrderTrackingPage = () => {
   }
 
   const isCancelled = order.status === "cancelled";
-  const isActive = !isCancelled && order.status !== "completed";
-  const currentIndex = Math.max(0, statusSteps.findIndex((s) => s.key === order.status));
-  const progressPercent = isCancelled ? 0 : Math.round(((currentIndex + 1) / statusSteps.length) * 100);
+  const isCompleted = order.status === "completed";
+  const isActive = isActiveOrderStatus(order.status);
+  const currentIndex = Math.max(
+    0,
+    ORDER_STAGE_SEQUENCE.findIndex((s) => s === order.status),
+  );
+  const stageCopy = getOrderStageCopy(order.status ?? "pending", order.order_type);
+  const progressPercent = stageCopy.progressPercent;
   const typeLabel = orderTypeLabels[order.order_type ?? ""] ?? "Order";
-  const headline = statusHeadline[order.status ?? "pending"] ?? statusHeadline.pending;
-  const subline = statusSubline[order.status ?? "pending"] ?? statusSubline.pending;
+  const headline = stageCopy.headline;
+  const subline = stageCopy.notificationMessage;
   const orderNumber = formatOrderNumber(String(order.id));
   const placedTime = order.created_at
-    ? new Date(order.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
+    ? new Date(order.created_at).toLocaleString("en-GB", {
+        timeZone: "Africa/Windhoek",
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
     : "";
+
+  const historyTimeByStatus = new Map<string, string>();
+  for (const h of history) {
+    if (h.to_status && h.created_at) {
+      historyTimeByStatus.set(h.to_status, formatWindhoekTime(h.created_at));
+    }
+  }
+  if (order.created_at && !historyTimeByStatus.has("pending")) {
+    historyTimeByStatus.set("pending", formatWindhoekTime(order.created_at));
+  }
+
+  const stageItems = [
+    { key: "pending", label: "Received", icon: Clock },
+    { key: "confirmed", label: "Confirmed", icon: CheckCircle2 },
+    { key: "preparing", label: "Preparing", icon: ChefHat },
+    { key: "ready", label: "Ready", icon: PackageCheck },
+    { key: "handover", label: order.order_type === "dinein" ? "To Table" : "Collection", icon: Utensils },
+    { key: "completed", label: "Completed", icon: Star },
+  ];
 
   const fulfillmentSummary =
     order.order_type === "dinein" && order.table_number
@@ -289,10 +403,30 @@ const OrderTrackingPage = () => {
           >
             <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Link>
-          <span className="rounded-full border border-white/10 bg-[#242424] px-4 py-2 font-mono text-[13px] font-bold text-[#FF5A1F]">
-            #{orderNumber}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openNotificationCenter}
+              aria-label="Open notifications"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#242424] text-white transition-colors hover:bg-[#303030]"
+            >
+              <Bell className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <span className="rounded-full border border-white/10 bg-[#242424] px-4 py-2 font-mono text-[13px] font-bold text-[#FF5A1F]">
+              #{orderNumber}
+            </span>
+          </div>
         </header>
+
+        {isOffline && (
+          <div
+            role="status"
+            className="mt-4 flex items-center gap-2.5 rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-[13px] text-amber-200"
+          >
+            <WifiOff className="h-4 w-4 shrink-0 text-amber-400" aria-hidden="true" />
+            <span>You are offline. Showing your last known status — live updates will resume automatically.</span>
+          </div>
+        )}
 
         {/* Status & Progress Card (real DB statuses including cancelled) */}
         <section
@@ -343,9 +477,9 @@ const OrderTrackingPage = () => {
             </div>
           ) : (
             <>
-              {isActive && etaRemaining !== null && order.status !== "ready" && (
+              {isActive && etaRemaining !== null && order.status !== "ready" && order.status !== "handover" && (
                 <p className="mt-3 rounded-xl bg-[#303030] px-3.5 py-2 text-[14px] font-semibold text-white">
-                  Estimated prep time remaining: <span className="text-[#FF5A1F]">~{etaRemaining} min</span>
+                  Kitchen estimate: <span className="text-[#FF5A1F]">~{etaRemaining} min</span>
                 </p>
               )}
 
@@ -357,13 +491,15 @@ const OrderTrackingPage = () => {
                   />
                 </div>
 
-                <div className="mt-4 grid grid-cols-4 gap-1">
-                  {statusSteps.map((step, i) => {
+                {/* 6-Stage Kitchen Progress Stepper */}
+                <ol className="mt-4 grid grid-cols-3 gap-y-4 gap-x-2 sm:grid-cols-6">
+                  {stageItems.map((step, i) => {
                     const done = i <= currentIndex;
                     const active = i === currentIndex;
                     const Icon = step.icon;
+                    const ts = historyTimeByStatus.get(step.key);
                     return (
-                      <div key={step.key} className="flex flex-col items-center gap-1.5 text-center">
+                      <li key={step.key} className="flex flex-col items-center gap-1 text-center">
                         <span
                           className={
                             "flex h-9 w-9 items-center justify-center rounded-full transition-colors " +
@@ -379,11 +515,48 @@ const OrderTrackingPage = () => {
                         <span className={"text-[11px] font-semibold leading-tight " + (done ? "text-white" : "text-[#737373]")}>
                           {step.label}
                         </span>
-                      </div>
+                        {ts && done && (
+                          <span className="text-[10px] tabular-nums text-[#A3A3A3]">{ts}</span>
+                        )}
+                      </li>
                     );
                   })}
-                </div>
+                </ol>
               </div>
+
+              {/* Explicit opt-in device alerts (never auto-prompted) */}
+              {isActive && user && !preferences.push_enabled && (
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#1B1B1B] px-3.5 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-white">Want instant kitchen alerts?</p>
+                    <p className="text-[12px] text-[#A3A3A3]">Get notified as soon as your meal moves stages.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void togglePushSubscription(true)}
+                    className="min-h-[40px] shrink-0 rounded-full bg-[#303030] px-3.5 text-[12px] font-bold text-white hover:bg-[#3A3A3A]"
+                  >
+                    Enable alerts
+                  </button>
+                </div>
+              )}
+
+              {/* Subtle completed meal prompt (connected to Phase 2 verified ratings) */}
+              {isCompleted && (
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-[#FF5A1F]/30 bg-[#FF5A1F]/10 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-bold text-white">How was your meal?</p>
+                    <p className="text-[12px] text-[#C4C4C4]">Share verified feedback on the dishes you ordered.</p>
+                  </div>
+                  <Link
+                    to={`/order/${order.id}?rate=1`}
+                    className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-full bg-[#FF5A1F] px-4 text-[12px] font-bold text-white hover:bg-[#E84D15]"
+                  >
+                    <Star className="h-3.5 w-3.5" aria-hidden="true" />
+                    Rate dishes
+                  </Link>
+                </div>
+              )}
             </>
           )}
         </section>

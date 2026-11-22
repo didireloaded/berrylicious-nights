@@ -23,7 +23,7 @@ export function useCustomerOrderStatusNotifications(userId: string | null | unde
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          const row = payload.new as { id?: string; status?: string };
+          const row = payload.new as { id?: string; status?: string; order_type?: string | null };
           const oldRow = payload.old as { status?: string } | undefined;
           const id = row?.id;
           const next = row?.status;
@@ -35,7 +35,7 @@ export function useCustomerOrderStatusNotifications(userId: string | null | unde
 
           seen.current.set(id, next);
 
-          notifyOrderStatusTransition(id, prev, next);
+          notifyOrderStatusTransition(id, prev, next, row.order_type);
         },
       )
       .subscribe();

@@ -20,11 +20,15 @@ interface Profile {
   loyalty_points?: number | null;
 }
 
+export type StaffRole = "admin" | "manager" | "kitchen" | "waiter" | null;
+
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
+  isStaff: boolean;
+  staffRole: StaffRole;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -45,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [staffRole, setStaffRole] = useState<StaffRole>(null);
   const activeUserIdRef = useRef<string | null>(null);
   const inflightUserLoadRef = useRef<string | null>(null);
 
@@ -63,21 +68,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", userId)
-      .eq("role", "admin")
-      .maybeSingle();
+      .eq("user_id", userId);
 
     if (activeUserIdRef.current !== userId) return;
 
-    if (data) {
+    const roles = (data ?? []).map((r) => String(r.role));
+    if (roles.includes("admin")) {
       setIsAdmin(true);
+      setStaffRole("admin");
+      return;
+    }
+    if (roles.includes("manager")) {
+      setIsAdmin(true);
+      setStaffRole("manager");
+      return;
+    }
+    if (roles.includes("kitchen")) {
+      setIsAdmin(false);
+      setStaffRole("kitchen");
+      return;
+    }
+    if (roles.includes("waiter")) {
+      setIsAdmin(false);
+      setStaffRole("waiter");
       return;
     }
     if (import.meta.env.DEV && email && DEV_ADMIN_EMAILS.has(email.toLowerCase())) {
       setIsAdmin(true);
+      setStaffRole("admin");
       return;
     }
     setIsAdmin(false);
+    setStaffRole(null);
   }, []);
 
   const loadUserMetadata = useCallback(
@@ -121,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         inflightUserLoadRef.current = null;
         setProfile(null);
         setIsAdmin(false);
+        setStaffRole(null);
       }
     };
 
@@ -160,18 +183,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
+  const isStaff = isAdmin || staffRole !== null;
+
   const value = useMemo<AuthContextType>(
     () => ({
       user,
       profile,
       loading,
       isAdmin,
+      isStaff,
+      staffRole,
       signIn,
       signUp,
       signOut,
       refreshProfile,
     }),
-    [user, profile, loading, isAdmin, signIn, signUp, signOut, refreshProfile],
+    [user, profile, loading, isAdmin, isStaff, staffRole, signIn, signUp, signOut, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

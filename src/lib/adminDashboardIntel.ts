@@ -16,8 +16,10 @@ export type AdminOrderLike = {
 
 export function groupOrdersByKitchenStatus(orders: AdminOrderLike[]) {
   const pending: AdminOrderLike[] = [];
+  const confirmed: AdminOrderLike[] = [];
   const preparing: AdminOrderLike[] = [];
   const ready: AdminOrderLike[] = [];
+  const handover: AdminOrderLike[] = [];
   const completed: AdminOrderLike[] = [];
   const cancelled: AdminOrderLike[] = [];
 
@@ -26,11 +28,17 @@ export function groupOrdersByKitchenStatus(orders: AdminOrderLike[]) {
       case "pending":
         pending.push(order);
         break;
+      case "confirmed":
+        confirmed.push(order);
+        break;
       case "preparing":
         preparing.push(order);
         break;
       case "ready":
         ready.push(order);
+        break;
+      case "handover":
+        handover.push(order);
         break;
       case "completed":
         completed.push(order);
@@ -41,7 +49,7 @@ export function groupOrdersByKitchenStatus(orders: AdminOrderLike[]) {
     }
   }
 
-  return { pending, preparing, ready, completed, cancelled };
+  return { pending, confirmed, preparing, ready, handover, completed, cancelled };
 }
 
 function lineCount(order: AdminOrderLike): number {
@@ -147,9 +155,11 @@ export function revenueTodayCompleted(orders: AdminOrderLike[], todayIso: string
 }
 
 export function getNextOrderStatus(status: string): string | null {
-  if (status === "pending") return "preparing";
+  if (status === "pending") return "confirmed";
+  if (status === "confirmed") return "preparing";
   if (status === "preparing") return "ready";
-  if (status === "ready") return "completed";
+  if (status === "ready") return "handover";
+  if (status === "handover") return "completed";
   return null;
 }
 
