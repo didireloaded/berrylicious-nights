@@ -150,14 +150,14 @@ export default function DrinksPage() {
         />
 
         {showCategoryShelves ? (
-          <div className="mt-7 space-y-10">
+          <div className="mt-6 space-y-7">
             {groupedByCategory.map((group) => (
               <section key={group.name} aria-labelledby={`drink-cat-${group.name}`}>
                 <div className="flex items-baseline justify-between gap-4">
-                  <h2 id={`drink-cat-${group.name}`} className="text-[22px] font-bold tracking-[-0.03em] text-white">
+                  <h2 id={`drink-cat-${group.name}`} className="text-[20px] font-bold tracking-[-0.03em] text-white">
                     {group.name}
                   </h2>
-                  {group.items.length > 3 && (
+                  {group.items.length > 4 && (
                     <button
                       type="button"
                       onClick={() => selectCategory(group.name)}
@@ -167,8 +167,8 @@ export default function DrinksPage() {
                     </button>
                   )}
                 </div>
-                <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {group.items.slice(0, 3).map((item) => (
+                <div className="mt-2 grid grid-cols-1 gap-2.5 md:grid-cols-2 md:gap-3.5">
+                  {group.items.slice(0, 4).map((item) => (
                     <MenuCard key={item.id} item={item} disabled={isUnavailable(item.id)} />
                   ))}
                 </div>
@@ -176,10 +176,10 @@ export default function DrinksPage() {
             ))}
           </div>
         ) : (
-          <section className="mt-7 scroll-mt-6" aria-labelledby="drinks-filtered-heading">
+          <section className="mt-6 scroll-mt-6" aria-labelledby="drinks-filtered-heading">
             <div className="flex items-baseline justify-between gap-3">
               <div>
-                <h2 id="drinks-filtered-heading" className="text-[24px] font-bold tracking-[-0.03em] text-white">
+                <h2 id="drinks-filtered-heading" className="text-[22px] font-bold tracking-[-0.03em] text-white">
                   {category === "All" ? "Filtered drinks" : category}
                 </h2>
                 <p className="mt-0.5 text-[14px] text-[#A3A3A3]">
@@ -196,7 +196,7 @@ export default function DrinksPage() {
             </div>
 
             {displayedItems.length > 0 ? (
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-2 md:gap-3.5">
                 {displayedItems.map((item) => (
                   <MenuCard key={item.id} item={item} disabled={isUnavailable(item.id)} />
                 ))}
