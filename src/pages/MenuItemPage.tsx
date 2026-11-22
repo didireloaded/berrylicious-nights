@@ -386,7 +386,7 @@ export default function MenuItemPage() {
                           }}
                           aria-pressed={active}
                           className={
-                            "flex min-h-[48px] items-center justify-center rounded-2xl border px-2 py-2 text-center text-[13px] font-semibold leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+                            "bb-press flex min-h-[48px] items-center justify-center rounded-2xl border px-2 py-2 text-center text-[13px] font-semibold leading-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
                             (active
                               ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
                               : "border-white/10 bg-[#242424] text-white/85 hover:bg-[#303030]")
@@ -422,7 +422,7 @@ export default function MenuItemPage() {
                           }}
                           aria-pressed={active}
                           className={
-                            "relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-2xl border px-2 py-3 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+                            "bb-press relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-2xl border px-2 py-3 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
                             (active
                               ? "border-[#FF5A1F] bg-[#FF5A1F]/15 text-white"
                               : "border-white/10 bg-[#242424] text-[#C4C4C4] hover:bg-[#303030]")
@@ -461,7 +461,7 @@ export default function MenuItemPage() {
                           onClick={() => toggleSauce(sauce.id)}
                           aria-pressed={active}
                           className={
-                            "flex min-h-[48px] items-center justify-between gap-2 rounded-2xl border px-3 py-2 text-left text-[13px] font-medium leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+                            "bb-press flex min-h-[48px] items-center justify-between gap-2 rounded-2xl border px-3 py-2 text-left text-[13px] font-medium leading-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
                             (active
                               ? "border-[#FF5A1F] bg-[#FF5A1F]/15 text-white"
                               : "border-white/10 bg-[#242424] text-white/85 hover:bg-[#303030]")
@@ -547,7 +547,7 @@ export default function MenuItemPage() {
             type="button"
             onClick={addToBag}
             disabled={unavailable}
-            className="flex min-h-[52px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#FF5A1F] px-4 text-[15px] font-bold text-white transition-colors hover:bg-[#E84D15] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="bb-press flex min-h-[52px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#FF5A1F] px-4 text-[15px] font-bold text-white hover:bg-[#E84D15] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
             {isSeasonalQuote ? (
               <span>Ask waiter for today&apos;s quote</span>

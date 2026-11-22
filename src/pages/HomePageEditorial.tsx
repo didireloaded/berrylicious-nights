@@ -1,18 +1,18 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
 import heroGrill from "@/assets/dish-lamb.jpg";
 import butcherBlockLogo from "@/assets/butcher-block-logo.png";
+import { SlideToEnter, type SlideToEnterHandle } from "@/components/SlideToEnter";
 
 const WELCOME_STORAGE_KEY = "bb-welcome-seen";
-const SMOOTH_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+const IOS_CURVE = "cubic-bezier(0.32, 0.72, 0, 1)";
 const MOTION_SAFE = "motion-reduce:transition-none";
 
-function transitionStyle(delayMs: number, durationMs = 560): CSSProperties {
+function enterStyle(delayMs: number, durationMs = 620): CSSProperties {
   return {
     transitionDelay: `${delayMs}ms`,
     transitionDuration: `${durationMs}ms`,
-    transitionTimingFunction: SMOOTH_EASE,
+    transitionTimingFunction: IOS_CURVE,
   };
 }
 
@@ -34,18 +34,18 @@ export default function HomePageEditorial() {
   const [returningVisitor] = useState<boolean>(() => !forceIntro && hasSeenWelcome());
   const [mounted, setMounted] = useState(false);
   const [entering, setEntering] = useState(false);
+  const [slideProgress, setSlideProgress] = useState(0);
+  const sliderRef = useRef<SlideToEnterHandle>(null);
 
   useEffect(() => {
     if (returningVisitor) return;
+    // Preload Home chunk immediately so transition into /home has zero flash
+    void import("@/pages/DashboardHomePage").catch(() => undefined);
     const id = window.requestAnimationFrame(() => setMounted(true));
     return () => window.cancelAnimationFrame(id);
   }, [returningVisitor]);
 
-  if (returningVisitor) {
-    return <Navigate to="/home" replace />;
-  }
-
-  const handleEnter = () => {
+  const handleSlideComplete = useCallback(() => {
     if (entering) return;
     setEntering(true);
     try {
@@ -59,29 +59,40 @@ export default function HomePageEditorial() {
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     window.setTimeout(() => {
       navigate("/home", { replace: true });
-    }, reduced ? 40 : 420);
-  };
+    }, reduced ? 40 : 460);
+  }, [entering, navigate]);
+
+  if (returningVisitor) {
+    return <Navigate to="/home" replace />;
+  }
 
   return (
     <div
-      style={transitionStyle(0, 420)}
-      className={
-        `relative isolate flex min-h-dvh w-full flex-col justify-between overflow-hidden bg-[#0A0A0A] text-white transition-all ${MOTION_SAFE} ` +
-        (entering ? "scale-[1.03] opacity-0" : "scale-100 opacity-100")
-      }
+      style={{
+        transform: entering ? "translate3d(-100%, 0, 0)" : "translate3d(0, 0, 0)",
+        opacity: entering ? 0.35 : 1,
+        transition: `transform 460ms ${IOS_CURVE}, opacity 420ms ${IOS_CURVE}`,
+      }}
+      className={`relative isolate flex min-h-dvh w-full flex-col justify-between overflow-hidden bg-[#0A0A0A] text-white will-change-transform ${MOTION_SAFE}`}
     >
-      {/* Close-up chargrilled steak photography anchored cleanly into deep charcoal */}
+      {/* Close-up chargrilled steak photography with subtle live slide parallax */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[24%] -z-20 overflow-hidden">
         <img
           src={heroGrill}
           alt=""
           aria-hidden="true"
           decoding="async"
-          style={transitionStyle(0, 900)}
-          className={
-            `h-full w-full object-cover object-center transition-all ${MOTION_SAFE} ` +
-            (mounted ? "scale-100 opacity-90" : "scale-105 opacity-0")
-          }
+          style={{
+            transform: mounted
+              ? `translate3d(${Math.round(-slideProgress * 18)}px, 0, 0) scale(${(1 + slideProgress * 0.045).toFixed(3)})`
+              : "translate3d(0, 0, 0) scale(1.06)",
+            opacity: mounted ? 0.92 : 0,
+            transition:
+              slideProgress > 0 && !entering
+                ? "opacity 600ms ease"
+                : `transform 760ms ${IOS_CURVE}, opacity 760ms ${IOS_CURVE}`,
+          }}
+          className={`h-full w-full object-cover object-center will-change-transform ${MOTION_SAFE}`}
         />
       </div>
 
@@ -99,18 +110,23 @@ export default function HomePageEditorial() {
       <div className="mx-auto flex w-full max-w-[520px] flex-1 flex-col items-center justify-center px-8 pb-20 pt-[max(56px,env(safe-area-inset-top,0px))] text-center">
         <button
           type="button"
-          onClick={handleEnter}
+          onClick={() => sliderRef.current?.triggerSlideComplete()}
           aria-label="Enter Butcher Block Steakhouse"
-          style={transitionStyle(60, 680)}
-          className={
-            `group flex flex-col items-center rounded-3xl p-4 transition-all ${MOTION_SAFE} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] ` +
-            (mounted ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0")
-          }
+          style={{
+            ...(slideProgress > 0 && !entering
+              ? { transition: "opacity 600ms ease" }
+              : enterStyle(50, 640)),
+            transform: mounted
+              ? `translate3d(0, ${Math.round(-slideProgress * 10)}px, 0)`
+              : "translate3d(0, 16px, 0)",
+            opacity: mounted ? 1 : 0,
+          }}
+          className={`group flex flex-col items-center rounded-3xl p-4 transition-[transform,opacity] will-change-transform ${MOTION_SAFE} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]`}
         >
           <img
             src={butcherBlockLogo}
             alt="Butcher Block Steakhouse"
-            className="w-[240px] max-w-[68vw] object-contain transition-transform duration-300 group-hover:scale-[1.02] sm:w-[270px]"
+            className="w-[240px] max-w-[68vw] object-contain transition-transform duration-300 ease-out group-hover:scale-[1.02] sm:w-[270px]"
           />
           <p className="mt-5 text-[14px] font-medium tracking-[0.14em] text-[#A3A3A3]">
             AM WEINBERG ESTATE · WINDHOEK
@@ -118,27 +134,22 @@ export default function HomePageEditorial() {
         </button>
       </div>
 
-      {/* Bottom iOS entry pill */}
+      {/* Bottom iOS Slide-to-Enter track */}
       <div
-        style={transitionStyle(180, 680)}
+        style={enterStyle(160, 640)}
         className={
-          `mx-auto w-full max-w-[440px] px-6 pb-[max(34px,env(safe-area-inset-bottom,0px))] transition-all ${MOTION_SAFE} ` +
+          `mx-auto w-full max-w-[440px] px-6 pb-[max(34px,env(safe-area-inset-bottom,0px))] transition-[transform,opacity] will-change-transform ${MOTION_SAFE} ` +
           (mounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0")
         }
       >
-        <button
-          type="button"
-          onClick={handleEnter}
+        <SlideToEnter
+          ref={sliderRef}
+          label="Slide to Enter"
+          completedLabel="Opening Butcher Block…"
           disabled={entering}
-          className="group relative flex min-h-[58px] w-full items-center justify-center rounded-full border border-white/15 bg-[#1B1B1B]/90 pl-6 pr-2 text-[16px] font-semibold text-white backdrop-blur-md transition-all duration-200 hover:border-white/25 hover:bg-[#242424] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
-        >
-          <span className="pr-10 tracking-[-0.01em]">
-            {entering ? "Opening Butcher Block…" : "Tap to Enter"}
-          </span>
-          <span className="absolute right-1.5 flex h-[46px] w-[46px] items-center justify-center rounded-full bg-[#FF5A1F] text-white transition-transform duration-200 group-hover:scale-[1.04]">
-            <ArrowRight className="h-5 w-5" strokeWidth={2.2} aria-hidden="true" />
-          </span>
-        </button>
+          onProgress={setSlideProgress}
+          onComplete={handleSlideComplete}
+        />
       </div>
     </div>
   );

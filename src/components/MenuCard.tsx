@@ -53,7 +53,7 @@ const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: Menu
     <article
       style={{ contentVisibility: "auto", containIntrinsicSize: "272px" }}
       className={
-        "group relative flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[#242424] transition-colors " +
+        "bb-card-motion group relative flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[#242424] " +
         (disabled ? "opacity-55" : "hover:border-white/20")
       }
     >
@@ -71,7 +71,7 @@ const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: Menu
                 alt={artwork.isExactDish ? item.name : ""}
                 loading="lazy"
                 decoding="async"
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                className="bb-ease-spring h-full w-full object-cover transition-transform duration-500 will-change-transform group-hover:scale-[1.035]"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#242424] via-[#242424]/25 to-transparent" />
             </>
@@ -91,10 +91,11 @@ const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: Menu
           onClick={handleToggleFavorite}
           aria-pressed={favorited}
           aria-label={favorited ? `Remove ${item.name} from favourites` : `Save ${item.name} to favourites`}
-          className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#121212]/70 text-white backdrop-blur-md transition-transform active:scale-95 hover:bg-[#121212]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+          className="bb-press absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#121212]/70 text-white backdrop-blur-md active:scale-90 hover:bg-[#121212]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
         >
           <Heart
-            className={"h-5 w-5 transition-colors " + (favorited ? "fill-[#FF5A1F] text-[#FF5A1F]" : "text-white")}
+            key={favorited ? "fav" : "unfav"}
+            className={"h-5 w-5 transition-colors " + (favorited ? "bb-pop fill-[#FF5A1F] text-[#FF5A1F]" : "text-white")}
             strokeWidth={1.9}
             aria-hidden="true"
           />
@@ -157,7 +158,7 @@ const MenuCard = memo(function MenuCard({ item, disabled = false }: { item: Menu
                 type="button"
                 onClick={handleQuickAdd}
                 aria-label={`Add ${item.name} to order`}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FF5A1F] text-white transition-transform hover:bg-[#E84D15] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="bb-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FF5A1F] text-white hover:bg-[#E84D15] active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <Plus className="h-5 w-5" strokeWidth={2.4} aria-hidden="true" />
               </button>

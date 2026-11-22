@@ -1,0 +1,343 @@
+/* ═══════════════════════════════════════════════════════════════════
+   BUTCHER BLOCK STEAKHOUSE — NATIVE iOS MOTION SYSTEM
+   GPU-composited transforms & opacity only · 60/120fps · Reduced-motion safe
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --ease-ios-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-ios-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-ios-press: cubic-bezier(0.2, 0, 0, 1);
+  --ease-ios-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── 1. Route / Page Transitions ──────────────────────────────────── */
+
+@keyframes bb-page-tab-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes bb-page-push-in {
+  from {
+    opacity: 0;
+    transform: translate3d(20px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes bb-page-pop-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-16px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes bb-page-welcome-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(28px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Use `backwards` (not `both`) and avoid permanent `will-change: transform` so
+   `position: fixed` descendants (e.g. sticky item CTA bars) are never trapped
+   in a transformed containing block after the entrance finishes. */
+.bb-page-tab {
+  animation: bb-page-tab-in 240ms var(--ease-ios-spring) backwards;
+}
+
+.bb-page-push {
+  animation: bb-page-push-in 300ms var(--ease-ios-sheet) backwards;
+}
+
+.bb-page-pop {
+  animation: bb-page-pop-in 260ms var(--ease-ios-sheet) backwards;
+}
+
+.bb-page-welcome {
+  animation: bb-page-welcome-reveal 420ms var(--ease-ios-sheet) backwards;
+}
+
+/* ── 2. Upgrade ALL Radix Bottom Sheets to Apple UIKit Sheet Curve ── */
+
+@keyframes bb-sheet-up-in {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes bb-sheet-down-out {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+
+@keyframes bb-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bb-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Bottom sheets rendered via Radix SheetPrimitive.Content */
+[role="dialog"][data-state="open"].bottom-0.inset-x-0 {
+  animation: bb-sheet-up-in 380ms var(--ease-ios-sheet) both !important;
+  will-change: transform;
+}
+
+[role="dialog"][data-state="closed"].bottom-0.inset-x-0 {
+  animation: bb-sheet-down-out 260ms var(--ease-ios-sheet) both !important;
+  will-change: transform;
+}
+
+/* Backdrop overlay fade */
+div[data-state="open"].fixed.inset-0.bg-black\/80 {
+  animation: bb-backdrop-in 260ms var(--ease-ios-spring) both !important;
+}
+
+div[data-state="closed"].fixed.inset-0.bg-black\/80 {
+  animation: bb-backdrop-out 220ms var(--ease-ios-spring) both !important;
+}
+
+/* Upgrade legacy panel-up / fade-in classes globally */
+.animate-fade-in {
+  animation: bb-page-tab-in 260ms var(--ease-ios-spring) both !important;
+}
+
+.animate-panel-up {
+  animation: bb-sheet-up-in 380ms var(--ease-ios-sheet) both !important;
+  will-change: transform;
+}
+
+/* ── 3. Floating Cart Bar & Interactive Micro-Motion ─────────────── */
+
+@keyframes bb-cart-bar-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, 24px, 0) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(-50%, 0, 0) scale(1);
+  }
+}
+
+.bb-cart-bar-enter {
+  animation: bb-cart-bar-in 340ms var(--ease-ios-sheet) both;
+  will-change: transform, opacity;
+}
+
+@keyframes bb-pop-spring {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.22);
+  }
+  75% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.bb-pop {
+  animation: bb-pop-spring 320ms var(--ease-ios-spring) both;
+}
+
+/* Tactile iOS press physics (GPU-only transform + opacity) */
+.bb-press {
+  transition:
+    transform 180ms var(--ease-ios-spring),
+    background-color 180ms var(--ease-ios-press),
+    border-color 180ms var(--ease-ios-press),
+    color 180ms var(--ease-ios-press),
+    opacity 180ms var(--ease-ios-press);
+}
+
+.bb-press:active:not(:disabled) {
+  transform: scale(0.965);
+}
+
+.bb-card-motion {
+  transition:
+    transform 240ms var(--ease-ios-spring),
+    border-color 220ms var(--ease-ios-press),
+    background-color 220ms var(--ease-ios-press);
+}
+
+.bb-card-motion:active {
+  transform: scale(0.985);
+}
+
+.bb-ease-spring {
+  transition-timing-function: var(--ease-ios-spring);
+}
+
+/* ── 4. Slide-to-Enter Track Shimmer & Directional Chevrons ───────── */
+
+@keyframes bb-slide-shimmer {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
+.bb-slide-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.48) 0%,
+    rgba(255, 255, 255, 0.55) 36%,
+    rgba(255, 255, 255, 1) 50%,
+    rgba(255, 255, 255, 0.55) 64%,
+    rgba(255, 255, 255, 0.48) 100%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: bb-slide-shimmer 2.6s linear infinite;
+}
+
+@keyframes bb-chevron-glide {
+  0%, 100% {
+    opacity: 0.28;
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    opacity: 0.92;
+    transform: translate3d(3px, 0, 0);
+  }
+}
+
+.bb-chevron-1 {
+  animation: bb-chevron-glide 1.6s var(--ease-ios-spring) infinite;
+}
+
+.bb-chevron-2 {
+  animation: bb-chevron-glide 1.6s var(--ease-ios-spring) 180ms infinite;
+}
+
+/* ── 5. Smooth Accordion / Collapsible Filter Panel ───────────────── */
+
+.bb-collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    grid-template-rows 280ms var(--ease-ios-sheet),
+    opacity 220ms var(--ease-ios-spring);
+}
+
+.bb-collapsible[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bb-collapsible > div {
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 0ms linear 280ms;
+}
+
+.bb-collapsible[data-open="true"] > div {
+  visibility: visible;
+  transition: visibility 0ms linear 0ms;
+}
+
+/* ── 6. Staggered Gentle Section Entrance ─────────────────────────── */
+
+@keyframes bb-stagger-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.bb-stagger {
+  animation: bb-stagger-in 340ms var(--ease-ios-spring) both;
+}
+
+.bb-stagger-1 { animation-delay: 30ms; }
+.bb-stagger-2 { animation-delay: 75ms; }
+.bb-stagger-3 { animation-delay: 120ms; }
+.bb-stagger-4 { animation-delay: 165ms; }
+
+/* ── 7. Strict Reduced-Motion Support ─────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .bb-page-tab,
+  .bb-page-push,
+  .bb-page-pop,
+  .bb-page-welcome,
+  .bb-cart-bar-enter,
+  .bb-pop,
+  .bb-stagger,
+  .bb-chevron-1,
+  .bb-chevron-2 {
+    animation: none !important;
+  }
+
+  .bb-slide-shimmer-text {
+    animation: none !important;
+    background: none !important;
+    -webkit-background-clip: initial !important;
+    background-clip: initial !important;
+    color: #ffffff !important;
+  }
+
+  [role="dialog"][data-state="open"].bottom-0.inset-x-0,
+  [role="dialog"][data-state="closed"].bottom-0.inset-x-0,
+  div[data-state="open"].fixed.inset-0.bg-black\/80,
+  div[data-state="closed"].fixed.inset-0.bg-black\/80 {
+    animation: none !important;
+  }
+
+  .bb-collapsible {
+    transition: none !important;
+  }
+}

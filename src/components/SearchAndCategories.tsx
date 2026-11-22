@@ -121,111 +121,117 @@ export const SearchAndCategories = forwardRef<HTMLInputElement, SearchAndCategor
           </button>
         </div>
 
-        {/* Composable Filter Panel (works alongside search & selected category) */}
-        {filtersOpen && (
-          <div
-            role="region"
-            aria-label="Menu filters"
-            className="space-y-4 rounded-[22px] border border-white/10 bg-[#242424] p-4 animate-fade-in"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[14px] font-bold text-white">Filter &amp; Sort</p>
-              {activeFilterCount > 0 && onResetFilters && (
-                <button
-                  type="button"
-                  onClick={onResetFilters}
-                  className="text-[13px] font-semibold text-[#FF5A1F] hover:text-white"
-                >
-                  Reset filters
-                </button>
-              )}
-            </div>
+        {/* Smoothly Collapsible Filter Panel */}
+        <div
+          className="bb-collapsible"
+          data-open={filtersOpen ? "true" : "false"}
+          aria-hidden={!filtersOpen}
+        >
+          <div>
+            <div
+              role="region"
+              aria-label="Menu filters"
+              className="space-y-4 rounded-[22px] border border-white/10 bg-[#242424] p-4"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[14px] font-bold text-white">Filter &amp; Sort</p>
+                {activeFilterCount > 0 && onResetFilters && (
+                  <button
+                    type="button"
+                    onClick={onResetFilters}
+                    className="text-[13px] font-semibold text-[#FF5A1F] hover:text-white"
+                  >
+                    Reset filters
+                  </button>
+                )}
+              </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                aria-pressed={featuredOnly}
-                onClick={onFeaturedToggle}
-                className={
-                  "min-h-[40px] rounded-full border px-3.5 text-[13px] font-semibold transition-colors " +
-                  (featuredOnly
-                    ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
-                    : "border-white/10 bg-[#303030] text-white/85 hover:border-white/25")
-                }
-              >
-                House favourites
-              </button>
-              {onFavoritesToggle && (
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  aria-pressed={favoritesOnly}
-                  onClick={onFavoritesToggle}
+                  aria-pressed={featuredOnly}
+                  onClick={onFeaturedToggle}
                   className={
-                    "inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition-colors " +
-                    (favoritesOnly
+                    "bb-press min-h-[40px] rounded-full border px-3.5 text-[13px] font-semibold " +
+                    (featuredOnly
                       ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
                       : "border-white/10 bg-[#303030] text-white/85 hover:border-white/25")
                   }
                 >
-                  <Heart className="h-3.5 w-3.5" aria-hidden="true" />
-                  Saved ({favoritesCount})
+                  House favourites
                 </button>
+                {onFavoritesToggle && (
+                  <button
+                    type="button"
+                    aria-pressed={favoritesOnly}
+                    onClick={onFavoritesToggle}
+                    className={
+                      "bb-press inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold " +
+                      (favoritesOnly
+                        ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
+                        : "border-white/10 bg-[#303030] text-white/85 hover:border-white/25")
+                    }
+                  >
+                    <Heart className="h-3.5 w-3.5" aria-hidden="true" />
+                    Saved ({favoritesCount})
+                  </button>
+                )}
+              </div>
+
+              {onPriceBandChange && (
+                <div>
+                  <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.1em] text-[#A3A3A3]">
+                    Price Range
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {PRICE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        aria-pressed={priceBand === opt.value}
+                        onClick={() => onPriceBandChange(opt.value)}
+                        className={
+                          "bb-press min-h-[38px] rounded-full border px-3 text-[13px] font-medium " +
+                          (priceBand === opt.value
+                            ? "border-[#FF5A1F] bg-[#FF5A1F]/20 text-[#FF5A1F]"
+                            : "border-white/10 bg-[#1B1B1B] text-[#A3A3A3] hover:text-white")
+                        }
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {onSortByChange && (
+                <div>
+                  <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.1em] text-[#A3A3A3]">
+                    Sort By
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {SORT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        aria-pressed={sortBy === opt.value}
+                        onClick={() => onSortByChange(opt.value)}
+                        className={
+                          "bb-press min-h-[38px] rounded-full border px-3 text-[13px] font-medium " +
+                          (sortBy === opt.value
+                            ? "border-[#FF5A1F] bg-[#FF5A1F]/20 text-[#FF5A1F]"
+                            : "border-white/10 bg-[#1B1B1B] text-[#A3A3A3] hover:text-white")
+                        }
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-
-            {onPriceBandChange && (
-              <div>
-                <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.1em] text-[#A3A3A3]">
-                  Price Range
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {PRICE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      aria-pressed={priceBand === opt.value}
-                      onClick={() => onPriceBandChange(opt.value)}
-                      className={
-                        "min-h-[38px] rounded-full border px-3 text-[13px] font-medium transition-colors " +
-                        (priceBand === opt.value
-                          ? "border-[#FF5A1F] bg-[#FF5A1F]/20 text-[#FF5A1F]"
-                          : "border-white/10 bg-[#1B1B1B] text-[#A3A3A3] hover:text-white")
-                      }
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {onSortByChange && (
-              <div>
-                <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.1em] text-[#A3A3A3]">
-                  Sort By
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {SORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      aria-pressed={sortBy === opt.value}
-                      onClick={() => onSortByChange(opt.value)}
-                      className={
-                        "min-h-[38px] rounded-full border px-3 text-[13px] font-medium transition-colors " +
-                        (sortBy === opt.value
-                          ? "border-[#FF5A1F] bg-[#FF5A1F]/20 text-[#FF5A1F]"
-                          : "border-white/10 bg-[#1B1B1B] text-[#A3A3A3] hover:text-white")
-                      }
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-        )}
+        </div>
 
         {/* Horizontally scrollable circular category selectors with orange active ring */}
         <div
@@ -242,12 +248,12 @@ export const SearchAndCategories = forwardRef<HTMLInputElement, SearchAndCategor
                 key={name}
                 aria-pressed={active}
                 onClick={() => onCategoryChange(name)}
-                className="group flex min-w-[68px] max-w-[84px] shrink-0 snap-start flex-col items-center gap-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+                className="bb-press group flex min-w-[68px] max-w-[84px] shrink-0 snap-start flex-col items-center gap-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
               >
                 <span
                   className={
-                    "flex h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-full border-[2.5px] p-[3px] transition-colors " +
-                    (active ? "border-[#FF5A1F]" : "border-white/10 group-hover:border-white/30")
+                    "bb-ease-spring flex h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-full border-[2.5px] p-[3px] transition-[border-color,transform] duration-200 " +
+                    (active ? "scale-[1.04] border-[#FF5A1F]" : "border-white/10 group-hover:border-white/30")
                   }
                 >
                   <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-[#242424]">

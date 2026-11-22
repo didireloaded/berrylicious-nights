@@ -13,7 +13,7 @@ export default function BottomNav() {
   const isMore = pathname === "/profile" || pathname === "/events" || pathname === "/messages" || pathname === "/auth";
 
   const tabClass = (active: boolean) =>
-    "flex min-h-[48px] min-w-[56px] flex-col items-center justify-center gap-1 rounded-xl px-2 py-1 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+    "bb-press relative flex min-h-[48px] min-w-[56px] flex-col items-center justify-center gap-1 rounded-xl px-2 py-1 active:scale-[0.90] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
     (active ? "text-[#FF5A1F]" : "text-[#A3A3A3] hover:text-white");
 
   return (
@@ -38,7 +38,7 @@ export default function BottomNav() {
           aria-current={isCart ? "page" : undefined}
           aria-label={`Your cart, ${totalItems} ${totalItems === 1 ? "item" : "items"}`}
           className={
-            "relative -mt-3 flex h-[52px] w-[52px] items-center justify-center rounded-full border transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white " +
+            "bb-press relative -mt-3 flex h-[52px] w-[52px] items-center justify-center rounded-full border active:scale-[0.92] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white " +
             (isCart
               ? "border-[#FF5A1F] bg-[#FF5A1F] text-white shadow-[0_8px_24px_rgba(255,90,31,0.35)]"
               : "border-white/15 bg-[#303030] text-white shadow-[0_8px_22px_rgba(0,0,0,0.45)] hover:bg-[#3A3A3A]")
@@ -46,7 +46,10 @@ export default function BottomNav() {
         >
           <ShoppingBag className="h-[21px] w-[21px]" strokeWidth={2} aria-hidden="true" />
           {totalItems > 0 && (
-            <span className="absolute -right-1 -top-1 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full border-2 border-[#181818] bg-[#FF5A1F] px-1 text-[10px] font-bold text-white tabular-nums">
+            <span
+              key={totalItems}
+              className="bb-pop absolute -right-1 -top-1 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full border-2 border-[#181818] bg-[#FF5A1F] px-1 text-[10px] font-bold text-white tabular-nums"
+            >
               {totalItems > 99 ? "99+" : totalItems}
             </span>
           )}

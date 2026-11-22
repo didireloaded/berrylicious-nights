@@ -26,7 +26,7 @@ export function FloatingCartBar() {
     <Link
       to="/cart"
       aria-label={`View cart: ${totalItems} ${totalItems === 1 ? "item" : "items"}, ${formatPrice(totalPrice)}`}
-      className="fixed left-1/2 z-40 flex min-h-[56px] w-[calc(100%-32px)] max-w-[440px] -translate-x-1/2 items-center justify-between rounded-full bg-[#FF5A1F] py-2 pl-5 pr-2 text-white shadow-[0_12px_28px_rgba(0,0,0,0.4)] transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white lg:hidden"
+      className="bb-cart-bar-enter bb-press fixed left-1/2 z-40 flex min-h-[56px] w-[calc(100%-32px)] max-w-[440px] -translate-x-1/2 items-center justify-between rounded-full bg-[#FF5A1F] py-2 pl-5 pr-2 text-white shadow-[0_12px_28px_rgba(0,0,0,0.4)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white lg:hidden"
       style={{ bottom: "calc(max(12px, env(safe-area-inset-bottom, 0px)) + 74px)" }}
     >
       <span className="flex items-center gap-3">

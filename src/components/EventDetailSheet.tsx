@@ -28,10 +28,23 @@ type EventDetailSheetProps = {
 
 export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
   const navigate = useNavigate();
+  const [renderedEvent, setRenderedEvent] = useState<HomeUpdateRow | null>(event);
+  const [visible, setVisible] = useState(false);
   const [openSlots, setOpenSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState(false);
   const dragStartY = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (event) {
+      setRenderedEvent(event);
+      const id = window.requestAnimationFrame(() => setVisible(true));
+      return () => window.cancelAnimationFrame(id);
+    }
+    setVisible(false);
+    const timer = window.setTimeout(() => setRenderedEvent(null), 260);
+    return () => window.clearTimeout(timer);
+  }, [event]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     dragStartY.current = e.touches[0]?.clientY ?? null;
@@ -89,14 +102,14 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [event, onClose]);
 
-  if (!event) return null;
+  if (!renderedEvent) return null;
 
   const details =
-    event.subtitle?.trim() ||
+    renderedEvent.subtitle?.trim() ||
     "Explore the menu or check available reservation times for this date.";
 
-  const eventDate = resolveEventDate(event);
-  const headlineTime = resolveHeadlineTime(event);
+  const eventDate = resolveEventDate(renderedEvent);
+  const headlineTime = resolveHeadlineTime(renderedEvent);
   const nightLabel = formatNightLabel(eventDate);
 
   const primaryTime =
@@ -108,8 +121,8 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
 
   const goBooking = (time: string) => {
     const state: BookingNavState = {
-      eventId: event.id,
-      eventTitle: event.title,
+      eventId: renderedEvent.id,
+      eventTitle: renderedEvent.title,
       suggestedDate: eventDate,
       suggestedTime: time,
       eventTimeSlots: openSlots.length > 0 ? openSlots : undefined,
@@ -123,7 +136,11 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
       <button
         type="button"
         aria-label="Dismiss"
-        className="min-h-[20dvh] flex-1 pointer-events-auto bg-background/70 backdrop-blur-sm animate-fade-in"
+        style={{
+          opacity: visible ? 1 : 0,
+          transition: "opacity 240ms cubic-bezier(0.22, 1, 0.36, 1)",
+        }}
+        className="min-h-[20dvh] flex-1 pointer-events-auto bg-black/75 backdrop-blur-sm"
         onClick={onClose}
       />
 
@@ -131,7 +148,11 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="event-sheet-title"
-        className="pointer-events-auto mx-auto flex max-h-[min(85dvh,720px)] w-full max-w-lg flex-col rounded-t-[28px] border border-white/10 border-b-0 bg-[#181818] text-white shadow-[0_-8px_40px_rgba(0,0,0,0.55)] animate-panel-up"
+        style={{
+          transform: visible ? "translate3d(0, 0, 0)" : "translate3d(0, 100%, 0)",
+          transition: "transform 360ms cubic-bezier(0.32, 0.72, 0, 1)",
+        }}
+        className="pointer-events-auto mx-auto flex max-h-[min(85dvh,720px)] w-full max-w-lg flex-col rounded-t-[28px] border border-white/10 border-b-0 bg-[#181818] text-white shadow-[0_-8px_40px_rgba(0,0,0,0.55)] will-change-transform"
       >
         <div
           className="flex shrink-0 justify-center pt-3 pb-2"
@@ -144,10 +165,10 @@ export function EventDetailSheet({ event, onClose }: EventDetailSheetProps) {
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-2">
           <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-primary">
-            {event.type}
+            {renderedEvent.type}
           </p>
           <h2 id="event-sheet-title" className="font-display mt-1 text-xl font-bold leading-tight text-foreground">
-            {event.title}
+            {renderedEvent.title}
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{details}</p>
           <p className="mt-3 text-xs text-muted-foreground">

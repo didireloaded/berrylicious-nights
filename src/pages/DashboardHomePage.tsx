@@ -137,7 +137,7 @@ export default function DashboardHomePage() {
         <ActiveOrderBanner />
 
         {/* Editorial Hero Composition matching Screen 02 */}
-        <section className="relative mt-6 overflow-hidden rounded-[26px] bg-[#121212] py-2 lg:mt-8 lg:grid lg:grid-cols-12 lg:items-center lg:gap-8">
+        <section className="bb-stagger bb-stagger-1 relative mt-6 overflow-hidden rounded-[26px] bg-[#121212] py-2 lg:mt-8 lg:grid lg:grid-cols-12 lg:items-center lg:gap-8">
           <div className="relative z-10 max-w-[62%] py-3 lg:col-span-6 lg:max-w-none lg:py-6">
             <h1 className="font-display text-[clamp(2.25rem,9.5vw,3rem)] font-extrabold leading-[1.03] tracking-[-0.045em] text-white lg:text-[3.4rem]">
               <span className="block">Premium</span>
@@ -165,10 +165,10 @@ export default function DashboardHomePage() {
         </section>
 
         {/* 4 Compact Primary Actions matching approved reference */}
-        <section className="mt-5 grid grid-cols-4 gap-2.5 sm:gap-3 lg:mt-6" aria-label="Primary actions">
+        <section className="bb-stagger bb-stagger-2 mt-5 grid grid-cols-4 gap-2.5 sm:gap-3 lg:mt-6" aria-label="Primary actions">
           <Link
             to="/menu"
-            className="flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] bg-[#FF5A1F] px-2 py-3 text-center text-white transition-transform active:scale-[0.97] hover:bg-[#E84D15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="bb-press flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] bg-[#FF5A1F] px-2 py-3 text-center text-white hover:bg-[#E84D15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
             <UtensilsCrossed className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
             <span className="text-[12px] font-bold leading-tight sm:text-[13px]">Order Food</span>
@@ -176,7 +176,7 @@ export default function DashboardHomePage() {
 
           <Link
             to="/drinks"
-            className="flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-[#242424] px-2 py-3 text-center text-white transition-colors active:scale-[0.97] hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+            className="bb-press flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-[#242424] px-2 py-3 text-center text-white hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
           >
             <Wine className="h-5 w-5 text-white/90" strokeWidth={1.9} aria-hidden="true" />
             <span className="text-[12px] font-semibold leading-tight text-white/90 sm:text-[13px]">Drinks</span>
@@ -184,7 +184,7 @@ export default function DashboardHomePage() {
 
           <Link
             to="/booking"
-            className="flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-[#242424] px-2 py-3 text-center text-white transition-colors active:scale-[0.97] hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+            className="bb-press flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-[#242424] px-2 py-3 text-center text-white hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
           >
             <CalendarDays className="h-5 w-5 text-white/90" strokeWidth={1.9} aria-hidden="true" />
             <span className="text-[12px] font-semibold leading-tight text-white/90 sm:text-[13px]">Reserve a Table</span>
@@ -192,7 +192,7 @@ export default function DashboardHomePage() {
 
           <Link
             to="/events"
-            className="flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-[#242424] px-2 py-3 text-center text-white transition-colors active:scale-[0.97] hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+            className="bb-press flex min-h-[86px] flex-col items-center justify-center gap-2 rounded-[20px] border border-white/10 bg-[#242424] px-2 py-3 text-center text-white hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
           >
             <CalendarHeart className="h-5 w-5 text-white/90" strokeWidth={1.9} aria-hidden="true" />
             <span className="text-[12px] font-semibold leading-tight text-white/90 sm:text-[13px]">Events</span>
@@ -200,7 +200,7 @@ export default function DashboardHomePage() {
         </section>
 
         {/* House Signatures (real menu data — never a fabricated "Today's Special") */}
-        <section className="mt-8" aria-labelledby="house-signatures-heading">
+        <section className="bb-stagger bb-stagger-3 mt-8" aria-labelledby="house-signatures-heading">
           <div className="flex items-baseline justify-between gap-4">
             <h2 id="house-signatures-heading" className="text-[20px] font-bold tracking-[-0.03em] text-white">
               House Signatures
@@ -223,14 +223,14 @@ export default function DashboardHomePage() {
                 <Link
                   key={dish.id}
                   to={`/menu/${dish.id}`}
-                  className="group flex items-center gap-3.5 rounded-[22px] border border-white/10 bg-[#242424] p-3 transition-colors hover:bg-[#2C2C2C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+                  className="bb-card-motion group flex items-center gap-3.5 rounded-[22px] border border-white/10 bg-[#242424] p-3 hover:bg-[#2C2C2C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
                 >
                   <img
                     src={dish.image}
                     alt=""
                     loading="lazy"
                     decoding="async"
-                    className="h-[84px] w-[96px] shrink-0 rounded-[16px] object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                    className="bb-ease-spring h-[84px] w-[96px] shrink-0 rounded-[16px] object-cover transition-transform duration-500 will-change-transform group-hover:scale-[1.04]"
                   />
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate text-[16px] font-bold tracking-[-0.02em] text-white">
