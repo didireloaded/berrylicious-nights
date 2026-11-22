@@ -7,10 +7,22 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:smoke": "playwright test --config=playwright.ci.config.ts tests/e2e/smoke.spec.ts",
+    "security:secrets": "node scripts/check-no-secrets.mjs",
+    "db:guard": "node scripts/local-supabase-guard.mjs",
+    "db:start": "npm run db:guard && supabase start",
+    "db:stop": "supabase stop",
+    "db:status": "supabase status",
+    "db:reset": "npm run db:guard && supabase db reset --local",
+    "db:test": "npm run db:guard && supabase test db --local",
+    "db:health": "node scripts/db-healthcheck.mjs",
+    "db:types": "npm run db:guard && supabase gen types typescript --local > src/integrations/supabase/types.ts",
+    "db:functions:serve": "npm run db:guard && supabase functions serve --no-verify-jwt"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
