@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
+import { useTableSession } from "@/context/TableSessionContext";
 import { useMenuAvailability } from "@/hooks/useMenuAvailability";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/vibe";
@@ -55,15 +56,23 @@ export default function CartPage() {
   const { items, updateQuantity, removeItem, clearCart, totalItems } = useCart();
   const { user, profile, refreshProfile } = useAuth();
   const { setCurrentOrder } = useApp();
+  const { session: tableSession, verifySessionLive } = useTableSession();
   const { isUnavailable, refresh: refreshAvailability } = useMenuAvailability();
   const navigate = useNavigate();
 
   const today = getWindhoekDateISO();
-  const [orderType, setOrderType] = useState<OrderType>("pickup");
+  const [orderType, setOrderType] = useState<OrderType>(() => (tableSession ? "dinein" : "pickup"));
   const [pickupTime, setPickupTime] = useState<string>(PICKUP_TIMES[0]);
   const [preorderDate, setPreorderDate] = useState<string>(today);
   const [preorderSlot, setPreorderSlot] = useState<string>("19:30");
-  const [tableNumber, setTableNumber] = useState<string>("");
+  const [tableNumber, setTableNumber] = useState<string>(() => tableSession?.displayName ?? "");
+
+  useEffect(() => {
+    if (tableSession) {
+      setOrderType("dinein");
+      setTableNumber(tableSession.displayName);
+    }
+  }, [tableSession]);
   const [guestName, setGuestName] = useState<string>(
     () => profile?.display_name || user?.user_metadata?.full_name || readStoredGuest("butcher-block-guest-name"),
   );
@@ -154,6 +163,19 @@ export default function CartPage() {
     submittingRef.current = true;
     setSubmitting(true);
 
+    // 0. If ordering via a scanned QR table session, confirm the table session is still open
+    if (orderType === "dinein" && tableSession) {
+      const check = await verifySessionLive();
+      if (!check.valid && check.reason !== "verification_unavailable") {
+        const msg = "Your table session was closed or expired. Please scan the table QR code again before ordering.";
+        setFormError(msg);
+        toast.error(msg);
+        submittingRef.current = false;
+        setSubmitting(false);
+        return;
+      }
+    }
+
     // 1. Refresh live kitchen 86 board right before submitting so stale carts cannot order unavailable dishes
     let freshDisabled: Set<string>;
     try {
@@ -236,6 +258,7 @@ export default function CartPage() {
           total: validated.total,
           order_type: orderType,
           ...(orderMeta.tableNumber ? { table_number: orderMeta.tableNumber } : {}),
+          ...(orderType === "dinein" && tableSession ? { table_session_id: tableSession.sessionId } : {}),
           ...(guestAccessTokenHash ? { guest_access_token_hash: guestAccessTokenHash } : {}),
         },
         { idempotencyId: stableOrderId },

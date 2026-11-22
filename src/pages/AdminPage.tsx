@@ -7,7 +7,7 @@ import {
   CalendarDays, ShoppingBag, Megaphone, Plus, Trash2, Check, X, Clock,
   LayoutDashboard, Flame, BarChart3, MessageSquare, UtensilsCrossed,
   ChevronRight, Home, RefreshCw, Users, DollarSign, TrendingUp,
-  AlertTriangle, Filter, Brain, Zap, Star, Gift,
+  AlertTriangle, Filter, Brain, Zap, Star, Gift, QrCode,
 } from "lucide-react";
 import { AdminMessagesPanel } from "@/components/admin/AdminMessagesPanel";
 import { AdminArrivalVerify } from "@/components/admin/AdminArrivalVerify";
@@ -15,6 +15,7 @@ import { AdminWaitlistPanel } from "@/components/admin/AdminWaitlistPanel";
 import { AdminMenuDisabledPanel } from "@/components/admin/AdminMenuDisabledPanel";
 import { AdminReviewsPanel } from "@/components/admin/AdminReviewsPanel";
 import { AdminLoyaltyPanel } from "@/components/admin/AdminLoyaltyPanel";
+import { AdminTablesAndServicePanel } from "@/components/admin/AdminTablesAndServicePanel";
 import AdminAIInsights from "@/components/admin/AdminAIInsights";
 import { toast } from "sonner";
 import {
@@ -79,10 +80,11 @@ function timeAgo(dateStr: string) {
 }
 
 /* ── Tab definitions ── */
-type AdminTab = "kitchen" | "bookings" | "events" | "reviews" | "rewards" | "analytics" | "insights" | "messages" | "tools";
+type AdminTab = "kitchen" | "tables" | "bookings" | "events" | "reviews" | "rewards" | "analytics" | "insights" | "messages" | "tools";
 
 const TABS: { id: AdminTab; label: string; icon: typeof ShoppingBag }[] = [
   { id: "kitchen", label: "Kitchen", icon: Flame },
+  { id: "tables", label: "Tables & Floor", icon: QrCode },
   { id: "bookings", label: "Bookings", icon: CalendarDays },
   { id: "reviews", label: "Reviews", icon: Star },
   { id: "rewards", label: "Rewards", icon: Gift },
@@ -702,6 +704,9 @@ const AdminPage = () => {
               <AdminAIInsights orders={orders} bookings={bookings} />
             </div>
           )}
+
+          {/* TABLES & WAITER SERVICE TAB */}
+          {tab === "tables" && <AdminTablesAndServicePanel />}
 
           {/* REVIEWS TAB */}
           {tab === "reviews" && <AdminReviewsPanel />}
