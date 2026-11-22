@@ -74,6 +74,7 @@ function isSchemaCacheOrMissingColumnError(err: unknown): boolean {
     blob.includes("guest_access_token_hash") ||
     blob.includes("table_number") ||
     blob.includes("table_session_id") ||
+    blob.includes("occasion") ||
     blob.includes("pgrst204") ||
     blob.includes("pgrst205")
   );
@@ -89,6 +90,12 @@ function stripExtendedOrderColumns(row: Record<string, unknown>): Record<string,
   void _g;
   void _tn;
   void _ts;
+  return legacyRow;
+}
+
+function stripExtendedBookingColumns(row: Record<string, unknown>): Record<string, unknown> {
+  const { occasion: _occ, ...legacyRow } = row;
+  void _occ;
   return legacyRow;
 }
 
@@ -115,7 +122,9 @@ export async function insertBookingWithArrivalCode(
       if (isBookingSlotConflictError(error)) throw error;
       if (isSchemaCacheOrMissingColumnError(error)) {
         const legacyId = generateClientUuid();
-        const { error: legErr } = await supabase.from("bookings").insert({ ...row, id: legacyId });
+        const { error: legErr } = await supabase
+          .from("bookings")
+          .insert({ ...stripExtendedBookingColumns(row), id: legacyId });
         if (!legErr) return { booking_id: legacyId, arrival_code: null, assigned_table_code: null };
         throw legErr ?? error;
       }
@@ -138,7 +147,11 @@ export async function insertBookingWithArrivalCode(
     }
     if (error && isBookingSlotConflictError(error)) throw error;
     if (error && isSchemaCacheOrMissingColumnError(error)) {
-      const { data: legacy, error: legErr } = await supabase.from("bookings").insert(row).select("id").single();
+      const { data: legacy, error: legErr } = await supabase
+        .from("bookings")
+        .insert(stripExtendedBookingColumns(row))
+        .select("id")
+        .single();
       if (!legErr) {
         return {
           booking_id: legacy?.id ? String(legacy.id) : null,

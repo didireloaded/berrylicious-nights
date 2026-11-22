@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
+  Bookmark,
   Check,
   Flame,
   Heart,
@@ -26,9 +27,10 @@ import {
 import { useCart } from "@/context/CartContext";
 import { useMenuAvailability } from "@/hooks/useMenuAvailability";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useDiningPreferences } from "@/hooks/useDiningPreferences";
 import { useRestaurantAssistant } from "@/context/RestaurantAssistantContext";
 import { menuArtwork } from "@/lib/menuArtwork";
-import { getUpsellItems } from "@/services/upsell";
+import { getFoodWinePairings } from "@/services/upsell";
 import { formatPrice } from "@/lib/vibe";
 import MenuCard from "@/components/MenuCard";
 import { DishReviewsSection } from "@/components/DishReviewsSection";
@@ -50,6 +52,7 @@ export default function MenuItemPage() {
   const { addItem, totalItems } = useCart();
   const { isUnavailable } = useMenuAvailability();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { prefs, saveUsualItem } = useDiningPreferences();
   const { openAssistant } = useRestaurantAssistant();
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
@@ -64,9 +67,16 @@ export default function MenuItemPage() {
   const hasVariations = Boolean(item?.variations && item.variations.length > 1);
   const isSeasonalQuote = Boolean(item?.priceLabel);
 
+  const defaultDoneness = PDF_DONENESS_GUIDE.some((d) => d.label === prefs.preferredDoneness)
+    ? prefs.preferredDoneness
+    : "Medium Rare";
+  const defaultSide = PDF_COMPLIMENTARY_SIDES.includes(prefs.preferredSide as (typeof PDF_COMPLIMENTARY_SIDES)[number])
+    ? prefs.preferredSide
+    : "Chips";
+
   const [selectedVariation, setSelectedVariation] = useState<string>("");
-  const [selectedDoneness, setSelectedDoneness] = useState<string>("Medium Rare");
-  const [selectedSide, setSelectedSide] = useState<string>("Chips");
+  const [selectedDoneness, setSelectedDoneness] = useState<string>(defaultDoneness);
+  const [selectedSide, setSelectedSide] = useState<string>(defaultSide);
   const [selectedSauces, setSelectedSauces] = useState<string[]>([]);
   const [alcoholFree, setAlcoholFree] = useState(false);
 
@@ -74,15 +84,15 @@ export default function MenuItemPage() {
     setQuantity(1);
     setJustAdded(false);
     setSelectedVariation(item?.variations?.[0]?.size ?? "");
-    setSelectedDoneness("Medium Rare");
-    setSelectedSide("Chips");
+    setSelectedDoneness(defaultDoneness);
+    setSelectedSide(defaultSide);
     setSelectedSauces([]);
     setAlcoholFree(false);
-  }, [item?.id, item?.variations]);
+  }, [item?.id, item?.variations, defaultDoneness, defaultSide]);
 
-  const related = useMemo(() => {
+  const pairings = useMemo(() => {
     if (!id) return [];
-    return getUpsellItems(id, 4).filter((suggestion) => !isUnavailable(suggestion.id));
+    return getFoodWinePairings(id, 4).filter((p) => !isUnavailable(p.item.id));
   }, [id, isUnavailable]);
 
   const baseUnitPrice = useMemo(() => {
@@ -138,6 +148,33 @@ export default function MenuItemPage() {
   const handleToggleFavorite = () => {
     const added = toggleFavorite(item.id);
     toast.success(added ? `Saved ${item.name} to favourites` : `Removed ${item.name} from favourites`);
+  };
+
+  const currentUsualKey = [
+    item.id,
+    selectedVariation || "",
+    isSteakCut ? selectedDoneness : item.alcoholFreeOption && alcoholFree ? "Alcohol-Free" : "",
+    isSteakCut ? selectedSide : "",
+    isSteakCut ? selectedSauces.slice().sort().join(",") : "",
+  ].join("|");
+  const isSavedUsual = prefs.usualItems.some((u) => u.key === currentUsualKey);
+
+  const handleSaveToUsual = () => {
+    if (unavailable) return;
+    saveUsualItem({
+      menuItemId: item.id,
+      name: item.name,
+      weight: selectedVariation || undefined,
+      doneness: isSteakCut
+        ? selectedDoneness
+        : item.alcoholFreeOption && alcoholFree
+          ? "Alcohol-Free"
+          : undefined,
+      side: isSteakCut ? selectedSide : undefined,
+      sauces: isSteakCut && selectedSauces.length > 0 ? selectedSauces : undefined,
+      quantity,
+    });
+    toast.success(`Saved ${item.name} to My Usual Order`);
   };
 
   const addToBag = () => {
@@ -480,8 +517,27 @@ export default function MenuItemPage() {
               </div>
             )}
 
-            {/* Inline assistant & bag link */}
-            <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5">
+            {/* Inline assistant, Save to My Usual & bag link */}
+            <div className="mt-7 flex flex-wrap items-center gap-2.5 border-t border-white/10 pt-5">
+              {!unavailable && (
+                <button
+                  type="button"
+                  onClick={handleSaveToUsual}
+                  aria-pressed={isSavedUsual}
+                  className={
+                    "inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 text-[14px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+                    (isSavedUsual
+                      ? "border-[#FF5A1F] bg-[#FF5A1F]/15 text-white"
+                      : "border-white/10 bg-[#242424] text-white hover:bg-[#303030]")
+                  }
+                >
+                  <Bookmark
+                    className={"h-4 w-4 " + (isSavedUsual ? "fill-[#FF5A1F] text-[#FF5A1F]" : "text-[#FF5A1F]")}
+                    aria-hidden="true"
+                  />
+                  {isSavedUsual ? "Saved in My Usual" : "Save to My Usual"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={openAssistant}
@@ -505,20 +561,30 @@ export default function MenuItemPage() {
         {/* Verified Diner Reviews (real completed orders only; neutral empty state when none) */}
         <DishReviewsSection menuItemId={item.id} />
 
-        {/* Related recommendations */}
-        {related.length > 0 && (
+        {/* Restaurant-Approved Food & Wine Pairings */}
+        {pairings.length > 0 && (
           <section className="mt-12 border-t border-white/10 px-5 pt-8 sm:px-6 lg:px-0" aria-labelledby="related-heading">
             <div className="flex items-baseline justify-between gap-4">
-              <h2 id="related-heading" className="text-[20px] font-bold tracking-[-0.03em] text-white">
-                Pairs well with
-              </h2>
-              <Link to={backRoute} className="text-[14px] font-semibold text-[#FF5A1F] hover:text-white">
+              <div>
+                <h2 id="related-heading" className="text-[20px] font-bold tracking-[-0.03em] text-white">
+                  {item.menuSection === "food" ? "Food & Wine Pairings" : "Pairs Well With"}
+                </h2>
+                <p className="mt-0.5 text-[13px] text-[#A3A3A3]">
+                  Butcher Block cellar &amp; kitchen pairing suggestions
+                </p>
+              </div>
+              <Link to={backRoute} className="shrink-0 text-[14px] font-semibold text-[#FF5A1F] hover:text-white">
                 Full {item.menuSection === "drinks" ? "drinks" : "menu"}
               </Link>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {related.map((suggestion) => (
-                <MenuCard key={suggestion.id} item={suggestion} disabled={isUnavailable(suggestion.id)} />
+              {pairings.map(({ item: suggestion, pairingNote }) => (
+                <div key={suggestion.id} className="flex flex-col">
+                  <MenuCard item={suggestion} disabled={isUnavailable(suggestion.id)} />
+                  <p className="mt-1.5 px-1 text-[12px] leading-snug text-[#A3A3A3]">
+                    {pairingNote}
+                  </p>
+                </div>
               ))}
             </div>
           </section>

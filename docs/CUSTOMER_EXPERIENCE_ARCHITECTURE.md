@@ -1,6 +1,6 @@
 # Butcher Block Steakhouse — Customer Experience Architecture & Operations Guide
 
-This document describes the database schema, security model, centralized notification pipeline, staff roles, and operational decisions introduced across Phases 1–6.
+This document describes the database schema, security model, centralized notification pipeline, staff roles, and operational decisions introduced across Phases 1–7.
 
 ---
 
@@ -27,6 +27,7 @@ Roles are stored in `public.user_roles` (`public.app_role` enum) and verified vi
 5. `supabase/migrations/20261123040000_phase4_qr_tables_and_waiter.sql` — `restaurant_tables`, `table_sessions`, `service_requests` (with active deduplication index), QR resolution/validation/rotation RPCs, and race-safe waiter request updates.
 6. `supabase/migrations/20261123050000_phase5_order_history_and_claim.sql` — Order history index & dual-factor guest order claim (`claim_guest_order_by_arrival_code`).
 7. `supabase/migrations/20261123060000_phase6_group_orders_and_split_bills.sql` — `group_orders`, `group_participants`, `group_order_items` (integer minor units / cents), `bill_allocations`, `bill_settlements`, atomic group submit, exact-sum bill split validation, and staff-only settlement RPCs.
+8. `supabase/migrations/20261123070000_phase7_dining_perks_and_feedback.sql` — `user_dining_preferences` (My Usual presets, default steak doneness/side, dietary preferences), `bookings.occasion` (birthday/anniversary/celebration/date_night/business), `private_dining_feedback` (confidential guest feedback & duty-manager requests — never public), and `update_private_feedback_status` staff RPC.
 
 ---
 
@@ -44,12 +45,13 @@ All durable notifications write through `public.create_notification_idempotent(.
 - `service:<request_id>:acknowledged` / `completed` — Waiter response notifications
 - `loyalty:earn:<order_id>` / `reward:redeemed:<redemption_id>` — Butcher Block Rewards activity
 - `gotw:invite:<gotw_id>:<user_id>` / `gotw:published:<gotw_id>` — Guest of the Week consent & publication
+- `feedback:<feedback_id>:<status>` — Private dining feedback acknowledgment / resolution updates for signed-in guests
 
 ---
 
 ## 4. Operational Setup & Decisions Requiring Restaurant Approval
 
-1. **Apply Migrations & Seed Tables**: Review and run migrations `20261122180000` through `20261123060000` against the production Supabase database, then create physical restaurant tables in `/admin → Tables & Floor` and print QR cards.
+1. **Apply Migrations & Seed Tables**: Review and run migrations `20261122180000` through `20261123070000` against the production Supabase database, then create physical restaurant tables in `/admin → Tables & Floor` and print QR cards.
 2. **Assign Staff Roles**: Grant `kitchen`, `waiter`, `manager`, or `admin` rows in `public.user_roles` for staff accounts.
 3. **Approve Butcher Block Rewards Rules**: `loyalty_rules.enabled` defaults to `false` so no unauthorized discounts or points accrue before management configures points-per-N$, minimum spend, exclusions, and approved rewards in `/admin → Rewards`.
 4. **Optional Web Push Delivery**: To deliver background push alerts while the browser is closed, generate a VAPID key pair, set `VITE_WEB_PUSH_PUBLIC_KEY` in frontend builds, and connect a Supabase Edge Function webhook on `user_notifications` INSERT using the stored `push_subscriptions` table. In-app real-time alerts work without external push infrastructure.

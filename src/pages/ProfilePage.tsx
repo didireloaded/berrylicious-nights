@@ -10,6 +10,7 @@ import {
   Instagram,
   MapPin,
   MessageSquare,
+  MessageSquareHeart,
   Heart,
   Wine,
   Check,
@@ -26,6 +27,8 @@ import { useApp } from "@/context/AppContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { MyReviewsSection } from "@/components/MyReviewsSection";
 import { MyOrdersSection } from "@/components/MyOrdersSection";
+import { MyUsualSection } from "@/components/MyUsualSection";
+import { PrivateFeedbackSheet } from "@/components/PrivateFeedbackSheet";
 import { RewardsAndGuestSection } from "@/components/RewardsAndGuestSection";
 import { menuItems } from "@/data/menu";
 import { supabase } from "@/integrations/supabase/client";
@@ -82,6 +85,7 @@ const ProfilePage = () => {
   const [guestPhoneInput, setGuestPhoneInput] = useState(() => readLocal("butcher-block-guest-phone"));
   const [savedGuestName, setSavedGuestName] = useState(() => readLocal("butcher-block-guest-name"));
   const [savedNotice, setSavedNotice] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const displayName =
     profile?.display_name || user?.user_metadata?.full_name || savedGuestName || "Guest";
@@ -391,6 +395,9 @@ const ProfilePage = () => {
             </section>
           )}
 
+          {/* My Usual Order, Steak Defaults & Dietary Preferences */}
+          <MyUsualSection />
+
           {/* Real Butcher Block Rewards Ledger & Consent-Gated Guest of the Week */}
           <RewardsAndGuestSection />
 
@@ -473,6 +480,18 @@ const ProfilePage = () => {
               </a>
               <button
                 type="button"
+                onClick={() => setFeedbackOpen(true)}
+                className="flex min-h-[52px] w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#303030]"
+              >
+                <MessageSquareHeart className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-semibold text-white">Private Dining Feedback</span>
+                  <span className="block text-[12px] text-[#A3A3A3]">Compliments, service issues, or manager request</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
                 onClick={openAbout}
                 className="flex min-h-[52px] w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#303030]"
               >
@@ -513,6 +532,8 @@ const ProfilePage = () => {
           )}
         </div>
       </div>
+
+      <PrivateFeedbackSheet open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </div>
   );
 };

@@ -23,6 +23,7 @@ import {
   ChefHat,
   Clock,
   MessageSquare,
+  MessageSquareHeart,
   PackageCheck,
   Phone,
   Plus,
@@ -30,13 +31,17 @@ import {
   Star,
   Utensils,
   WifiOff,
+  Wine,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { notifyOrderStatusTransition } from "@/lib/orderStatusNotify";
+import { extractDrinkLinesFromOrder } from "@/lib/anotherRound";
 import { ArrivalCodeCard } from "@/components/ArrivalCodeCard";
 import { OrderReviewSheet } from "@/components/OrderReviewSheet";
 import { ReorderPreviewSheet } from "@/components/ReorderPreviewSheet";
+import { OrderAnotherRoundSheet } from "@/components/OrderAnotherRoundSheet";
+import { PrivateFeedbackSheet } from "@/components/PrivateFeedbackSheet";
 
 const WHILE_WAIT_MENU_IDS = ["14", "12", "19"];
 
@@ -130,7 +135,14 @@ const OrderTrackingPage = () => {
   const [cancelling, setCancelling] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reorderOpen, setReorderOpen] = useState(false);
+  const [anotherRoundOpen, setAnotherRoundOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [isOffline, setIsOffline] = useState(() => (typeof navigator !== "undefined" ? !navigator.onLine : false));
+
+  const hasOrderDrinks = useMemo(
+    () => extractDrinkLinesFromOrder(order?.items).length > 0,
+    [order?.items],
+  );
 
   useEffect(() => {
     if (searchParams.get("rate") === "1" && order?.status === "completed") {
@@ -658,15 +670,43 @@ const OrderTrackingPage = () => {
               {order.arrival_code ? ` or code ${order.arrival_code}` : ""} to staff on collection or at your table.
             </p>
           )}
-          {isCompleted && (
-            <button
-              type="button"
-              onClick={() => setReorderOpen(true)}
-              className="mt-4 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-[#303030] text-[14px] font-bold text-white transition-colors hover:bg-[#3A3A3A]"
-            >
-              Order Again (Revalidate Prices)
-            </button>
-          )}
+          <div className="mt-4 flex flex-col gap-2.5 sm:flex-row">
+            {!isCancelled && hasOrderDrinks && (
+              <button
+                type="button"
+                onClick={() => setAnotherRoundOpen(true)}
+                className="flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-full bg-[#FF5A1F] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[#E84D15]"
+              >
+                <Wine className="h-4 w-4" aria-hidden="true" />
+                Order Another Round
+              </button>
+            )}
+            {isCompleted && (
+              <button
+                type="button"
+                onClick={() => setReorderOpen(true)}
+                className="flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-full border border-white/15 bg-[#303030] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[#3A3A3A]"
+              >
+                Order Again (Revalidate Prices)
+              </button>
+            )}
+          </div>
+        </section>
+
+        {/* Private Feedback to Management */}
+        <section className="mt-4 flex items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-[#242424] px-4 py-3.5">
+          <div className="min-w-0">
+            <p className="text-[14px] font-bold text-white">Private dining feedback</p>
+            <p className="text-[12px] text-[#A3A3A3]">Compliments, issues, or request a duty manager privately.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFeedbackOpen(true)}
+            className="inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-[#303030] px-3.5 text-[13px] font-semibold text-white hover:bg-[#3A3A3A]"
+          >
+            <MessageSquareHeart className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+            Message
+          </button>
         </section>
 
         {/* Corrections & Cancellation Support for Active Orders */}
@@ -760,6 +800,19 @@ const OrderTrackingPage = () => {
         onOpenChange={setReorderOpen}
         orderNumber={orderNumber}
         orderItems={order.items}
+      />
+
+      <OrderAnotherRoundSheet
+        open={anotherRoundOpen}
+        onOpenChange={setAnotherRoundOpen}
+        orderNumber={orderNumber}
+        orderItems={order.items}
+      />
+
+      <PrivateFeedbackSheet
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        orderId={String(order.id)}
       />
     </div>
   );
