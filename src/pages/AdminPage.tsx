@@ -7,7 +7,7 @@ import {
   CalendarDays, ShoppingBag, Megaphone, Plus, Trash2, Check, X, Clock,
   LayoutDashboard, Flame, BarChart3, MessageSquare, UtensilsCrossed,
   ChevronRight, Home, RefreshCw, Users, DollarSign, TrendingUp,
-  AlertTriangle, Filter, Brain, Zap, Star, Gift, QrCode,
+  AlertTriangle, Filter, Brain, Zap, Star, Gift, QrCode, Lock, Sparkles,
 } from "lucide-react";
 import { AdminMessagesPanel } from "@/components/admin/AdminMessagesPanel";
 import { AdminArrivalVerify } from "@/components/admin/AdminArrivalVerify";
@@ -17,6 +17,7 @@ import { AdminReviewsPanel } from "@/components/admin/AdminReviewsPanel";
 import { AdminLoyaltyPanel } from "@/components/admin/AdminLoyaltyPanel";
 import { AdminTablesAndServicePanel } from "@/components/admin/AdminTablesAndServicePanel";
 import { AdminGroupBillsPanel } from "@/components/admin/AdminGroupBillsPanel";
+import { AdminFeedbackPanel } from "@/components/admin/AdminFeedbackPanel";
 import AdminAIInsights from "@/components/admin/AdminAIInsights";
 import { toast } from "sonner";
 import {
@@ -81,7 +82,7 @@ function timeAgo(dateStr: string) {
 }
 
 /* ── Tab definitions ── */
-type AdminTab = "kitchen" | "tables" | "group_bills" | "bookings" | "events" | "reviews" | "rewards" | "analytics" | "insights" | "messages" | "tools";
+type AdminTab = "kitchen" | "tables" | "group_bills" | "bookings" | "events" | "reviews" | "feedback" | "rewards" | "analytics" | "insights" | "messages" | "tools";
 
 const TABS: { id: AdminTab; label: string; icon: typeof ShoppingBag }[] = [
   { id: "kitchen", label: "Kitchen", icon: Flame },
@@ -89,6 +90,7 @@ const TABS: { id: AdminTab; label: string; icon: typeof ShoppingBag }[] = [
   { id: "group_bills", label: "Group Bills", icon: Users },
   { id: "bookings", label: "Bookings", icon: CalendarDays },
   { id: "reviews", label: "Reviews", icon: Star },
+  { id: "feedback", label: "Feedback", icon: Lock },
   { id: "rewards", label: "Rewards", icon: Gift },
   { id: "events", label: "Events", icon: Megaphone },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
@@ -507,6 +509,11 @@ const AdminPage = () => {
                         </div>
                         <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${statusColors[b.status] || "bg-muted text-muted-foreground"}`}>{b.status}</span>
                       </div>
+                      {b.occasion && (
+                        <span className="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-semibold capitalize text-amber-300">
+                          <Sparkles className="h-3 w-3" /> {String(b.occasion).replace("_", " ")}
+                        </span>
+                      )}
                       {b.special_requests && <p className="text-[11px] text-muted-foreground italic mb-2 bg-muted/20 rounded-lg px-2 py-1">"{b.special_requests}"</p>}
                       {b.assigned_table_code && <p className="text-[10px] font-mono font-semibold text-foreground">Table {b.assigned_table_code}</p>}
                       {b.arrival_code && <p className="font-mono text-sm font-bold text-primary tracking-wide mt-1">{b.arrival_code}</p>}
@@ -715,6 +722,9 @@ const AdminPage = () => {
 
           {/* REVIEWS TAB */}
           {tab === "reviews" && <AdminReviewsPanel />}
+
+          {/* PRIVATE DINING FEEDBACK TAB */}
+          {tab === "feedback" && <AdminFeedbackPanel />}
 
           {/* REWARDS & GUEST OF THE WEEK TAB */}
           {tab === "rewards" && <AdminLoyaltyPanel />}

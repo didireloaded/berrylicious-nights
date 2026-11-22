@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { BellRing, CheckCircle2, Clock3, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BellRing, CheckCircle2, Clock3, MessageSquareHeart, Wine, X } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useTableSession } from "@/context/TableSessionContext";
 import { useAuth } from "@/context/AuthContext";
+import { useApp } from "@/context/AppContext";
+import { extractDrinkLinesFromOrder } from "@/lib/anotherRound";
+import { OrderAnotherRoundSheet } from "@/components/OrderAnotherRoundSheet";
+import { PrivateFeedbackSheet } from "@/components/PrivateFeedbackSheet";
 import {
   canCustomerCancelServiceRequest,
   findDuplicateActiveServiceRequest,
@@ -25,10 +29,18 @@ type DynamicServiceRpc = {
 export function WaiterServiceSheet() {
   const { session, guestKey, serviceSheetOpen, setServiceSheetOpen, clearSession } = useTableSession();
   const { user } = useAuth();
+  const { currentOrder } = useApp();
   const [requests, setRequests] = useState<ServiceRequestRow[]>([]);
   const [otherNote, setOtherNote] = useState("");
   const [sendingType, setSendingType] = useState<ServiceRequestType | null>(null);
+  const [roundOpen, setRoundOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const dragStartY = useRef<number | null>(null);
+
+  const hasCurrentDrinks = useMemo(
+    () => extractDrinkLinesFromOrder(currentOrder?.items).length > 0,
+    [currentOrder?.items],
+  );
 
   const loadRequests = useCallback(async () => {
     if (!session) {
@@ -121,6 +133,7 @@ export function WaiterServiceSheet() {
   const openRequests = requests.filter((r) => r.status === "pending" || r.status === "acknowledged");
 
   return (
+    <>
     <Sheet open={serviceSheetOpen} onOpenChange={setServiceSheetOpen}>
       <SheetContent
         side="bottom"
@@ -252,6 +265,21 @@ export function WaiterServiceSheet() {
                 })}
               </div>
 
+              {/* Order Another Round shortcut (when current table order has drinks) */}
+              {hasCurrentDrinks && currentOrder && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setServiceSheetOpen(false);
+                    setRoundOpen(true);
+                  }}
+                  className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-[#FF5A1F] text-[14px] font-bold text-white transition-colors hover:bg-[#E84D15]"
+                >
+                  <Wine className="h-4 w-4" aria-hidden="true" />
+                  Order Another Round of Drinks
+                </button>
+              )}
+
               {/* Other Assistance Note */}
               <div className="rounded-[20px] border border-white/10 bg-[#242424] p-4 space-y-2.5">
                 <label htmlFor="waiter-other-note" className="block text-[13px] font-bold text-white">
@@ -279,8 +307,37 @@ export function WaiterServiceSheet() {
               </div>
             </>
           )}
+
+          {/* Private Management Feedback */}
+          <button
+            type="button"
+            onClick={() => {
+              setServiceSheetOpen(false);
+              setFeedbackOpen(true);
+            }}
+            className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-[#1B1B1B] px-4 text-[13px] font-semibold text-[#D4D4D4] transition-colors hover:bg-[#242424] hover:text-white"
+          >
+            <MessageSquareHeart className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+            Private feedback or request duty manager
+          </button>
         </div>
       </SheetContent>
     </Sheet>
+
+    {currentOrder && (
+      <OrderAnotherRoundSheet
+        open={roundOpen}
+        onOpenChange={setRoundOpen}
+        orderNumber={`BB-${String(currentOrder.id).slice(0, 6).toUpperCase()}`}
+        orderItems={currentOrder.items}
+      />
+    )}
+
+    <PrivateFeedbackSheet
+      open={feedbackOpen}
+      onOpenChange={setFeedbackOpen}
+      orderId={currentOrder?.id ?? null}
+    />
+    </>
   );
 }

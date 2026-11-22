@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Info, ListOrdered, Minus, Plus } from "lucide-react";
+import { ArrowLeft, CalendarDays, Info, ListOrdered, Minus, Plus, Sparkles } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { bookingTimeSlots } from "@/lib/bookingSlots";
@@ -41,6 +41,17 @@ function buildWindhoekDateStrip(startISO: string, days = 14): DayChip[] {
   return result;
 }
 
+const OCCASION_OPTIONS = [
+  { id: "", label: "None" },
+  { id: "birthday", label: "Birthday" },
+  { id: "anniversary", label: "Anniversary" },
+  { id: "celebration", label: "Celebration" },
+  { id: "date_night", label: "Date Night" },
+  { id: "business", label: "Business" },
+] as const;
+
+type OccasionId = (typeof OCCASION_OPTIONS)[number]["id"];
+
 const BookingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -62,6 +73,7 @@ const BookingPage = () => {
   const [guests, setGuests] = useState(
     typeof suggestedGuests === "number" && suggestedGuests > 0 ? suggestedGuests : 2,
   );
+  const [occasion, setOccasion] = useState<OccasionId>("");
   const [specialRequests, setSpecialRequests] = useState(() => (eventTitle ? `Event: ${eventTitle}` : ""));
   const [guestName, setGuestName] = useState(() => {
     try {
@@ -168,6 +180,15 @@ const BookingPage = () => {
       return;
     }
 
+    const occasionLabel = OCCASION_OPTIONS.find((o) => o.id === occasion)?.label ?? "";
+    const trimmedNotes = specialRequests.trim();
+    const combinedSpecialRequests =
+      occasion && occasionLabel
+        ? trimmedNotes
+          ? `[${occasionLabel}] ${trimmedNotes}`
+          : `[${occasionLabel}]`
+        : trimmedNotes || null;
+
     const bookingData = {
       user_id: user?.id || null,
       guest_name: user ? null : guestName.trim(),
@@ -175,7 +196,8 @@ const BookingPage = () => {
       date,
       time: selectedTime,
       guests,
-      special_requests: specialRequests.trim() || null,
+      occasion: occasion || null,
+      special_requests: combinedSpecialRequests,
     };
 
     let booking_id: string | null = null;
@@ -217,7 +239,8 @@ const BookingPage = () => {
       date,
       time: selectedTime,
       guests,
-      specialRequests: specialRequests.trim(),
+      ...(occasionLabel ? { occasion: occasionLabel } : {}),
+      specialRequests: combinedSpecialRequests ?? "",
       ...(eventTitle ? { eventTitle } : {}),
       createdAt: new Date().toISOString(),
       ...(arrival_code ? { arrival_code } : {}),
@@ -492,6 +515,42 @@ const BookingPage = () => {
             </div>
           </section>
         )}
+
+        {/* Special Occasion (Birthday, Anniversary & Celebrations) */}
+        <section className="mt-7" aria-labelledby="occasion-heading">
+          <h2 id="occasion-heading" className="text-[15px] font-bold text-white">
+            Special Occasion <span className="font-normal text-[#A3A3A3]">(optional)</span>
+          </h2>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {OCCASION_OPTIONS.map((opt) => {
+              const active = occasion === opt.id;
+              return (
+                <button
+                  key={opt.id || "none"}
+                  type="button"
+                  onClick={() => setOccasion(opt.id)}
+                  aria-pressed={active}
+                  className={
+                    "min-h-[42px] rounded-full border px-4 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+                    (active
+                      ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
+                      : "border-white/10 bg-[#242424] text-white/85 hover:bg-[#303030]")
+                  }
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          {occasion && (
+            <div className="mt-3 flex items-start gap-2.5 rounded-2xl border border-[#FF5A1F]/30 bg-[#FF5A1F]/10 px-3.5 py-3 text-[13px] text-[#E5E5E5]">
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+              <p>
+                Noted for our host team. Any available Butcher Block occasion touches or perks are confirmed directly by staff at your table.
+              </p>
+            </div>
+          )}
+        </section>
 
         {/* Special Requests */}
         <section className="mt-7">

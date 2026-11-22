@@ -16,6 +16,29 @@ let cachedDisabledIds: Set<string> = new Set();
 let hasLoadedCache = false;
 let inflightRefresh: Promise<Set<string>> | null = null;
 const listeners = new Set<(next: Set<string>) => void>();
+let sharedChannel: ReturnType<typeof supabase.channel> | null = null;
+
+function ensureRealtimeSubscription() {
+  if (sharedChannel) return;
+  sharedChannel = supabase
+    .channel("menu_item_disabled_shared")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "menu_item_disabled" },
+      () => {
+        void fetchDisabledMenuIds();
+      },
+    )
+    .subscribe();
+}
+
+function releaseRealtimeSubscriptionIfIdle() {
+  if (listeners.size === 0 && sharedChannel) {
+    const ch = sharedChannel;
+    sharedChannel = null;
+    void supabase.removeChannel(ch);
+  }
+}
 
 function setsEqual(a: Set<string>, b: Set<string>): boolean {
   if (a.size !== b.size) return false;
@@ -74,20 +97,11 @@ export function useMenuAvailability() {
       setDisabledIds(cachedDisabledIds);
     }
 
-    const ch = supabase
-      .channel("menu_item_disabled")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "menu_item_disabled" },
-        () => {
-          void fetchDisabledMenuIds();
-        },
-      )
-      .subscribe();
+    ensureRealtimeSubscription();
 
     return () => {
       listeners.delete(listener);
-      void supabase.removeChannel(ch);
+      releaseRealtimeSubscriptionIfIdle();
     };
   }, [refresh]); // eslint-disable-line react-hooks/exhaustive-deps
 

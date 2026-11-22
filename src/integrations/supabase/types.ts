@@ -25,6 +25,7 @@ export type Database = {
           guest_phone: string | null
           guests: number
           id: string
+          occasion: string | null
           pre_order: Json | null
           special_requests: string | null
           status: string
@@ -41,6 +42,7 @@ export type Database = {
           guest_phone?: string | null
           guests?: number
           id?: string
+          occasion?: string | null
           pre_order?: Json | null
           special_requests?: string | null
           status?: string
@@ -57,6 +59,7 @@ export type Database = {
           guest_phone?: string | null
           guests?: number
           id?: string
+          occasion?: string | null
           pre_order?: Json | null
           special_requests?: string | null
           status?: string
@@ -729,6 +732,87 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      private_dining_feedback: {
+        Row: {
+          category: string
+          created_at: string
+          guest_name: string | null
+          guest_phone: string | null
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          message: string
+          order_id: string | null
+          staff_note: string | null
+          status: string
+          table_label: string | null
+          table_session_id: string | null
+          user_id: string | null
+          wants_manager_visit: boolean
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          guest_name?: string | null
+          guest_phone?: string | null
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          message: string
+          order_id?: string | null
+          staff_note?: string | null
+          status?: string
+          table_label?: string | null
+          table_session_id?: string | null
+          user_id?: string | null
+          wants_manager_visit?: boolean
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          guest_name?: string | null
+          guest_phone?: string | null
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          message?: string
+          order_id?: string | null
+          staff_note?: string | null
+          status?: string
+          table_label?: string | null
+          table_session_id?: string | null
+          user_id?: string | null
+          wants_manager_visit?: boolean
+        }
+        Relationships: []
+      }
+      user_dining_preferences: {
+        Row: {
+          dietary_preferences: string[]
+          preferred_doneness: string | null
+          preferred_side: string | null
+          updated_at: string
+          user_id: string
+          usual_items: Json
+        }
+        Insert: {
+          dietary_preferences?: string[]
+          preferred_doneness?: string | null
+          preferred_side?: string | null
+          updated_at?: string
+          user_id: string
+          usual_items?: Json
+        }
+        Update: {
+          dietary_preferences?: string[]
+          preferred_doneness?: string | null
+          preferred_side?: string | null
+          updated_at?: string
+          user_id?: string
+          usual_items?: Json
         }
         Relationships: []
       }
