@@ -7,6 +7,7 @@ import { useCustomerOrderStatusNotifications } from "@/hooks/useCustomerOrderSta
 import { AboutSheetProvider } from "@/context/AboutSheetContext";
 import { RestaurantAssistantProvider } from "@/context/RestaurantAssistantContext";
 import BottomNav from "@/components/BottomNav";
+import SiteHeader from "@/components/SiteHeader";
 import { FloatingCartBar } from "@/components/FloatingCartBar";
 import PageLoader from "@/components/PageLoader";
 import { ScrollToTop } from "@/components/ScrollToTop";
@@ -42,7 +43,7 @@ function OrderNotificationEffects() {
 function BottomSpacing() {
   const { totalItems } = useCart();
   useEffect(() => {
-    document.documentElement.style.setProperty("--pb-bottom-chrome", totalItems > 0 ? "12rem" : "7rem");
+    document.documentElement.style.setProperty("--pb-bottom-chrome", totalItems > 0 ? "11rem" : "6.25rem");
     return () => document.documentElement.style.removeProperty("--pb-bottom-chrome");
   }, [totalItems]);
   return null;
@@ -51,7 +52,12 @@ function BottomSpacing() {
 function ChromeWrapper() {
   const { pathname } = useLocation();
   const noNav = pathname === "/" || pathname === "/admin" || pathname.startsWith("/menu/");
-  return noNav ? null : <><FloatingCartBar /><BottomNav /></>;
+  return noNav ? null : (
+    <>
+      <FloatingCartBar />
+      <BottomNav />
+    </>
+  );
 }
 
 export default function AppProviders() {
@@ -64,7 +70,8 @@ export default function AppProviders() {
             <RestaurantAssistantProvider>
               <ScrollToTop />
               <OrderNotificationEffects />
-              <main id="main-content" tabIndex={-1} className="min-h-dvh outline-none focus:outline-none">
+              <SiteHeader />
+              <main id="main-content" tabIndex={-1} className="min-h-dvh bg-[#121212] outline-none focus:outline-none">
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/" element={<WelcomePage />} />

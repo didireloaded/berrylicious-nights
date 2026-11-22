@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { CalendarDays, Minus, Plus, Clock, ListOrdered } from "lucide-react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowLeft, CalendarDays, ListOrdered, Minus, Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { bookingTimeSlots } from "@/lib/bookingSlots";
@@ -19,6 +19,28 @@ type RpcSupabaseClient = {
 
 const rpcClient = supabase as unknown as RpcSupabaseClient;
 
+type DayChip = {
+  iso: string;
+  weekday: string;
+  dayNum: string;
+  monthShort: string;
+};
+
+function buildWindhoekDateStrip(startISO: string, days = 14): DayChip[] {
+  const [y, m, d] = startISO.split("-").map(Number);
+  const baseUtc = Date.UTC(y, (m || 1) - 1, d || 1, 12, 0, 0);
+  const result: DayChip[] = [];
+  for (let offset = 0; offset < days; offset += 1) {
+    const dt = new Date(baseUtc + offset * 86_400_000);
+    const iso = dt.toISOString().slice(0, 10);
+    const weekday = dt.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+    const dayNum = String(dt.getUTCDate());
+    const monthShort = dt.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+    result.push({ iso, weekday, dayNum, monthShort });
+  }
+  return result;
+}
+
 const BookingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,10 +52,12 @@ const BookingPage = () => {
   const suggestedDate = planState?.suggestedDate?.trim() ?? "";
   const eventTitle = planState?.eventTitle?.trim() ?? "";
   const eventTimeSlots = planState?.eventTimeSlots;
-  const tablesAlmostFull = Boolean(planState?.tablesAlmostFull);
 
   const { user, profile } = useAuth();
-  const [date, setDate] = useState(() => suggestedDate || getWindhoekDateISO());
+  const today = getWindhoekDateISO();
+  const dateStrip = useMemo(() => buildWindhoekDateStrip(today, 14), [today]);
+
+  const [date, setDate] = useState(() => suggestedDate || today);
   const [selectedTime, setSelectedTime] = useState(() => suggestedTime.trim() || "19:30");
   const [guests, setGuests] = useState(
     typeof suggestedGuests === "number" && suggestedGuests > 0 ? suggestedGuests : 2,
@@ -60,8 +84,6 @@ const BookingPage = () => {
   const [waitlistBusy, setWaitlistBusy] = useState(false);
   const [waitlistSnap, setWaitlistSnap] = useState<{ position: number; est: number } | null>(null);
 
-  const today = getWindhoekDateISO();
-
   useEffect(() => {
     let cancelled = false;
     setCheckingTimes(true);
@@ -79,7 +101,9 @@ const BookingPage = () => {
       .finally(() => {
         if (!cancelled) setCheckingTimes(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [date]);
 
   const slotOptions = useMemo(() => {
@@ -98,46 +122,59 @@ const BookingPage = () => {
     }
   }, [slotOptions, selectedTime]);
 
+  useEffect(() => {
+    if (checkingTimes || timesError || !bookedTimes.includes(selectedTime)) return;
+    const nextOpenSlot = slotOptions.find((slot) => !bookedTimes.includes(slot.time));
+    if (nextOpenSlot) setSelectedTime(nextOpenSlot.time);
+  }, [checkingTimes, timesError, bookedTimes, selectedTime, slotOptions]);
+
+  const fullyBooked = useMemo(() => {
+    if (slotOptions.length === 0) return false;
+    const taken = new Set(bookedTimes);
+    return slotOptions.every((s) => taken.has(s.time));
+  }, [slotOptions, bookedTimes]);
+
   const handleConfirm = async () => {
     if (loading || !date || !selectedTime) return;
     if (checkingTimes || timesError) {
-      toast.error("Please wait while we check table availability, or try another date.");
+      toast.error("Availability could not be verified. Please retry or pick another date.");
       return;
     }
     if (bookedTimes.includes(selectedTime)) {
-      toast.error("That time is already taken. Please select another.");
+      toast.error("That time is unavailable. Please select another slot.");
       return;
     }
     if (!user && !guestName.trim()) {
-      toast.error("Please enter your name");
+      toast.error("Please enter your name for the reservation.");
       return;
     }
 
     setLoading(true);
-    // Recheck at submission so a previously available slot is not offered after another booking.
+    // Mandatory pre-submit recheck against Supabase availability RPC
     try {
       const { data, error } = await rpcClient.rpc("booked_table_times", { p_date: date });
       if (error) throw error;
       const latestBooked = parseRpcBookedTimes(data);
       if (latestBooked.includes(selectedTime)) {
         setBookedTimes(latestBooked);
-        toast.error("That table time has just been taken. Pick another time.");
+        toast.error("That table time has just been taken. Please pick another time.");
         setLoading(false);
         return;
       }
     } catch {
-      toast.error("We couldn't verify this time. Please try again.");
+      toast.error("We couldn't verify live availability. Nothing was booked — please try again.");
       setLoading(false);
       return;
     }
+
     const bookingData = {
       user_id: user?.id || null,
-      guest_name: user ? null : guestName,
-      guest_phone: user ? null : guestPhone,
+      guest_name: user ? null : guestName.trim(),
+      guest_phone: user ? null : guestPhone.trim() || null,
       date,
       time: selectedTime,
       guests,
-      special_requests: specialRequests || null,
+      special_requests: specialRequests.trim() || null,
     };
 
     let booking_id: string | null = null;
@@ -149,7 +186,7 @@ const BookingPage = () => {
       arrival_code = res.arrival_code;
       assigned_table_code = res.assigned_table_code;
     } catch {
-      toast.error("Something went wrong. Try again.");
+      toast.error("Could not complete your reservation. Please try again.");
       setLoading(false);
       return;
     }
@@ -169,14 +206,14 @@ const BookingPage = () => {
       date,
       time: selectedTime,
       guests,
-      specialRequests,
+      specialRequests: specialRequests.trim(),
       ...(eventTitle ? { eventTitle } : {}),
       createdAt: new Date().toISOString(),
       ...(arrival_code ? { arrival_code } : {}),
       ...(reservation_number ? { reservation_number } : {}),
       ...(assigned_table_code ? { assigned_table_code } : {}),
     };
-    // Local history is optional. A storage failure must never hide a confirmed server booking.
+
     try {
       const existing = JSON.parse(localStorage.getItem("berrylicious-bookings") || "[]");
       if (Array.isArray(existing)) {
@@ -184,38 +221,21 @@ const BookingPage = () => {
         localStorage.setItem("berrylicious-bookings", JSON.stringify(existing));
       }
     } catch {
-      // Booking was saved remotely and can still be shown to the guest.
+      /* ignore local history errors */
     }
 
     navigate("/booking/success", { state: localData });
   };
 
-  const recommendTime = useMemo(() => {
-    if (suggestedTime && slotOptions.some((s) => s.time === suggestedTime)) return suggestedTime;
-    return slotOptions.find((s) => s.time === "19:30")?.time ?? slotOptions[0]?.time ?? "19:30";
-  }, [suggestedTime, slotOptions]);
-
-  useEffect(() => {
-    if (checkingTimes || timesError || !bookedTimes.includes(selectedTime)) return;
-    const nextOpenSlot = slotOptions.find((slot) => !bookedTimes.includes(slot.time));
-    if (nextOpenSlot) setSelectedTime(nextOpenSlot.time);
-  }, [checkingTimes, timesError, bookedTimes, selectedTime, slotOptions]);
-
-  const fullyBooked = useMemo(() => {
-    if (slotOptions.length === 0) return false;
-    const taken = new Set(bookedTimes);
-    return slotOptions.every((s) => taken.has(s.time));
-  }, [slotOptions, bookedTimes]);
-
   const joinWaitlist = async () => {
     const name = user ? (profile?.display_name?.trim() || "Guest") : guestName.trim();
     const phone = user ? (profile?.phone?.trim() || guestPhone.trim()) : guestPhone.trim();
     if (!user && !name) {
-      toast.error("Enter your name");
+      toast.error("Please enter your name");
       return;
     }
     if (phone.length < 6) {
-      toast.error("Add a phone number the restaurant can use to contact you");
+      toast.error("Add a phone number Butcher Block can use to contact you");
       return;
     }
     setWaitlistBusy(true);
@@ -232,192 +252,285 @@ const BookingPage = () => {
         position: Number(j?.position) || 1,
         est: Number(j?.estimated_wait_minutes) || 15,
       });
-      toast.success("You’re on the waitlist");
+      toast.success("You're on the waitlist");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn’t join waitlist");
+      toast.error(e instanceof Error ? e.message : "Couldn't join waitlist");
     } finally {
       setWaitlistBusy(false);
     }
   };
 
   return (
-    <div className="min-h-screen pb-safe-nav px-6 pt-6 max-w-lg mx-auto animate-fade-in">
-      <h1 className="font-display text-3xl font-bold mb-4">Book a table</h1>
+    <div className="min-h-dvh bg-[#121212] pb-32 text-white lg:pb-16">
+      <div className="mx-auto max-w-[560px] px-5 pt-[max(20px,env(safe-area-inset-top,0px))] sm:px-6 lg:max-w-2xl lg:pt-8">
+        {/* Clean iOS Header matching reference */}
+        <header className="flex items-center gap-3">
+          <Link
+            to="/home"
+            aria-label="Back to home"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#242424] text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+          >
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+          </Link>
+          <div>
+            <h1 className="font-display text-[24px] font-extrabold tracking-[-0.035em] text-white">
+              Reserve a Table
+            </h1>
+            <p className="text-[13px] text-[#A3A3A3]">Am Weinberg Estate · Windhoek</p>
+          </div>
+        </header>
 
-      <div className="mb-6 rounded-2xl glass-card px-4 py-4">
         {eventTitle && (
-          <p className="mb-2 inline-flex rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+          <div className="mt-5 inline-flex items-center rounded-full border border-[#FF5A1F]/40 bg-[#FF5A1F]/15 px-4 py-1.5 text-[13px] font-bold text-[#FF5A1F]">
             Reserving for: {eventTitle}
-          </p>
+          </div>
         )}
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Selected date:{" "}
-          <span className="font-semibold text-foreground">{date}</span>
-          {checkingTimes ? " · Checking times" : timesError ? " · Availability unavailable" : tablesAlmostFull ? " · Limited availability" : " · Please select an open time"}
-          {eventTimeSlots?.length && date === suggestedDate && suggestedDate ? " · Event night" : ""}
-        </p>
-        <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-          {suggestedDate && eventTimeSlots?.length
-            ? "Pre-filled from your event — change only if you need to."
-            : "Your best slot is highlighted — confirm when you’re ready."}
-        </p>
-        {fullyBooked && (
-          <p className="mt-3 text-xs font-semibold text-amber-600 dark:text-amber-400">
-            Every listed time is taken for this date — join the waitlist below or pick another night.
-          </p>
-        )}
-      </div>
 
-      {/* Times — confirm, don’t invent */}
-      <div className="mb-8 animate-fade-in">
-        <label className="text-sm font-semibold text-foreground mb-3 block">
-          {eventTimeSlots?.length && date === suggestedDate ? "Your open times" : "Pick your time"}
-        </label>
-        {timesError && <p role="alert" className="mb-3 text-sm text-amber-200">We couldn't check available tables. Please try another date or reload this page.</p>}
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {slotOptions.map((slot) => {
-            const isSuggested = slot.time === recommendTime;
-            const isBooked = bookedTimes.includes(slot.time);
-            const selected = selectedTime === slot.time && !isBooked;
-            return (
+        {/* Horizontal Windhoek Date Strip matching approved reference */}
+        <section className="mt-6" aria-labelledby="select-date-heading">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 id="select-date-heading" className="text-[15px] font-bold text-white">
+              Select Date
+            </h2>
+            <span className="text-[13px] text-[#A3A3A3]">{date}</span>
+          </div>
+
+          <div
+            role="group"
+            aria-label="Quick date selection"
+            className="-mx-5 mt-3 flex snap-x gap-2.5 overflow-x-auto px-5 pb-1 scrollbar-hide sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0"
+          >
+            {dateStrip.map((chip) => {
+              const active = date === chip.iso;
+              return (
+                <button
+                  key={chip.iso}
+                  type="button"
+                  onClick={() => setDate(chip.iso)}
+                  aria-pressed={active}
+                  className={
+                    "flex min-h-[76px] min-w-[62px] shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-2xl border px-2 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] " +
+                    (active
+                      ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
+                      : "border-white/10 bg-[#242424] text-white/85 hover:bg-[#303030]")
+                  }
+                >
+                  <span className={"text-[12px] font-medium " + (active ? "text-white/90" : "text-[#A3A3A3]")}>
+                    {chip.weekday}
+                  </span>
+                  <span className="text-[20px] font-extrabold leading-tight tabular-nums">
+                    {chip.dayNum}
+                  </span>
+                  <span className={"text-[11px] font-medium " + (active ? "text-white/85" : "text-[#737373]")}>
+                    {chip.monthShort}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Native date picker for further-out dates */}
+          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-[#242424] px-3.5 py-2">
+            <CalendarDays className="h-4 w-4 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+            <label htmlFor="booking-custom-date" className="text-[13px] font-medium text-[#A3A3A3]">
+              Other date:
+            </label>
+            <input
+              id="booking-custom-date"
+              type="date"
+              value={date}
+              min={today}
+              onChange={(e) => setDate(e.target.value)}
+              className="min-h-[38px] flex-1 bg-transparent text-right text-[14px] font-semibold text-white focus:outline-none [color-scheme:dark]"
+            />
+          </div>
+        </section>
+
+        {/* Select Time pills matching approved reference */}
+        <section className="mt-7" aria-labelledby="select-time-heading">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 id="select-time-heading" className="text-[15px] font-bold text-white">
+              Select Time
+            </h2>
+            <span className="text-[13px] text-[#A3A3A3]">
+              {checkingTimes ? "Checking live tables…" : timesError ? "Availability unavailable" : "Windhoek time"}
+            </span>
+          </div>
+
+          {timesError && (
+            <p role="alert" className="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-[14px] text-amber-200">
+              We couldn&apos;t verify table availability for this date. Please retry or pick another date before booking.
+            </p>
+          )}
+
+          {fullyBooked && !checkingTimes && !timesError && (
+            <p className="mt-3 rounded-2xl border border-white/10 bg-[#242424] p-3.5 text-[14px] text-white/85">
+              All listed times are currently taken for {date}. Join the waitlist below or select another day.
+            </p>
+          )}
+
+          <div className="mt-3 grid grid-cols-3 gap-2.5 sm:grid-cols-4">
+            {slotOptions.map((slot) => {
+              const isBooked = bookedTimes.includes(slot.time);
+              const selected = selectedTime === slot.time && !isBooked;
+              return (
+                <button
+                  key={slot.time}
+                  type="button"
+                  onClick={() => setSelectedTime(slot.time)}
+                  disabled={checkingTimes || timesError || isBooked}
+                  aria-pressed={selected}
+                  aria-label={`${slot.time}, ${isBooked ? "unavailable" : slot.label}`}
+                  className={
+                    "flex min-h-[54px] flex-col items-center justify-center rounded-2xl border px-2 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] disabled:cursor-not-allowed " +
+                    (isBooked
+                      ? "border-white/5 bg-[#1B1B1B] text-[#737373] line-through opacity-45"
+                      : selected
+                        ? "border-[#FF5A1F] bg-[#FF5A1F] text-white"
+                        : "border-white/10 bg-[#242424] text-white hover:bg-[#303030]")
+                  }
+                >
+                  <span className="text-[15px] font-bold tabular-nums">{slot.time}</span>
+                  <span className={"text-[11px] font-medium " + (selected ? "text-white/90" : "text-[#A3A3A3]")}>
+                    {isBooked ? "Taken" : slot.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Guests Counter */}
+        <section className="mt-7" aria-labelledby="guests-heading">
+          <h2 id="guests-heading" className="text-[15px] font-bold text-white">
+            Guests
+          </h2>
+          <div className="mt-3 flex items-center justify-between rounded-2xl border border-white/10 bg-[#242424] px-4 py-3">
+            <span className="text-[15px] font-medium text-[#A3A3A3]">
+              Party size
+            </span>
+            <div className="flex items-center gap-3">
               <button
-                key={slot.time}
                 type="button"
-                onClick={() => setSelectedTime(slot.time)}
-                disabled={checkingTimes || timesError || isBooked}
-                aria-pressed={selected}
-                aria-label={`${slot.time}, ${isBooked ? "fully booked" : slot.label}`}
-                className={`shrink-0 px-4 py-3 rounded-xl text-sm font-medium border-2 flex flex-col items-start gap-0.5 btn-press transition-transform disabled:cursor-not-allowed disabled:opacity-40 ${
-                  selected
-                    ? "border-primary bg-primary text-primary-foreground scale-[1.03] shadow-lg shadow-primary/25 ring-2 ring-primary/30"
-                    : isSuggested
-                      ? "border-primary bg-primary/20 text-foreground shadow-sm shadow-primary/10"
-                      : "border-border glass-subtle text-foreground hover:border-primary/35"
-                }`}
+                aria-label="Decrease guests"
+                onClick={() => setGuests(Math.max(1, guests - 1))}
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#303030] text-white transition-colors hover:bg-[#3A3A3A] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
               >
-                <span className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 shrink-0" />
-                  <span className="font-bold">{slot.time}</span>
-                </span>
-                <span className={`text-xs pl-6 ${selected ? "text-primary-foreground/85" : "text-muted-foreground"}`}>
-                  {slot.label}
-                  {isBooked ? " · taken" : isSuggested && !selected ? " · suggested" : ""}
-                </span>
+                <Minus className="h-4 w-4" aria-hidden="true" />
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Date */}
-      <div className="mb-6 animate-fade-in">
-        <label className="text-sm text-muted-foreground font-medium mb-2 block">Date</label>
-        <div className="relative">
-          <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <input
-            type="date"
-            value={date}
-            min={today}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full glass-subtle border-0 rounded-lg py-3 pl-10 pr-4 text-foreground focus:outline-none focus:border-primary transition-colors [color-scheme:dark]"
-          />
-        </div>
-      </div>
-
-      {/* Guests */}
-      <div className="mb-6 animate-fade-in">
-        <label className="text-sm text-muted-foreground font-medium mb-2 block">Guests</label>
-        <div className="flex items-center gap-4 glass-subtle rounded-lg p-3">
-          <button
-            onClick={() => setGuests(Math.max(1, guests - 1))}
-            className="w-10 h-10 rounded-lg bg-surface flex items-center justify-center hover:bg-muted transition-colors active:scale-95"
-          >
-            <Minus className="w-5 h-5 text-foreground" />
-          </button>
-          <span className="text-2xl font-semibold text-foreground min-w-[40px] text-center">{guests}</span>
-          <button
-            onClick={() => setGuests(Math.min(20, guests + 1))}
-            className="w-10 h-10 rounded-lg bg-surface flex items-center justify-center hover:bg-muted transition-colors active:scale-95"
-          >
-            <Plus className="w-5 h-5 text-foreground" />
-          </button>
-          <span className="text-muted-foreground text-sm ml-1">guest{guests > 1 ? "s" : ""}</span>
-        </div>
-      </div>
-
-      {/* Guest info (only if not logged in) */}
-      {!user && (
-        <div className="mb-6 space-y-4 animate-fade-in">
-          <div>
-            <label className="text-sm text-muted-foreground font-medium mb-2 block">Your Name</label>
-            <input
-              type="text"
-              value={guestName}
-              onChange={(e) => setGuestName(e.target.value)}
-              placeholder="Enter your name"
-              className="w-full bg-card border border-border rounded-lg py-3 px-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
-            />
+              <output aria-label="Number of guests" className="min-w-[32px] text-center text-[18px] font-extrabold tabular-nums text-white">
+                {guests}
+              </output>
+              <button
+                type="button"
+                aria-label="Increase guests"
+                onClick={() => setGuests(Math.min(20, guests + 1))}
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FF5A1F] text-white transition-colors hover:bg-[#E84D15] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
           </div>
-          <div>
-            <label className="text-sm text-muted-foreground font-medium mb-2 block">Phone (optional)</label>
-            <input
-              type="tel"
-              value={guestPhone}
-              onChange={(e) => setGuestPhone(e.target.value)}
-              placeholder="+264 81 234 5678"
-              className="w-full bg-card border border-border rounded-lg py-3 px-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
-            />
-          </div>
-        </div>
-      )}
+        </section>
 
-      {/* Special Requests */}
-      <div className="mb-8 animate-fade-in">
-        <label className="text-sm text-muted-foreground font-medium mb-2 block">Any special requests? (optional)</label>
-        <textarea
-          value={specialRequests}
-          onChange={(e) => setSpecialRequests(e.target.value)}
-          placeholder="Birthday celebration, dietary needs, window seat..."
-          className="w-full bg-card border border-border rounded-lg py-3 px-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors resize-none h-24"
-        />
-      </div>
-
-      {/* Waitlist */}
-      <div className="mb-8 rounded-2xl glass-card px-4 py-4">
-        <div className="flex items-center gap-2 text-foreground font-semibold text-sm">
-          <ListOrdered className="w-4 h-4 text-primary shrink-0" />
-          Smart waitlist
-        </div>
-        <p className="text-xs text-muted-foreground mt-1 mb-3">
-          {fullyBooked
-            ? "No open slots in this list? Join the queue — we’ll prioritise you when tables turn."
-            : "Prefer to queue instead? We’ll estimate your spot and wait time."}
-        </p>
-        {waitlistSnap ? (
-          <p className="text-sm text-foreground">
-            You’re #{waitlistSnap.position} in line · ~{waitlistSnap.est} min estimated. Stay close — we’ll reach out
-            when you’re up.
-          </p>
-        ) : (
-          <button
-            type="button"
-            disabled={waitlistBusy}
-            onClick={() => void joinWaitlist()}
-            className="w-full rounded-xl border border-primary/50 bg-primary/10 py-3 text-sm font-bold text-primary btn-press disabled:opacity-50"
-          >
-            {waitlistBusy ? "Joining…" : "Join waitlist for this date"}
-          </button>
+        {/* Guest Information (when not signed in) */}
+        {!user && (
+          <section className="mt-7 space-y-3.5" aria-label="Guest details">
+            <h2 className="text-[15px] font-bold text-white">Guest Details</h2>
+            <div>
+              <label htmlFor="booking-guest-name" className="mb-1.5 block text-[13px] font-medium text-[#A3A3A3]">
+                Your Name <span className="text-[#FF5A1F]">*</span>
+              </label>
+              <input
+                id="booking-guest-name"
+                type="text"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                placeholder="Enter your name"
+                className="min-h-[48px] w-full rounded-2xl border border-white/10 bg-[#242424] px-4 text-[16px] text-white placeholder:text-[#737373] focus:border-[#FF5A1F] focus:outline-none sm:text-[15px]"
+              />
+            </div>
+            <div>
+              <label htmlFor="booking-guest-phone" className="mb-1.5 block text-[13px] font-medium text-[#A3A3A3]">
+                Phone (optional)
+              </label>
+              <input
+                id="booking-guest-phone"
+                type="tel"
+                value={guestPhone}
+                onChange={(e) => setGuestPhone(e.target.value)}
+                placeholder="+264 81 234 5678"
+                className="min-h-[48px] w-full rounded-2xl border border-white/10 bg-[#242424] px-4 text-[16px] text-white placeholder:text-[#737373] focus:border-[#FF5A1F] focus:outline-none sm:text-[15px]"
+              />
+            </div>
+          </section>
         )}
-      </div>
 
-      {/* Confirm */}
-      <button
-        onClick={handleConfirm}
-        disabled={!date || !selectedTime || loading || checkingTimes || timesError || bookedTimes.includes(selectedTime) || fullyBooked}
-        className="w-full bg-primary text-primary-foreground font-bold py-4 rounded-xl btn-press disabled:opacity-40 disabled:cursor-not-allowed text-base"
-      >
-        {loading ? "Booking…" : checkingTimes ? "Checking availability…" : timesError ? "Availability unavailable" : fullyBooked ? "No open times — use waitlist above" : "Confirm my table"}
-      </button>
+        {/* Special Requests */}
+        <section className="mt-7">
+          <label htmlFor="booking-notes" className="mb-2 block text-[15px] font-bold text-white">
+            Special Requests <span className="font-normal text-[#A3A3A3]">(optional)</span>
+          </label>
+          <textarea
+            id="booking-notes"
+            value={specialRequests}
+            onChange={(e) => setSpecialRequests(e.target.value)}
+            placeholder="Birthday celebration, dietary requirements, terrace seating..."
+            className="h-24 w-full resize-none rounded-2xl border border-white/10 bg-[#242424] p-4 text-[16px] text-white placeholder:text-[#737373] focus:border-[#FF5A1F] focus:outline-none sm:text-[15px]"
+          />
+        </section>
+
+        {/* Confirm CTA */}
+        <button
+          type="button"
+          onClick={() => void handleConfirm()}
+          disabled={
+            !date ||
+            !selectedTime ||
+            loading ||
+            checkingTimes ||
+            timesError ||
+            bookedTimes.includes(selectedTime) ||
+            fullyBooked
+          }
+          className="mt-7 flex min-h-[54px] w-full items-center justify-center rounded-full bg-[#FF5A1F] px-6 text-[16px] font-bold text-white transition-colors hover:bg-[#E84D15] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          {loading
+            ? "Confirming Reservation…"
+            : checkingTimes
+              ? "Checking Availability…"
+              : timesError
+                ? "Availability Unavailable"
+                : fullyBooked
+                  ? "No Open Times — Join Waitlist Below"
+                  : "Confirm Reservation"}
+        </button>
+
+        {/* Smart Waitlist preserved */}
+        <section className="mt-6 rounded-[22px] border border-white/10 bg-[#242424] p-4">
+          <div className="flex items-center gap-2 text-[15px] font-bold text-white">
+            <ListOrdered className="h-4 w-4 text-[#FF5A1F]" aria-hidden="true" />
+            Smart Waitlist
+          </div>
+          <p className="mt-1 text-[13px] leading-relaxed text-[#A3A3A3]">
+            Prefer to queue for {date}? We&apos;ll notify you if an earlier table opens up.
+          </p>
+          {waitlistSnap ? (
+            <p className="mt-3 text-[14px] font-semibold text-white">
+              You&apos;re #{waitlistSnap.position} in line · ~{waitlistSnap.est} min estimated.
+            </p>
+          ) : (
+            <button
+              type="button"
+              disabled={waitlistBusy}
+              onClick={() => void joinWaitlist()}
+              className="mt-3 min-h-[44px] w-full rounded-full border border-white/15 bg-[#303030] text-[14px] font-semibold text-white transition-colors hover:bg-[#3A3A3A] disabled:opacity-50"
+            >
+              {waitlistBusy ? "Joining waitlist…" : "Join waitlist for this date"}
+            </button>
+          )}
+        </section>
+      </div>
     </div>
   );
 };

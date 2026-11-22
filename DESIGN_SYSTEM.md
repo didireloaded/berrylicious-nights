@@ -1,49 +1,46 @@
-# Berrylicious product design and implementation guardrails
+# Butcher Block Steakhouse — Approved iOS-Style Design System
 
-This is the existing Berrylicious Windhoek restaurant PWA, not a generic food-delivery demo.
+This document defines the approved visual design system and engineering guardrails for the **Butcher Block Steakhouse** (Am Weinberg Estate, Windhoek, Namibia) mobile-first PWA.
 
-## Design reference (approved 20 November 2026)
-The primary screens follow the uploaded mobile concept featuring a full-bleed food hero, large editorial sans-serif headings, floating circular food visuals, a curved price panel and a restrained floating navigation pill. Adapt the composition to Berrylicious and Namibia rather than copying sample sushi products, USD prices, fake users or features.
+## 1. Visual Tokens
 
-- Background **#121212**, surface **#242424**, white text, muted gray secondary text
-- Accent orange **#FF5A1F**, used for key actions and selected states, never gradients for decoration
-- **Manrope** typography with deliberate size hierarchy and substantial breathing room
-- Mobile-first, centered `max-w-[560px]` on desktop, no fake phone chrome
-- Lucide icons, genuine navigation, accessible buttons and focus states
-- Key screens: immersive landing (`/`), discovery (`/menu`), item detail (`/menu/:id`)
-- Floating navigation on internal app screens with menu, real cart, search focus and the existing chat assistant
-- Motion is minimal and respects reduced-motion; avoid excessive parallax and animate-on-scroll clutter
+| Token | Value | Usage |
+| --- | --- | --- |
+| Main background | `#121212` | Page canvas |
+| Card surface | `#242424` | Menu cards, rows, summary panels, input fields |
+| Elevated surface | `#303030` | Elevated controls, center cart tab, avatars, active hover states |
+| Primary accent | `#FF5A1F` | Selected navigation, primary CTAs, active chips, key prices |
+| Primary text | `#FFFFFF` | Headings, dish titles, primary labels |
+| Secondary text | `#A3A3A3` | Descriptions, metadata, supporting copy |
+| Subtle border | `rgba(255,255,255,0.10)` | Surface separation without heavy drop shadows |
 
-## Non-negotiable quality bar
-Never ship generic AI-generated design patterns: no purple or neon gradients, glassmorphism everywhere, illegible 9px labels, random badge collections, meaningless glowing borders, repetitive bento-card layouts, fake activity, generic landing copy or decorative AI features that do nothing.
+## 2. Typography
 
-Each action must work using existing React Router, Supabase and application state. Maintain authenticated account access, reservation constraints, live ordering, cart pricing, waitlist, order tracking and admin functionality. Never invent hours, restaurant capacity, menu prices, promotions, special offers, staff recommendations or recent sales claims.
+- Primary typeface: **Manrope** (`system-ui, sans-serif` fallback).
+- Page headings: expressive bold/extrabold (`28px–38px`), tight tracking (`-0.04em` to `-0.055em`).
+- Ordinary readable body text: minimum `14px` with generous line height.
+- Restrained uppercase eyebrow labels (`11px–12px`, `0.12em–0.16em` tracking).
 
-## Images
-Legacy food assets show categories and are **illustrative**, not verified images of individual dishes. `menuArtwork(item)` exposes whether the image matches the exact dish. Only set `verifiedImage: true` in `src/data/menu.ts` after the restaurant provides or confirms a photograph of that specific dish. Replace with genuine approved food photography when available. Do not add unsplash placeholders or AI-generated photos.
+## 3. Layout, Shape & Responsive Behavior
 
-## Product and engineering rules
-- Namibia currency is **N$**, never example USD
-- Restaurant business dates follow **Africa/Windhoek**
-- Don't add undocumented charges or call a pickup charge a delivery fee
-- Check the available reservation slot and reconfirm at submission
-- Real AI chat is the existing `RestaurantChatSheet` behind `RestaurantAssistantContext`, which may ask guests to sign in
-- Keep code organized, accessible and responsive at 320px, 375px and 390px
-- Do not rewrite Supabase tables, RLS, auth or admin security just for design
-- Check `npm run build`, `npm test` and TypeScript. Report failures, never invent results
-- **Do not auto-publish production** until preview QA is complete
+- **Mobile-first (`320px–560px`)**: Full-bleed edge-aware layouts respecting `env(safe-area-inset-*)` and `dvh` units.
+- **Desktop (`>= 1024px`)**: Clean `SiteHeader` top navigation with wider balanced multi-column grids (`max-w-5xl` on catalog pages) — never a mobile bottom tab bar copied onto desktop.
+- **Touch Targets**: All interactive buttons, steppers, and links maintain at least `44×44px` comfortable hit areas.
+- **Icons**: Lucide icons used consistently across all screens; never use random emojis as UI icons.
 
-Note: the current public hostname references Butchers Block while the app is branded Berrylicious. Confirm final branding before any production release.
+## 4. Core Screens
 
+1. **Welcome / Launch (`/`)**: Full-screen charcoal/black cinematic entry with the official Butcher Block logo, dark-vignetted close-up grill photography, and prominent `#FF5A1F` `Tap to Enter` pill transitioning smoothly into `/home`. Returning navigation to Home goes directly to `/home`.
+2. **Home Dashboard (`/home`)**: Verified greeting & avatar, real active-order banner (when active), editorial `Premium Steaks & More` hero composition, 4 compact primary actions (`Order Food`, `Drinks`, `Reserve a Table`, `Events`), real featured grill dishes (`House Signatures`), active reservation card (when present), and live upcoming events.
+3. **Food & Drinks Discovery (`/menu`, `/drinks`)**: Rounded search field + multi-criteria filter sheet (featured, favourites, price range, sort), horizontal circular category selector with `#FF5A1F` selected ring, full-width photographic editorial cards on mobile (`2-col` on tablet/desktop), real favourite toggle, and quick add-to-order.
+4. **Item & Steak Detail (`/menu/:id`)**: Full-bleed food hero with back + real favourite toggle, dish title/price/description, inline cut/weight selector, doneness picker with official PDF guide, icon-grid complimentary side selector (`1 Included`), optional 14 PDF sauces, and sticky quantity + `#FF5A1F` `Add to Order` bar.
+5. **Cart & Checkout (`/cart`)**: Clean vertical item rows with one-handed quantity controls, Pickup / Pre-order / Dine-in mode-specific fields, honest `N$` order summary (zero fake fees or fake payment forms), duplicate-submit protection, and real Supabase order submission.
+6. **Reservations (`/booking`, `/booking/success`)**: Windhoek-local horizontal date strip + date picker, live Supabase `booked_table_times` availability with visibly disabled taken slots, pre-submit recheck, smart waitlist, and confirmed Reservation Number + QR code.
+7. **Order Tracking & Receipt (`/order/:id`, `ActiveOrderBanner`)**: Real Supabase statuses (`Order received`, `Preparing`, `Ready for collection`, `Completed`), kitchen ETA only when genuinely set, compact progress bar, arrival QR code, and always-open itemized receipt.
 
-## November 2026 reference expansion
+## 5. Strictly Prohibited Patterns
 
-- Search has a real featured-only toggle, not a cosmetic filter switch.
-- The category scroller uses circular photos with an orange selected ring. Category photos are illustrative and the visible category labels come from the actual menu.
-- Quick action pills Ask / Menu / Contact / Explore must navigate to real features. "Ask" opens the existing assistant, which requires authentication where the app already requires it. Contact opens the actual About/contact sheet.
-- The order banner must read real order state from Supabase when authorized. If only a local snapshot is available, clearly label it as last-known. Never invent drivers, ratings, exact ETAs, phone numbers or addresses.
-- A floating cart summary shows actual quantities and totals and stays clear of the primary bottom navigation.
-- The cart uses list rows, 44px-or-better quantity targets and an accurate N$ order summary. The real checkout currently places restaurant orders. There is **no integrated card-payment gateway**, so never show a fake Visa card, "Pay now" button, promo form or payment success.
-- No placeholder maps or map/list toggle for a single restaurant. Add a map feature only when backed by verified locations and an actual map service.
-- Avoid hard-coded USD prices, demo users, app reviews, Unsplash random photos and fake offer prices.
-- Photo-led screens must remain usable on 320-390px phones, and every floating element must leave room for buttons and the safe area.
+- No fake payment methods, card entry screens, or fake payment confirmations.
+- No fake delivery drivers, star ratings, delivery fees, or fabricated live countdowns.
+- No purple/neon gradients, heavy glassmorphism, glowing borders, obstructive floating widgets, or generic SaaS bento grids.
+- No unverified dish photography claimed as exact (`verifiedImage` remains truthful in `src/lib/menuArtwork.ts`).

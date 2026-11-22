@@ -6,30 +6,29 @@ import { formatPrice } from "@/lib/vibe";
 import { menuItems } from "@/data/menu";
 import { useCart } from "@/context/CartContext";
 import { useApp } from "@/context/AppContext";
-import heroImage from "@/assets/hero-restaurant.jpg";
-import { ArrowLeft, Clock, CheckCircle2, ChefHat, Package, Plus, ReceiptText } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, ChefHat, PackageCheck, Plus, ReceiptText } from "lucide-react";
 import { notifyOrderStatusTransition, requestOrderNotificationPermission } from "@/lib/orderStatusNotify";
 import { ArrivalCodeCard } from "@/components/ArrivalCodeCard";
 
 const statusSteps = [
-  { key: "pending", label: "We're on it", icon: Clock },
-  { key: "preparing", label: "Chef started", icon: ChefHat },
-  { key: "ready", label: "Almost ready", icon: Package },
-  { key: "completed", label: "All yours", icon: CheckCircle2 },
+  { key: "pending", label: "Order received", icon: Clock },
+  { key: "preparing", label: "Preparing", icon: ChefHat },
+  { key: "ready", label: "Ready", icon: PackageCheck },
+  { key: "completed", label: "Completed", icon: CheckCircle2 },
 ];
 
 const statusHeadline: Record<string, string> = {
-  pending: "We've got your order",
-  preparing: "Your order is on the grill",
-  ready: "It's ready when you are",
-  completed: "Enjoy every bite",
+  pending: "Order received",
+  preparing: "Preparing your order",
+  ready: "Ready for collection",
+  completed: "Order completed",
 };
 
 const statusSubline: Record<string, string> = {
-  pending: "Hang tight — the kitchen has received your ticket.",
-  preparing: "The kitchen is preparing your order. We will update you when it is ready.",
-  ready: "Ready — head to the counter or watch for your server.",
-  completed: "Thanks for dining with Butcher Block Steakhouse.",
+  pending: "The Butcher Block kitchen has received your ticket.",
+  preparing: "The grill and kitchen team are preparing your dishes.",
+  ready: "Your order is ready — collect at the counter or watch for your server.",
+  completed: "Thank you for dining with Butcher Block Steakhouse.",
 };
 
 const WHILE_WAIT_MENU_IDS = ["14", "12", "19"];
@@ -39,17 +38,6 @@ const orderTypeLabels: Record<string, string> = {
   pickup: "Pickup",
   dinein: "Dine-in",
 };
-
-function getDetailedStatus(status: string, etaRemaining: number | null): string {
-  if (status === "pending") return "Order received";
-  if (status === "preparing") {
-    if (etaRemaining !== null && etaRemaining >= 0 && etaRemaining <= 5) return "Almost ready";
-    return "Chef started your order";
-  }
-  if (status === "ready") return "Ready";
-  if (status === "completed") return "Completed";
-  return "Order received";
-}
 
 function formatOrderNumber(id: string): string {
   return `BB-${id.slice(0, 6).toUpperCase()}`;
@@ -149,7 +137,7 @@ const OrderTrackingPage = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }, [id]);
 
@@ -160,7 +148,7 @@ const OrderTrackingPage = () => {
       items: order.items,
       total: Number(order.total) || 0,
       status: String(order.status ?? "pending"),
-      order_type: order.order_type,
+      order_type: order.order_type ?? undefined,
       table_number: order.table_number ?? null,
       scheduled_time: order.scheduled_time ?? null,
       guest_name: order.guest_name ?? null,
@@ -190,8 +178,8 @@ const OrderTrackingPage = () => {
       return;
     }
     const calc = () => {
-      const elapsed = Math.floor((Date.now() - new Date(order.eta_set_at).getTime()) / 60000);
-      setEtaRemaining(Math.max(0, order.eta_minutes - elapsed));
+      const elapsed = Math.floor((Date.now() - new Date(order.eta_set_at!).getTime()) / 60000);
+      setEtaRemaining(Math.max(0, order.eta_minutes! - elapsed));
     };
     calc();
     const iv = setInterval(calc, 30_000);
@@ -200,27 +188,31 @@ const OrderTrackingPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm px-6 text-center">
-        One moment — pulling up your receipt…
+      <div className="flex min-h-dvh items-center justify-center bg-[#121212] px-6 text-center text-[14px] text-[#A3A3A3]">
+        Loading your order receipt…
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
-        <p className="text-muted-foreground text-lg mb-4">Order not found</p>
-        <Link to="/home" className="text-primary font-semibold hover:opacity-80">Back to Home</Link>
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-[#121212] px-6 text-center text-white">
+        <p className="text-[18px] font-bold">Order not found</p>
+        <Link
+          to="/home"
+          className="mt-4 inline-flex min-h-[44px] items-center rounded-full bg-[#FF5A1F] px-6 text-[14px] font-bold text-white"
+        >
+          Back to Home
+        </Link>
       </div>
     );
   }
 
   const currentIndex = Math.max(0, statusSteps.findIndex((s) => s.key === order.status));
-  const progressPercent = Math.round((currentIndex / (statusSteps.length - 1)) * 100);
-  const typeLabel = orderTypeLabels[order.order_type] ?? "Order";
-  const headline = statusHeadline[order.status] ?? statusHeadline.pending;
-  const subline = statusSubline[order.status] ?? statusSubline.pending;
-  const detailedStatus = getDetailedStatus(order.status, etaRemaining);
+  const progressPercent = Math.round(((currentIndex + 1) / statusSteps.length) * 100);
+  const typeLabel = orderTypeLabels[order.order_type ?? ""] ?? "Order";
+  const headline = statusHeadline[order.status ?? "pending"] ?? statusHeadline.pending;
+  const subline = statusSubline[order.status ?? "pending"] ?? statusSubline.pending;
   const isActive = order.status !== "completed";
   const orderNumber = formatOrderNumber(String(order.id));
   const placedTime = order.created_at
@@ -235,108 +227,82 @@ const OrderTrackingPage = () => {
         : typeLabel;
 
   return (
-    <div className="min-h-dvh relative flex flex-col justify-end">
-      {/* Background image + overlay */}
-      <div className="fixed inset-0 -z-10">
-        <img
-          src={heroImage}
-          alt=""
-          className="w-full h-full object-cover"
-          decoding="async"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/45 via-background/75 to-background" />
-      </div>
+    <div className="min-h-dvh bg-[#121212] pb-32 text-white lg:pb-16">
+      <div className="mx-auto max-w-[560px] px-5 pt-[max(20px,env(safe-area-inset-top,0px))] sm:px-6 lg:max-w-2xl lg:pt-8">
+        {/* Header */}
+        <header className="flex items-center justify-between gap-3">
+          <Link
+            to="/home"
+            aria-label="Back to Home"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#242424] text-white transition-colors hover:bg-[#303030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]"
+          >
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+          </Link>
+          <span className="rounded-full border border-white/10 bg-[#242424] px-4 py-2 font-mono text-[13px] font-bold text-[#FF5A1F]">
+            #{orderNumber}
+          </span>
+        </header>
 
-      {/* Back button */}
-      <div className="sticky top-0 z-20 flex items-center justify-between px-5 pt-[max(20px,env(safe-area-inset-top,0px))] pb-3 max-w-lg w-full mx-auto">
-        <Link
-          to="/home"
-          aria-label="Back to Home"
-          className="w-10 h-10 rounded-full glass border border-white/10 flex items-center justify-center btn-press"
-        >
-          <ArrowLeft className="w-5 h-5 text-foreground" />
-        </Link>
-        <span className="rounded-full glass border border-white/15 px-3.5 py-1.5 text-xs font-bold tracking-wider text-foreground">
-          #{orderNumber}
-        </span>
-      </div>
-
-      {/* Glass panel */}
-      <div className="relative z-10 mt-6 w-full animate-panel-up pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
-        <div className="glass border-t border-white/10 rounded-t-3xl px-6 pt-6 pb-8 max-w-lg mx-auto">
-
-          {/* Order meta row */}
-          <div className="flex items-start justify-between gap-3 mb-4">
+        {/* Compact Status & Progress Card (real statuses only — zero fake drivers/delivery) */}
+        <section className="mt-6 rounded-[24px] border border-white/10 bg-[#242424] p-5" aria-label="Order status">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary">
-                Order Number
+              <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#FF5A1F]">
+                Order #{orderNumber}
               </p>
-              <p className="text-foreground font-display text-2xl font-bold tracking-tight mt-0.5">
-                #{orderNumber}
-              </p>
-              <p className="text-muted-foreground text-xs mt-1">
+              <h1 className="mt-1 font-display text-[24px] font-extrabold tracking-[-0.03em] text-white">
+                {headline}
+              </h1>
+              <p className="mt-1 text-[14px] text-[#A3A3A3]">{subline}</p>
+              <p className="mt-2 text-[13px] font-medium text-white/80">
                 {fulfillmentSummary}
                 {order.guest_name ? ` · ${order.guest_name}` : ""}
               </p>
             </div>
             {isActive && (
-              <div className="mt-1 flex items-center gap-2 rounded-full border border-primary/35 bg-primary/15 px-3 py-1">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse-dot" />
-                <span className="text-[11px] font-semibold text-primary">{detailedStatus}</span>
-              </div>
+              <span className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#FF5A1F]/15 px-3 py-1 text-[12px] font-bold text-[#FF5A1F]">
+                <span className="h-2 w-2 rounded-full bg-[#FF5A1F] animate-pulse-dot" aria-hidden="true" />
+                Live
+              </span>
             )}
           </div>
 
-          {/* Status — human headline + micro story */}
-          <p className="text-foreground text-lg font-semibold leading-snug animate-fade-in">
-            {headline}
-          </p>
-          <p className="text-muted-foreground text-sm mt-1 leading-relaxed animate-fade-in">
-            {subline}
-          </p>
+          {/* Genuine kitchen ETA only when explicitly provided by staff */}
           {isActive && etaRemaining !== null && order.status !== "ready" && (
-            <p className="text-primary text-xl font-bold mt-2.5 animate-fade-in animate-eta-pulse">
-              About {etaRemaining} min to go
+            <p className="mt-3 rounded-xl bg-[#303030] px-3.5 py-2 text-[14px] font-semibold text-white">
+              Estimated prep time remaining: <span className="text-[#FF5A1F]">~{etaRemaining} min</span>
             </p>
           )}
 
-          {order.arrival_code && order.status !== "completed" && (
-            <div className="mt-4 rounded-2xl border border-white/10 bg-background/40 p-3">
-              <ArrivalCodeCard
-                code={order.arrival_code}
-                orderCreatedAt={order.created_at}
-                className="border-0 bg-transparent p-0 shadow-none"
-              />
-            </div>
-          )}
-
-          {/* Stepper */}
-          <div className="mt-6 mb-5">
-            <div className="relative h-1.5 rounded-full bg-border overflow-hidden">
+          {/* Horizontal progress track */}
+          <div className="mt-5">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[#303030]">
               <div
-                className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all duration-700"
+                className="h-full rounded-full bg-[#FF5A1F] transition-all duration-500"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <div className="flex justify-between mt-3">
+
+            <div className="mt-4 grid grid-cols-4 gap-1">
               {statusSteps.map((step, i) => {
                 const done = i <= currentIndex;
                 const active = i === currentIndex;
                 const Icon = step.icon;
                 return (
-                  <div key={step.key} className="flex flex-col items-center gap-1" style={{ width: `${100 / statusSteps.length}%` }}>
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                        active
-                          ? "bg-primary text-primary-foreground scale-110 ring-4 ring-primary/20"
+                  <div key={step.key} className="flex flex-col items-center gap-1.5 text-center">
+                    <span
+                      className={
+                        "flex h-9 w-9 items-center justify-center rounded-full transition-colors " +
+                        (active
+                          ? "bg-[#FF5A1F] text-white"
                           : done
-                            ? "bg-primary/80 text-primary-foreground"
-                            : "bg-card border border-border text-muted-foreground"
-                      }`}
+                            ? "bg-[#FF5A1F]/25 text-[#FF5A1F]"
+                            : "bg-[#303030] text-[#737373]")
+                      }
                     >
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <span className={`text-[9px] font-medium text-center leading-tight ${done ? "text-foreground" : "text-muted-foreground"}`}>
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span className={"text-[11px] font-semibold leading-tight " + (done ? "text-white" : "text-[#737373]")}>
                       {step.label}
                     </span>
                   </div>
@@ -344,124 +310,120 @@ const OrderTrackingPage = () => {
               })}
             </div>
           </div>
+        </section>
 
-          {/* Always-open Itemized Receipt */}
-          <section className="mt-5 rounded-2xl border border-white/12 bg-background/55 p-4" aria-labelledby="receipt-heading">
-            <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2">
-                <ReceiptText className="h-4 w-4 text-primary" aria-hidden="true" />
-                <h2 id="receipt-heading" className="text-sm font-bold text-foreground">Order receipt</h2>
-              </div>
-              <span className="font-mono text-xs font-semibold text-primary">#{orderNumber}</span>
+        {/* Arrival/Collection QR Code */}
+        {order.arrival_code && isActive && (
+          <div className="mt-4">
+            <ArrivalCodeCard
+              code={order.arrival_code}
+              orderCreatedAt={order.created_at}
+              className="rounded-[24px] border-white/10 bg-[#242424]"
+            />
+          </div>
+        )}
+
+        {/* Always-open Itemized Order Receipt */}
+        <section
+          className="mt-4 rounded-[24px] border border-white/10 bg-[#242424] p-5"
+          aria-labelledby="receipt-heading"
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2">
+              <ReceiptText className="h-5 w-5 text-[#FF5A1F]" aria-hidden="true" />
+              <h2 id="receipt-heading" className="text-[16px] font-bold text-white">
+                Order receipt
+              </h2>
             </div>
+            <span className="font-mono text-[13px] font-bold text-[#FF5A1F]">#{orderNumber}</span>
+          </div>
 
-            {placedTime && (
-              <p className="mt-2.5 text-[11px] text-muted-foreground">
-                Placed {placedTime} · {fulfillmentSummary}
-              </p>
-            )}
-
-            <div className="mt-3 space-y-2.5">
-              {Array.isArray(order.items) &&
-                (order.items as TrackedOrderItem[]).map((item, i) => {
-                  const qty = Number(item.qty ?? 1);
-                  const lineTotal = Number(item.price ?? 0) * qty;
-                  const mods = [
-                    item.weight,
-                    item.doneness,
-                    item.side ? `Side: ${item.side}` : null,
-                    Array.isArray(item.sauces) && item.sauces.length > 0 ? `Sauce: ${item.sauces.join(", ")}` : null,
-                  ].filter(Boolean);
-                  return (
-                    <div key={i} className="flex items-start justify-between gap-3 text-sm">
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground">
-                          {qty}× {item.name}
-                        </p>
-                        {mods.length > 0 && (
-                          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                            {mods.join(" · ")}
-                          </p>
-                        )}
-                      </div>
-                      <span className="shrink-0 font-semibold tabular-nums text-foreground">
-                        {formatPrice(lineTotal)}
-                      </span>
-                    </div>
-                  );
-                })}
-            </div>
-
-            <div className="mt-3.5 flex items-center justify-between border-t border-white/10 pt-3">
-              <span className="text-sm font-semibold text-foreground">Total</span>
-              <span className="text-lg font-extrabold tabular-nums text-primary">{formatPrice(Number(order.total))}</span>
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Show order #{orderNumber}{order.arrival_code ? ` or code ${order.arrival_code}` : ""} to staff on collection or at your table.
+          {placedTime && (
+            <p className="mt-3 text-[13px] text-[#A3A3A3]">
+              Placed {placedTime} · {fulfillmentSummary}
             </p>
-          </section>
-
-          {isActive && (
-            <div className="mt-5 pt-4 border-t border-white/10">
-              <p className="text-sm font-semibold text-foreground">Add something while you wait</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Link
-                  to="/drinks"
-                  className="flex-1 min-w-[100px] rounded-xl border border-primary/45 bg-primary/12 py-2.5 text-center text-xs font-bold text-primary btn-press"
-                >
-                  Drinks
-                </Link>
-                <Link
-                  to="/menu?category=Desserts"
-                  className="flex-1 min-w-[100px] rounded-xl border border-white/15 bg-background/30 py-2.5 text-center text-xs font-bold text-foreground btn-press"
-                >
-                  Desserts
-                </Link>
-                <Link
-                  to="/menu"
-                  className="w-full rounded-xl border border-white/10 py-2 text-center text-[11px] font-semibold text-muted-foreground btn-press hover:text-foreground"
-                >
-                  View full menu
-                </Link>
-              </div>
-            </div>
           )}
 
-          {isActive && whileYouWaitItems.length > 0 && (
-            <div className="mt-5 pt-4 border-t border-white/10">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Quick adds
-              </p>
-              <div className="mt-2.5 space-y-2">
-                {whileYouWaitItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-3 rounded-xl border border-white/10 bg-background/20 px-3 py-2"
-                  >
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="h-11 w-11 rounded-lg object-cover shrink-0"
-                      decoding="async"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
-                      <p className="text-xs text-primary font-semibold">{formatPrice(item.price)}</p>
+          <div className="mt-4 space-y-3">
+            {Array.isArray(order.items) &&
+              (order.items as TrackedOrderItem[]).map((item, i) => {
+                const qty = Number(item.qty ?? 1);
+                const lineTotal = Number(item.price ?? 0) * qty;
+                const mods = [
+                  item.weight,
+                  item.doneness,
+                  item.side ? `Side: ${item.side}` : null,
+                  Array.isArray(item.sauces) && item.sauces.length > 0 ? `Sauce: ${item.sauces.join(", ")}` : null,
+                ].filter(Boolean);
+                return (
+                  <div key={i} className="flex items-start justify-between gap-3 text-[14px]">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white">
+                        {qty}× {item.name}
+                      </p>
+                      {mods.length > 0 && (
+                        <p className="mt-0.5 text-[13px] text-[#A3A3A3]">{mods.join(" · ")}</p>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => addItem(item)}
-                      className="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground btn-press"
-                      aria-label={`Add ${item.name}`}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
+                    <span className="shrink-0 font-bold tabular-nums text-white">
+                      {formatPrice(lineTotal)}
+                    </span>
                   </div>
-                ))}
-              </div>
+                );
+              })}
+          </div>
+
+          <div className="mt-4 flex items-baseline justify-between border-t border-white/10 pt-4">
+            <span className="text-[15px] font-bold text-white">Total</span>
+            <span className="text-[20px] font-extrabold tabular-nums text-[#FF5A1F]">
+              {formatPrice(Number(order.total))}
+            </span>
+          </div>
+
+          <p className="mt-2.5 text-[13px] text-[#A3A3A3]">
+            Show order #{orderNumber}
+            {order.arrival_code ? ` or code ${order.arrival_code}` : ""} to staff on collection or at your table.
+          </p>
+        </section>
+
+        {/* Quick add while waiting */}
+        {isActive && whileYouWaitItems.length > 0 && (
+          <section className="mt-6 rounded-[24px] border border-white/10 bg-[#242424] p-5" aria-label="Add drinks or desserts">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-[16px] font-bold text-white">Add while you wait</h2>
+              <Link to="/drinks" className="text-[13px] font-semibold text-[#FF5A1F] hover:text-white">
+                All drinks
+              </Link>
             </div>
-          )}
-        </div>
+            <div className="mt-3.5 space-y-2.5">
+              {whileYouWaitItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#1B1B1B] px-3 py-2.5"
+                >
+                  <img
+                    src={item.image}
+                    alt=""
+                    className="h-12 w-12 shrink-0 rounded-xl object-cover"
+                    decoding="async"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-semibold text-white">{item.name}</p>
+                    <p className="text-[13px] font-bold tabular-nums text-[#FF5A1F]">{formatPrice(item.price)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => addItem(item)}
+                    aria-label={`Add ${item.name}`}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FF5A1F] text-white transition-colors hover:bg-[#E84D15]"
+                  >
+                    <Plus className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
