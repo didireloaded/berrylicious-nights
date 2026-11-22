@@ -16,6 +16,9 @@ import {
   Heart,
   Wine,
   Check,
+  CheckCircle2,
+  KeyRound,
+  Pencil,
   UtensilsCrossed,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -34,6 +37,11 @@ import { MyOrdersSection } from "@/components/MyOrdersSection";
 import { MyUsualSection } from "@/components/MyUsualSection";
 import { PrivateFeedbackSheet } from "@/components/PrivateFeedbackSheet";
 import { RewardsAndGuestSection } from "@/components/RewardsAndGuestSection";
+import { AccountRequiredSheet } from "@/components/auth/AccountRequiredSheet";
+import {
+  ChangePasswordSheet,
+  EditProfileSheet,
+} from "@/components/auth/AccountSettingsSheets";
 import { menuItems } from "@/data/menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useMemo, useState } from "react";
@@ -92,6 +100,10 @@ const ProfilePage = () => {
   const [savedGuestName, setSavedGuestName] = useState(() => readLocal("butcher-block-guest-name"));
   const [savedNotice, setSavedNotice] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [accountSheetOpen, setAccountSheetOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const displayName =
     profile?.display_name || user?.user_metadata?.full_name || savedGuestName || "Guest";
@@ -153,8 +165,15 @@ const ProfilePage = () => {
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate("/home");
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+      toast.success("You've been signed out");
+      navigate("/home", { replace: true });
+    } finally {
+      setSigningOut(false);
+    }
   };
 
   const todayStr = useMemo(() => getWindhoekDateISO(), []);
@@ -186,19 +205,38 @@ const ProfilePage = () => {
             {user || savedGuestName ? initials(displayName) : <User className="h-7 w-7 text-[#A3A3A3]" aria-hidden="true" />}
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-display text-[24px] font-extrabold tracking-[-0.03em] text-white">
-              {displayName}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="truncate font-display text-[24px] font-extrabold tracking-[-0.03em] text-white">
+                {displayName}
+              </h1>
+              {user && (
+                user.email_confirmed_at ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-300">
+                    <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                    Verified
+                  </span>
+                ) : (
+                  <Link
+                    to="/auth/verify"
+                    state={{ email: user.email, from: "/profile" }}
+                    className="inline-flex items-center rounded-full border border-amber-400/35 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/25"
+                  >
+                    Verify email
+                  </Link>
+                )
+              )}
+            </div>
             {user?.email ? (
               <p className="truncate text-[14px] text-[#A3A3A3]">{user.email}</p>
             ) : (
-              <p className="text-[14px] text-[#A3A3A3]">Butcher Block Steakhouse · Windhoek</p>
+              <p className="text-[14px] text-[#A3A3A3]">Browsing as Guest · Windhoek</p>
             )}
           </div>
           {!user && (
             <Link
-              to="/auth"
-              className="inline-flex min-h-[44px] shrink-0 items-center rounded-full bg-[#FF5A1F] px-4 text-[13px] font-bold text-white transition-colors hover:bg-[#E84D15]"
+              to="/auth/sign-in"
+              state={{ from: "/profile" }}
+              className="bb-press inline-flex min-h-[44px] shrink-0 items-center rounded-full bg-[#FF5A1F] px-4 text-[13px] font-bold text-white transition-colors hover:bg-[#E84D15]"
             >
               Sign in
             </Link>
@@ -235,9 +273,13 @@ const ProfilePage = () => {
             <section className="rounded-[22px] border border-white/10 bg-[#242424] p-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-[15px] font-bold text-white">Your details</h2>
-                <Link to="/auth" className="text-[13px] font-semibold text-[#FF5A1F] hover:underline">
+                <button
+                  type="button"
+                  onClick={() => setAccountSheetOpen(true)}
+                  className="text-[13px] font-semibold text-[#FF5A1F] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F] rounded"
+                >
                   Sync across devices
-                </Link>
+                </button>
               </div>
               <form onSubmit={handleSaveGuestProfile} className="mt-3.5 space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -560,19 +602,64 @@ const ProfilePage = () => {
           </section>
 
           {user && (
+            <section aria-labelledby="account-security-heading">
+              <h2 id="account-security-heading" className="mb-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
+                Account &amp; Security
+              </h2>
+              <div className="divide-y divide-white/10 overflow-hidden rounded-[22px] border border-white/10 bg-[#242424]">
+                <button
+                  type="button"
+                  onClick={() => setEditProfileOpen(true)}
+                  className="flex min-h-[56px] w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#303030]"
+                >
+                  <Pencil className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold text-white">Edit Profile</span>
+                    <span className="block truncate text-[13px] text-[#A3A3A3]">
+                      {profile?.phone ? `${displayName} · ${profile.phone}` : displayName}
+                    </span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setChangePasswordOpen(true)}
+                  className="flex min-h-[56px] w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#303030]"
+                >
+                  <KeyRound className="h-5 w-5 shrink-0 text-[#FF5A1F]" aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold text-white">Change Password</span>
+                    <span className="block text-[13px] text-[#A3A3A3]">Update your account password</span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-[#A3A3A3]" aria-hidden="true" />
+                </button>
+              </div>
+            </section>
+          )}
+
+          {user && (
             <button
               type="button"
+              disabled={signingOut}
               onClick={() => void handleSignOut()}
-              className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-[#242424] text-[14px] font-semibold text-[#A3A3A3] transition-colors hover:text-white"
+              className="bb-press flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-[#242424] text-[14px] font-semibold text-[#A3A3A3] transition-colors hover:text-white disabled:opacity-55"
             >
               <LogOut className="h-4 w-4" aria-hidden="true" />
-              Sign out
+              {signingOut ? "Signing out…" : "Sign out"}
             </button>
           )}
         </div>
       </div>
 
       <PrivateFeedbackSheet open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      <EditProfileSheet open={editProfileOpen} onOpenChange={setEditProfileOpen} />
+      <ChangePasswordSheet open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
+      <AccountRequiredSheet
+        open={accountSheetOpen}
+        onOpenChange={setAccountSheetOpen}
+        redirectTo="/profile"
+      />
     </div>
   );
 };

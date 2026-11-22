@@ -20,7 +20,16 @@ export default function SiteHeader() {
   const { openAssistant } = useRestaurantAssistant();
   const { unreadCount, openNotificationCenter } = useNotificationCenter();
 
-  if (pathname === "/" || pathname.startsWith("/admin")) return null;
+  if (
+    pathname === "/" ||
+    pathname === "/onboarding" ||
+    pathname.startsWith("/onboarding/") ||
+    pathname === "/auth" ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/admin")
+  ) {
+    return null;
+  }
 
   return (
     <header className="sticky top-0 z-40 hidden border-b border-white/10 bg-[#121212]/95 backdrop-blur-xl lg:block">

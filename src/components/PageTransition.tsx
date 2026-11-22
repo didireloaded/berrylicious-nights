@@ -19,9 +19,9 @@ export function PageTransition({ children }: { children: ReactNode }) {
 
   if (lastPathRef.current !== pathname) {
     const prev = lastPathRef.current;
-    if (pathname === "/") {
+    if (pathname === "/" || pathname === "/onboarding") {
       animClassRef.current = "";
-    } else if (prev === "/") {
+    } else if (prev === "/" || prev === "/onboarding") {
       animClassRef.current = "bb-page-welcome";
     } else if (navigationType === "POP") {
       animClassRef.current = "bb-page-pop";

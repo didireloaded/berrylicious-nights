@@ -1,110 +1,103 @@
-import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { toast } from "sonner";
+import {
+  readPendingRedirect,
+  sanitizeRedirectPath,
+  savePendingRedirect,
+} from "@/lib/authUtils";
+import { AuthLayout } from "@/components/auth/AuthLayout";
+import { AuthLoadingState } from "@/components/auth/AuthLoadingState";
+import { SignInForm } from "@/components/auth/SignInForm";
+import { SignUpForm } from "@/components/auth/SignUpForm";
+import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
+import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
+import { EmailVerificationState } from "@/components/auth/EmailVerificationState";
+import { ProfileSetup } from "@/components/auth/ProfileSetup";
 
-const AuthPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
-  const navigate = useNavigate();
+export type AuthScreenMode = "sign-in" | "sign-up" | "forgot" | "reset" | "verify" | "setup";
+
+interface AuthLocationState {
+  from?: string;
+  email?: string;
+}
+
+interface AuthPageProps {
+  mode?: AuthScreenMode;
+}
+
+function resolveMode(propMode: AuthScreenMode | undefined, queryMode: string | null): AuthScreenMode {
+  if (propMode) return propMode;
+  if (queryMode === "sign-up" || queryMode === "signup") return "sign-up";
+  if (queryMode === "forgot") return "forgot";
+  if (queryMode === "reset") return "reset";
+  if (queryMode === "verify") return "verify";
+  if (queryMode === "setup") return "setup";
+  return "sign-in";
+}
+
+const AuthPage = ({ mode: propMode }: AuthPageProps) => {
+  const { user, loading, isRecoverySession } = useAuth();
   const location = useLocation();
-  const redirectTo = (location.state as { from?: string } | null)?.from ?? "/";
+  const [searchParams] = useSearchParams();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const state = (location.state as AuthLocationState | null) ?? null;
+  const mode = resolveMode(propMode, searchParams.get("mode"));
 
-    if (isLogin) {
-      const { error } = await signIn(email, password);
-      if (error) {
-        toast.error(error);
-      } else {
-        toast.success("Welcome back");
-        navigate(redirectTo, { replace: true });
-      }
-    } else {
-      if (!name.trim()) {
-        toast.error("Please enter your name");
-        setLoading(false);
-        return;
-      }
-      const { error } = await signUp(email, password, name);
-      if (error) {
-        toast.error(error);
-      } else {
-        toast.success("Account created. Check your email to verify.");
-        setIsLogin(true);
-      }
+  const rawFrom =
+    state?.from ||
+    searchParams.get("next") ||
+    searchParams.get("redirect") ||
+    readPendingRedirect("/home");
+  const redirectTo = sanitizeRedirectPath(rawFrom, "/home");
+
+  // Preserve safe intended destination across auth sub-screens and verification callbacks
+  useEffect(() => {
+    if (state?.from || searchParams.get("next") || searchParams.get("redirect")) {
+      savePendingRedirect(redirectTo);
     }
-    setLoading(false);
-  };
+  }, [state?.from, searchParams, redirectTo]);
+
+  if (loading && mode !== "reset") {
+    return <AuthLoadingState message="Checking your session…" />;
+  }
+
+  if (isRecoverySession && mode !== "reset") {
+    return <Navigate to="/auth/reset" replace />;
+  }
+
+  // Already authenticated visitors skip sign-in / sign-up / forgot screens cleanly
+  if (user && !isRecoverySession && (mode === "sign-in" || mode === "sign-up" || mode === "forgot")) {
+    return <Navigate to={redirectTo} replace />;
+  }
+
+  // Optional profile setup requires an active authenticated session
+  if (!user && mode === "setup") {
+    return <Navigate to="/auth/sign-in" replace state={{ from: redirectTo }} />;
+  }
+
+  const backTarget =
+    mode === "forgot" || mode === "verify" || mode === "reset"
+      ? "/auth/sign-in"
+      : redirectTo === "/admin" || redirectTo === "/messages"
+        ? "/home"
+        : redirectTo;
 
   return (
-    <div className="min-h-screen pb-safe-nav flex flex-col items-center justify-center px-6 max-w-lg mx-auto">
-      <h1 className="font-display text-3xl font-bold text-foreground mb-2">
-        {isLogin ? "Welcome back" : "Join Butcher Block"}
-      </h1>
-      <p className="text-muted-foreground text-sm mb-8">
-        {isLogin ? "Sign in to your account" : "Create your account to get started"}
-      </p>
-
-      <form onSubmit={handleSubmit} className="w-full space-y-4">
-        {!isLogin && (
-          <div>
-            <label className="text-sm text-muted-foreground font-medium mb-1 block">Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              className="w-full bg-card border border-border rounded-lg py-3 px-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
-            />
-          </div>
-        )}
-        <div>
-          <label className="text-sm text-muted-foreground font-medium mb-1 block">Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            required
-            className="w-full bg-card border border-border rounded-lg py-3 px-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
-          />
-        </div>
-        <div>
-          <label className="text-sm text-muted-foreground font-medium mb-1 block">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-            minLength={6}
-            className="w-full bg-card border border-border rounded-lg py-3 px-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-primary text-primary-foreground font-semibold py-4 rounded-lg hover:opacity-90 transition-all active:scale-[0.97] disabled:opacity-40"
-        >
-          {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
-        </button>
-      </form>
-
-      <button
-        onClick={() => setIsLogin(!isLogin)}
-        className="text-muted-foreground text-sm mt-6 hover:text-foreground transition-colors"
-      >
-        {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
-      </button>
-    </div>
+    <AuthLayout backTo={backTarget} hideBack={mode === "setup"}>
+      {mode === "sign-in" && (
+        <SignInForm redirectTo={redirectTo} initialEmail={state?.email} />
+      )}
+      {mode === "sign-up" && <SignUpForm redirectTo={redirectTo} />}
+      {mode === "forgot" && (
+        <ForgotPasswordForm initialEmail={state?.email} redirectTo={redirectTo} />
+      )}
+      {mode === "reset" && <ResetPasswordForm />}
+      {mode === "verify" && (
+        <EmailVerificationState initialEmail={state?.email} redirectTo={redirectTo} />
+      )}
+      {mode === "setup" && <ProfileSetup redirectTo={redirectTo} />}
+    </AuthLayout>
   );
 };
 

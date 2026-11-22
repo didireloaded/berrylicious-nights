@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   AlertCircle,
   Clock3,
@@ -55,7 +55,7 @@ function defaultIcon(status: Exclude<FeatureAvailabilityStatus, "available">) {
   }
 }
 
-function renderAction(action: FeatureAvailabilityAction) {
+function renderAction(action: FeatureAvailabilityAction, currentPath: string) {
   const isPrimary = action.variant !== "secondary";
   const classes = cn(
     "inline-flex min-h-[44px] items-center justify-center rounded-full px-5 text-[14px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]",
@@ -65,8 +65,9 @@ function renderAction(action: FeatureAvailabilityAction) {
   );
 
   if (action.to) {
+    const authState = action.to.startsWith("/auth") ? { from: currentPath } : undefined;
     return (
-      <Link to={action.to} className={classes}>
+      <Link to={action.to} state={authState} onClick={action.onClick} className={classes}>
         {action.label}
       </Link>
     );
@@ -88,6 +89,8 @@ export function FeatureAvailabilityState({
   icon,
   className,
 }: FeatureAvailabilityStateProps) {
+  const location = useLocation();
+  const currentPath = `${location.pathname}${location.search}`;
   const badgeText =
     status === "coming_soon"
       ? "Coming soon"
@@ -125,8 +128,8 @@ export function FeatureAvailabilityState({
 
           {(primaryAction || secondaryAction) && (
             <div className="mt-4 flex flex-wrap gap-2.5">
-              {primaryAction && renderAction(primaryAction)}
-              {secondaryAction && renderAction({ ...secondaryAction, variant: "secondary" })}
+              {primaryAction && renderAction(primaryAction, currentPath)}
+              {secondaryAction && renderAction({ ...secondaryAction, variant: "secondary" }, currentPath)}
             </div>
           )}
         </div>

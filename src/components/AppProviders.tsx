@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { CartProvider, useCart } from "@/context/CartContext";
 import { AppProvider } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
@@ -23,6 +23,7 @@ function retryImport<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 const WelcomePage = lazy(() => retryImport(() => import("@/pages/HomePageEditorial")));
+const OnboardingPage = lazy(() => retryImport(() => import("@/pages/OnboardingPage")));
 const DashboardHomePage = lazy(() => retryImport(() => import("@/pages/DashboardHomePage")));
 const MenuPage = lazy(() => retryImport(() => import("@/pages/MenuPage")));
 const DrinksPage = lazy(() => retryImport(() => import("@/pages/DrinksPage")));
@@ -84,9 +85,41 @@ function RoutePrefetcher() {
   return null;
 }
 
+function isFullScreenFlow(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname === "/onboarding" ||
+    pathname.startsWith("/onboarding/") ||
+    pathname === "/auth" ||
+    pathname.startsWith("/auth/") ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/")
+  );
+}
+
+function RecoverySessionGuard() {
+  const { isRecoverySession } = useAuth();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isRecoverySession && pathname !== "/auth/reset") {
+      navigate("/auth/reset", { replace: true });
+    }
+  }, [isRecoverySession, pathname, navigate]);
+
+  return null;
+}
+
+function TableBarWrapper() {
+  const { pathname } = useLocation();
+  if (isFullScreenFlow(pathname)) return null;
+  return <TableContextBar />;
+}
+
 function ChromeWrapper() {
   const { pathname } = useLocation();
-  const noNav = pathname === "/" || pathname === "/admin" || pathname.startsWith("/menu/");
+  const noNav = isFullScreenFlow(pathname) || pathname.startsWith("/menu/");
   return noNav ? null : (
     <>
       <FloatingCartBar />
@@ -107,14 +140,16 @@ export default function AppProviders() {
                 <RestaurantAssistantProvider>
                   <ScrollToTop />
                   <RoutePrefetcher />
+                  <RecoverySessionGuard />
                   <OrderNotificationEffects />
                   <SiteHeader />
-                  <TableContextBar />
+                  <TableBarWrapper />
                   <main id="main-content" tabIndex={-1} className="min-h-dvh overflow-x-clip bg-[#121212] outline-none focus:outline-none">
                     <Suspense fallback={<PageLoader />}>
                       <PageTransition>
                         <Routes>
                           <Route path="/" element={<WelcomePage />} />
+                          <Route path="/onboarding" element={<OnboardingPage />} />
                           <Route path="/home" element={<DashboardHomePage />} />
                           <Route path="/menu" element={<MenuPage />} />
                           <Route path="/food" element={<Navigate to="/menu" replace />} />
@@ -131,6 +166,12 @@ export default function AppProviders() {
                           <Route path="/profile" element={<ProfilePage />} />
                           <Route path="/messages" element={<MessagesPage />} />
                           <Route path="/auth" element={<AuthPage />} />
+                          <Route path="/auth/sign-in" element={<AuthPage mode="sign-in" />} />
+                          <Route path="/auth/sign-up" element={<AuthPage mode="sign-up" />} />
+                          <Route path="/auth/forgot" element={<AuthPage mode="forgot" />} />
+                          <Route path="/auth/reset" element={<AuthPage mode="reset" />} />
+                          <Route path="/auth/verify" element={<AuthPage mode="verify" />} />
+                          <Route path="/auth/setup" element={<AuthPage mode="setup" />} />
                           <Route path="/admin" element={<AdminPage />} />
                           <Route path="/order/:id" element={<OrderTrackingPage />} />
                           <Route path="/table/:tableCode" element={<TableEntryPage />} />
