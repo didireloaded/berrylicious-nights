@@ -25,6 +25,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { MyReviewsSection } from "@/components/MyReviewsSection";
+import { MyOrdersSection } from "@/components/MyOrdersSection";
 import { RewardsAndGuestSection } from "@/components/RewardsAndGuestSection";
 import { menuItems } from "@/data/menu";
 import { supabase } from "@/integrations/supabase/client";
@@ -440,42 +441,8 @@ const ProfilePage = () => {
             </section>
           )}
 
-          {/* Order Receipts */}
-          {orders.length > 0 && (
-            <section aria-labelledby="profile-orders-heading">
-              <h2 id="profile-orders-heading" className="mb-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#A3A3A3]">
-                Order Receipts
-              </h2>
-              <div className="space-y-2">
-                {orders.map((o, i) => (
-                  <div
-                    key={o.id || String(i)}
-                    className="flex items-center justify-between gap-3 rounded-[20px] border border-white/10 bg-[#242424] px-4 py-3.5"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14px] font-semibold text-white">
-                        {Array.isArray(o.items) ? o.items.map((x) => x.name).filter(Boolean).join(", ") || "Order" : "Order"}
-                      </p>
-                      <p className="mt-0.5 text-[12px] text-[#A3A3A3]">
-                        {o.id ? `#BB-${String(o.id).slice(0, 6).toUpperCase()} · ` : ""}
-                        {new Date(o.created_at || o.createdAt || "").toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="text-[14px] font-bold tabular-nums text-[#FF5A1F]">
-                        {formatPrice(Number(o.total))}
-                      </span>
-                      {o.id && (
-                        <Link to={`/order/${o.id}`} className="text-[13px] font-semibold text-white hover:text-[#FF5A1F]">
-                          Receipt
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          {/* Dedicated Secure Order History + Revalidated One-Tap Reorder */}
+          <MyOrdersSection />
 
           {/* User's verified dish reviews */}
           <MyReviewsSection />
