@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { notifyOrderStatusTransition } from "@/lib/orderStatusNotify";
 import { ArrivalCodeCard } from "@/components/ArrivalCodeCard";
 import { OrderReviewSheet } from "@/components/OrderReviewSheet";
+import { ReorderPreviewSheet } from "@/components/ReorderPreviewSheet";
 
 const WHILE_WAIT_MENU_IDS = ["14", "12", "19"];
 
@@ -128,6 +129,7 @@ const OrderTrackingPage = () => {
   const [etaRemaining, setEtaRemaining] = useState<number | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [reorderOpen, setReorderOpen] = useState(false);
   const [isOffline, setIsOffline] = useState(() => (typeof navigator !== "undefined" ? !navigator.onLine : false));
 
   useEffect(() => {
@@ -656,6 +658,15 @@ const OrderTrackingPage = () => {
               {order.arrival_code ? ` or code ${order.arrival_code}` : ""} to staff on collection or at your table.
             </p>
           )}
+          {isCompleted && (
+            <button
+              type="button"
+              onClick={() => setReorderOpen(true)}
+              className="mt-4 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-[#303030] text-[14px] font-bold text-white transition-colors hover:bg-[#3A3A3A]"
+            >
+              Order Again (Revalidate Prices)
+            </button>
+          )}
         </section>
 
         {/* Corrections & Cancellation Support for Active Orders */}
@@ -742,6 +753,13 @@ const OrderTrackingPage = () => {
         orderStatus={String(order.status ?? "pending")}
         orderItems={order.items}
         guestAccessToken={order.guest_access_token}
+      />
+
+      <ReorderPreviewSheet
+        open={reorderOpen}
+        onOpenChange={setReorderOpen}
+        orderNumber={orderNumber}
+        orderItems={order.items}
       />
     </div>
   );
