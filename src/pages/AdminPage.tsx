@@ -187,14 +187,21 @@ const AdminPage = () => {
     });
     if (rpcErr) {
       const msg = `${rpcErr.code ?? ""} ${rpcErr.message ?? ""}`.toLowerCase();
-      if (msg.includes("pgrst202") || msg.includes("does not exist") || msg.includes("schema cache")) {
-        // Fallback when Phase 1 SQL migration has not yet been applied to remote Supabase
+      const missingRpc =
+        msg.includes("pgrst202") || msg.includes("42883") || msg.includes("does not exist") || msg.includes("schema cache");
+      const allowLegacyFallback =
+        String(import.meta.env.VITE_ALLOW_LEGACY_SCHEMA_FALLBACK ?? "").trim().toLowerCase() === "true";
+
+      if (missingRpc && allowLegacyFallback) {
         const legacyStatus = status === "confirmed" ? "preparing" : status === "handover" ? "completed" : status;
         const { error: fallbackErr } = await supabase.from("orders").update({ status: legacyStatus }).eq("id", id);
         if (fallbackErr) {
           toast.error(fallbackErr.message || "Could not update order status");
           return;
         }
+      } else if (missingRpc) {
+        toast.error("Order transition RPC is not deployed on this database. Apply Supabase migrations before updating kitchen statuses.");
+        return;
       } else {
         toast.error(rpcErr.message || "Status change rejected");
         return;

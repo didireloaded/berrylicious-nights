@@ -6,7 +6,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: "./",
+  base: "/",
   server: {
     // true → listen on all addresses; avoids -102 / connection issues some clients have with "::" + localhost
     host: true,
@@ -22,17 +22,17 @@ export default defineConfig(({ mode }) => ({
       injectRegister: "auto",
       includeAssets: ["icon.svg", "robots.txt", "placeholder.svg"],
       manifest: {
-        id: "./",
-        name: "Berrylicious",
-        short_name: "Berrylicious",
+        id: "/",
+        name: "Butcher Block Steakhouse",
+        short_name: "Butcher Block",
         description:
-          "Book a table, browse the menu, and order — premium dining in Windhoek.",
+          "Order wet-aged Namibian steaks, reserve your table, and track your meal at Butcher Block Steakhouse, Windhoek.",
         theme_color: "#121212",
         background_color: "#121212",
         display: "standalone",
         display_override: ["standalone", "minimal-ui", "browser"],
-        scope: "./",
-        start_url: "./",
+        scope: "/",
+        start_url: "/",
         lang: "en",
         dir: "ltr",
         categories: ["food", "lifestyle"],
@@ -54,7 +54,19 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg,woff2}"],
         navigateFallback: "index.html",
-        navigateFallbackDenylist: [/^\/functions\//],
+        navigateFallbackDenylist: [/^\/functions\//, /^\/auth\/v1\//, /^\/rest\/v1\//],
+        // Strictly prevent shared service-worker caching of private Supabase API,
+        // authentication tokens, customer orders, profiles, or payment responses.
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/[^/]+\.supabase\.co\/(auth|rest|functions|realtime|storage)\//i,
+            handler: "NetworkOnly",
+          },
+          {
+            urlPattern: /^http:\/\/(localhost|127\.0\.0\.1):54321\/(auth|rest|functions|realtime|storage)\//i,
+            handler: "NetworkOnly",
+          },
+        ],
       },
       devOptions: {
         enabled: false,

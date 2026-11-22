@@ -265,6 +265,8 @@ export default function CartPage() {
 
     let orderId: string;
     let arrivalCode: string | null = null;
+    let authoritativeTotal = validated.total;
+    let authoritativeItems: unknown = validated.items;
     try {
       const row = await insertOrderWithArrivalCode(
         {
@@ -276,13 +278,31 @@ export default function CartPage() {
           ...(orderType === "dinein" && tableSession ? { table_session_id: tableSession.sessionId } : {}),
           ...(guestAccessTokenHash ? { guest_access_token_hash: guestAccessTokenHash } : {}),
         },
-        { idempotencyId: stableOrderId },
+        {
+          idempotencyId: stableOrderId,
+          tableSessionToken: orderType === "dinein" ? tableSession?.sessionToken ?? null : null,
+          orderMeta,
+        },
       );
       orderId = row.id;
       arrivalCode = row.arrival_code ?? null;
+      if (typeof row.total === "number" && Number.isFinite(row.total)) {
+        authoritativeTotal = row.total;
+      }
+      if (Array.isArray(row.items)) {
+        authoritativeItems = row.items;
+      }
     } catch (error) {
       console.error("[CartPage] Unable to place order", error);
-      toast.error("Your order could not be placed. Nothing was submitted. Please try again.");
+      const rawMsg = error instanceof Error ? error.message : String((error as { message?: string })?.message ?? "");
+      const friendly =
+        rawMsg.toLowerCase().includes("unavailable")
+          ? "One or more items in your cart were just marked unavailable by the kitchen. Please refresh and adjust your cart."
+          : rawMsg.toLowerCase().includes("table session")
+            ? "Your table session expired. Please re-scan the table QR code or switch to Pickup."
+            : "Your order could not be placed. Nothing was submitted. Please try again.";
+      setFormError(friendly);
+      toast.error(friendly);
       submittingRef.current = false;
       setSubmitting(false);
       return;
@@ -304,8 +324,8 @@ export default function CartPage() {
 
     const snapshot: TrackableOrderSnapshot = {
       id: orderId,
-      items: full?.items ?? validated.items,
-      total: Number(full?.total ?? validated.total),
+      items: full?.items ?? authoritativeItems,
+      total: Number(full?.total ?? authoritativeTotal),
       status: String(full?.status ?? "pending"),
       order_type: typeof full?.order_type === "string" ? full.order_type : orderType,
       table_number: orderMeta.tableNumber,
